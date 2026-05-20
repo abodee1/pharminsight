@@ -88,7 +88,7 @@ function PharmacyProfile() {
       if (p) {
         const { data: d } = await supabase
           .from("dispensing_data")
-          .select("month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations,gross_cost,pharmacy_first_payment,mcr_payment,mcr_registrations,mcr_items,ehc_items,methadone_items,supervised_methadone_doses,smoking_cessation,smoking_cessation_payment,final_payment,is_actual_payment")
+          .select("month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations,gross_cost,pharmacy_first_payment,mcr_payment,mcr_registrations,mcr_items,ehc_items,methadone_items,supervised_methadone_doses,smoking_cessation,smoking_cessation_payment,final_payment,is_actual_payment,pharmacy_first_services")
           .eq("pharmacy_id", (p as Pharmacy).id)
           .order("year", { ascending: true })
           .order("month", { ascending: true });
