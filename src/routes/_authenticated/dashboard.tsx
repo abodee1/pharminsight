@@ -98,7 +98,16 @@ function Dashboard() {
         if (!byPeriod.has(k)) byPeriod.set(k, []);
         byPeriod.get(k)!.push(r);
       });
-      const periods = [...byPeriod.keys()].sort((a, b) => a - b).slice(-24);
+      // Only keep periods with confirmed (non-provisional) data so sparklines aren't dragged to 0
+      const allPeriods = [...byPeriod.keys()].sort((a, b) => a - b);
+      const periods = allPeriods
+        .filter((k) => {
+          const rows = byPeriod.get(k)!;
+          return ph
+            ? rows.some((r) => r.pharmacy_id === ph.id && r.is_actual_payment)
+            : rows.some((r) => r.is_actual_payment);
+        })
+        .slice(-24);
 
       // Build mine vs national series (last 12 of those)
       const last12 = periods.slice(-12);
