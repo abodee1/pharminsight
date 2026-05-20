@@ -18,13 +18,46 @@ export const Route = createFileRoute("/_authenticated/compare")({ component: Com
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-const METRICS = [
-  { key: "items_dispensed", label: "Items dispensed", short: "Items" },
-  { key: "nms_count", label: "NMS", short: "NMS" },
-  { key: "pharmacy_first_count", label: "Pharmacy First", short: "PF" },
-  
-  { key: "eps_items", label: "EPS items", short: "EPS" },
-] as const;
+type MetricDef = {
+  key: string;
+  label: string;
+  short: string;
+  group: "volume" | "rate";
+  compute: (r: Row | undefined) => number;
+  format: (v: number) => string;
+};
+
+const fmtInt = (v: number) => Math.round(v).toLocaleString();
+const fmtRate = (v: number) => v.toFixed(1);
+const fmtPct = (v: number) => `${v.toFixed(1)}%`;
+
+const METRICS: MetricDef[] = [
+  // Raw volume metrics
+  { key: "items_dispensed", label: "Items dispensed", short: "Items", group: "volume",
+    compute: (r) => r?.items_dispensed ?? 0, format: fmtInt },
+  { key: "nms_count", label: "NMS consultations", short: "NMS", group: "volume",
+    compute: (r) => r?.nms_count ?? 0, format: fmtInt },
+  { key: "pharmacy_first_count", label: "Pharmacy First", short: "PF", group: "volume",
+    compute: (r) => r?.pharmacy_first_count ?? 0, format: fmtInt },
+  { key: "eps_items", label: "EPS items", short: "EPS", group: "volume",
+    compute: (r) => r?.eps_items ?? 0, format: fmtInt },
+  // Derived service-intensity metrics — far more comparable across pharmacy size
+  { key: "pf_per_1k", label: "PF per 1k items", short: "PF/1k", group: "rate",
+    compute: (r) => {
+      const items = r?.items_dispensed ?? 0;
+      return items > 0 ? ((r?.pharmacy_first_count ?? 0) * 1000) / items : 0;
+    }, format: fmtRate },
+  { key: "nms_per_1k", label: "NMS per 1k items", short: "NMS/1k", group: "rate",
+    compute: (r) => {
+      const items = r?.items_dispensed ?? 0;
+      return items > 0 ? ((r?.nms_count ?? 0) * 1000) / items : 0;
+    }, format: fmtRate },
+  { key: "eps_share", label: "EPS share", short: "EPS %", group: "rate",
+    compute: (r) => {
+      const items = r?.items_dispensed ?? 0;
+      return items > 0 ? ((r?.eps_items ?? 0) / items) * 100 : 0;
+    }, format: fmtPct },
+];
 
 const SERIES_COLORS = [
   "var(--cmp-1)",
