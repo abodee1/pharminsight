@@ -14,36 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _scot_metrics_staging: {
-        Row: {
-          mcr_items: number
-          mcr_registrations: number
-          month: number
-          ods_code: string
-          smoking_cessation_payment: number
-          supervised_methadone_doses: number
-          year: number
-        }
-        Insert: {
-          mcr_items?: number
-          mcr_registrations?: number
-          month: number
-          ods_code: string
-          smoking_cessation_payment?: number
-          supervised_methadone_doses?: number
-          year: number
-        }
-        Update: {
-          mcr_items?: number
-          mcr_registrations?: number
-          month?: number
-          ods_code?: string
-          smoking_cessation_payment?: number
-          supervised_methadone_doses?: number
-          year?: number
-        }
-        Relationships: []
-      }
       ai_insights: {
         Row: {
           generated_at: string
@@ -450,7 +420,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      _apply_scot_metrics: { Args: never; Returns: number }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
