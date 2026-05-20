@@ -93,12 +93,22 @@
   --sidebar-accent: oklch(0.26 0.035 260);
   --sidebar-border: oklch(0.28 0.03 260);
 
-  /* Charts — monochromatic slate scale */
+  /* Charts — monochromatic slate scale (for single-series charts) */
   --chart-1: oklch(0.22 0.035 260);  /* near-black slate */
   --chart-2: oklch(0.42 0.035 260);  /* dark slate */
   --chart-3: oklch(0.60 0.025 260);  /* mid slate */
   --chart-4: oklch(0.75 0.015 260);  /* light slate */
   --chart-5: oklch(0.88 0.008 260);  /* very light slate */
+
+  /* Comparison palette — distinct hues for multi-series side-by-side charts */
+  --cmp-1: oklch(0.55 0.18 250);   /* blue */
+  --cmp-2: oklch(0.62 0.18 35);    /* warm orange */
+  --cmp-3: oklch(0.58 0.16 155);   /* emerald */
+  --cmp-4: oklch(0.55 0.20 310);   /* violet */
+  --color-cmp-1: var(--cmp-1);
+  --color-cmp-2: var(--cmp-2);
+  --color-cmp-3: var(--cmp-3);
+  --color-cmp-4: var(--cmp-4);
 }
 
 @layer base {

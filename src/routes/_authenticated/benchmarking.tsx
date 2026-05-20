@@ -173,9 +173,9 @@ function Benchmarking() {
                     <PolarGrid stroke="var(--border)" />
                     <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
                     <PolarRadiusAxis tick={{ fontSize: 10 }} angle={30} />
-                    <Radar name="Mine" dataKey="Mine" stroke="var(--chart-2)" fill="var(--chart-2)" fillOpacity={0.5} />
-                    <Radar name="Local" dataKey="Local" stroke="var(--chart-3)" fill="var(--chart-3)" fillOpacity={0.2} />
-                    <Radar name="National" dataKey="National" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.15} />
+                    <Radar name="Mine" dataKey="Mine" stroke="var(--cmp-1)" fill="var(--cmp-1)" fillOpacity={0.45} />
+                    <Radar name="Local" dataKey="Local" stroke="var(--cmp-2)" fill="var(--cmp-2)" fillOpacity={0.25} />
+                    <Radar name="National" dataKey="National" stroke="var(--cmp-3)" fill="var(--cmp-3)" fillOpacity={0.2} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                     <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12 }} />
                   </RadarChart>
