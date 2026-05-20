@@ -87,7 +87,11 @@ function AdminDataPage() {
       }
       const path = opts?.reingest ? `${basePath}?reingest=1` : basePath;
       const res = await fetch(path, { method: "POST" });
-      const json = await res.json();
+      const text = await res.text();
+      let json: { ok?: boolean; error?: string; reset?: number; queued?: number; processed?: number; pending?: number } = {};
+      try { json = JSON.parse(text); } catch {
+        throw new Error(`Server returned non-JSON (HTTP ${res.status}): ${text.slice(0, 140)}`);
+      }
       if (!res.ok || !json.ok) throw new Error(json.error || `HTTP ${res.status}`);
       toast.success(
         opts?.reingest
