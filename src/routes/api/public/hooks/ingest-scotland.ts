@@ -70,45 +70,51 @@ function isProvisional(year: number | null, month: number | null) {
   return false;
 }
 
-// Minimal RFC-4180-ish CSV parser (handles quoted fields, commas, newlines).
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
+// Streaming CSV parser — never holds the full file in memory.
+// Calls onRow(cells) for each row as it arrives.
+async function streamCsv(url: string, onRow: (cells: string[]) => void) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Fetch ${res.status}`);
+  if (!res.body) throw new Error("Response has no body stream");
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
   let row: string[] = [];
   let cell = "";
   let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (text[i + 1] === '"') { cell += '"'; i++; }
-        else inQuotes = false;
-      } else cell += ch;
-    } else {
-      if (ch === '"') inQuotes = true;
-      else if (ch === ",") { row.push(cell); cell = ""; }
-      else if (ch === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; }
-      else if (ch === "\r") { /* skip */ }
-      else cell += ch;
+  const flushRow = () => { row.push(cell); onRow(row); row = []; cell = ""; };
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const text = decoder.decode(value, { stream: true });
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { cell += '"'; i++; }
+          else inQuotes = false;
+        } else cell += ch;
+      } else {
+        if (ch === '"') inQuotes = true;
+        else if (ch === ",") { row.push(cell); cell = ""; }
+        else if (ch === "\n") { flushRow(); }
+        else if (ch === "\r") { /* skip */ }
+        else cell += ch;
+      }
     }
   }
-  if (cell.length || row.length) { row.push(cell); rows.push(row); }
-  return rows;
+  // Tail
+  const tail = decoder.decode();
+  for (let i = 0; i < tail.length; i++) {
+    const ch = tail[i];
+    if (inQuotes) { if (ch === '"') inQuotes = false; else cell += ch; }
+    else if (ch === ",") { row.push(cell); cell = ""; }
+    else if (ch === "\n") { flushRow(); }
+    else if (ch !== "\r") cell += ch;
+  }
+  if (cell.length || row.length) flushRow();
 }
 
-function csvToObjects(text: string): Record<string, string>[] {
-  const rows = parseCsv(text);
-  if (rows.length < 2) return [];
-  const header = rows[0].map((h) => h.trim());
-  const out: Record<string, string>[] = [];
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
-    if (r.length === 1 && r[0] === "") continue;
-    const obj: Record<string, string> = {};
-    header.forEach((h, idx) => (obj[h] = (r[idx] ?? "").trim()));
-    out.push(obj);
-  }
-  return out;
-}
+
 
 async function discover() {
   // Pre-fetch the full set of already-successful URLs for this source in one go.
@@ -182,51 +188,12 @@ async function processQueueItem(item: {
     .eq("id", item.id);
 
   try {
-    const csvRes = await fetch(item.resource_url);
-    if (!csvRes.ok) throw new Error(`Fetch ${csvRes.status}`);
-    const text = await csvRes.text();
-    const rows = csvToObjects(text);
-    if (!rows.length) throw new Error("Empty CSV");
-
-    // Identify ods/name/region/items columns flexibly
-    const first = rows[0];
-    const headers = Object.keys(first);
-    const findHeader = (variants: string[]): string | undefined => {
-      const lower = new Map(headers.map((h) => [h.toLowerCase().replace(/[\s_]/g, ""), h]));
-      for (const v of variants) {
-        const norm = v.toLowerCase().replace(/[\s_]/g, "");
-        const found = lower.get(norm);
-        if (found) return found;
-      }
-      return undefined;
-    };
-    const logMissing = async (field: string, variants: string[]) => {
-      await supabaseAdmin.from("schema_alerts").insert({
-        source: SOURCE,
-        dataset: item.dataset,
-        resource_url: item.resource_url,
-        missing_field: field,
-        tried_variants: variants,
-        available_headers: headers,
-      });
-    };
-
-    const odsKey = findHeader([
-      "DispensLocationCode",
-      "DispenserLocationCode",
-      "DispLocationCode",
-      "DispenserLocation",
-      "ContractorCode",
-      "Contractor",
-    ]);
-    const nameKey = findHeader(["DispensLocationName", "DispenserLocationName", "DispLocationName", "ContractorName"]);
-    const regionKey = findHeader(["HBName", "HealthBoardName", "HBT", "HB"]);
-    const itemsKey = findHeader(["NumberOfPaidItems", "PaidQuantity", "Items"]);
-    const monthKey = findHeader(["PaidDateMonth"]);
-    const yearKey = findHeader(["Year"]);
-
-    // Payment / service field mapping with multiple known variants per field.
-    const PAYMENT_FIELDS = {
+    // STREAMING: aggregate per (ods, year, month) without buffering the full CSV.
+    // Memory stays ~O(unique pharmacies × months in file), not O(file size).
+    type PField =
+      | "pharmacy_first_payment" | "mcr_payment" | "ehc_items"
+      | "methadone_items" | "smoking_cessation" | "gross_cost" | "final_payment";
+    const PAYMENT_FIELDS: Record<PField, string[]> = {
       pharmacy_first_payment: ["PharmacyFirstPayment", "Pharmacy_First_Payment", "PF_Payment", "PFPayment", "PharmFirstPayment"],
       mcr_payment: ["MCRPayment", "MCR_Payment", "MedicinesCareReview", "MCR_Total"],
       ehc_items: ["EHCItems", "EHC_Items", "EHC", "EmergencyContraception"],
@@ -234,75 +201,106 @@ async function processQueueItem(item: {
       smoking_cessation: ["SmokingCessation", "Smoking_Cessation", "SmokingCessationItems", "SC_Items"],
       gross_cost: ["GrossIngredientCost", "Gross_Cost", "GIC", "GrossIngCost", "GICTotal"],
       final_payment: ["FinalPayment", "FinalPayments", "Final_Payment", "TotalPayment", "NetPayment", "Total_Net_Payment"],
-    } as const;
-    type PField = keyof typeof PAYMENT_FIELDS;
-
-    const paymentKeyByField: Partial<Record<PField, string>> = {};
-    const isContractorActivity = item.dataset === "community-pharmacy-contractor-activity";
-    for (const f of Object.keys(PAYMENT_FIELDS) as PField[]) {
-      const k = findHeader([...PAYMENT_FIELDS[f]]);
-      if (k) paymentKeyByField[f] = k;
-      else if (isContractorActivity) await logMissing(f, [...PAYMENT_FIELDS[f]]);
-    }
-
-    if (!odsKey) throw new Error("No ods code column found");
-
-    const num = (v: string | undefined) =>
-      v ? Number(String(v).replace(/[£,]/g, "")) || 0 : 0;
-
-    // Aggregate rows by (ods_code, year, month)
-    type Agg = {
-      ods_code: string;
-      name: string;
-      region: string | null;
-      year: number;
-      month: number;
-      items: number;
-      payments: Record<PField, number>;
     };
     const blankPayments = (): Record<PField, number> => ({
       pharmacy_first_payment: 0, mcr_payment: 0, ehc_items: 0,
       methadone_items: 0, smoking_cessation: 0, gross_cost: 0, final_payment: 0,
     });
+
+    type Agg = {
+      ods_code: string; name: string; region: string | null;
+      year: number; month: number; items: number; payments: Record<PField, number>;
+    };
     const agg = new Map<string, Agg>();
 
-    for (const row of rows) {
-      const ods = row[odsKey];
-      if (!ods) continue;
+    let headers: string[] = [];
+    let headerIdx: Record<string, number> = {};
+    let odsIdx = -1, nameIdx = -1, regionIdx = -1, itemsIdx = -1, monthIdx = -1, yearIdx = -1;
+    const paymentIdxByField: Partial<Record<PField, number>> = {};
+    const missingPayments: PField[] = [];
+
+    const findIdx = (variants: string[]): number => {
+      for (const v of variants) {
+        const norm = v.toLowerCase().replace(/[\s_]/g, "");
+        const idx = headerIdx[norm];
+        if (idx !== undefined) return idx;
+      }
+      return -1;
+    };
+    const num = (v: string | undefined) =>
+      v ? Number(String(v).replace(/[£,"]/g, "").trim()) || 0 : 0;
+
+    let rowCount = 0;
+    await streamCsv(item.resource_url, (cells) => {
+      if (rowCount === 0) {
+        headers = cells.map((c) => c.trim());
+        headerIdx = {};
+        headers.forEach((h, i) => { headerIdx[h.toLowerCase().replace(/[\s_]/g, "")] = i; });
+        odsIdx = findIdx(["DispensLocationCode", "DispenserLocationCode", "DispLocationCode", "DispenserLocation", "ContractorCode", "Contractor"]);
+        nameIdx = findIdx(["DispensLocationName", "DispenserLocationName", "DispLocationName", "ContractorName"]);
+        regionIdx = findIdx(["HBName", "HealthBoardName", "HBT", "HB"]);
+        itemsIdx = findIdx(["NumberOfPaidItems", "PaidQuantity", "Items"]);
+        monthIdx = findIdx(["PaidDateMonth"]);
+        yearIdx = findIdx(["Year"]);
+        for (const f of Object.keys(PAYMENT_FIELDS) as PField[]) {
+          const idx = findIdx(PAYMENT_FIELDS[f]);
+          if (idx >= 0) paymentIdxByField[f] = idx;
+          else if (item.dataset === "community-pharmacy-contractor-activity") missingPayments.push(f);
+        }
+        rowCount++;
+        return;
+      }
+      rowCount++;
+      if (cells.length === 1 && cells[0] === "") return;
+      if (odsIdx < 0) return;
+      const ods = (cells[odsIdx] ?? "").trim();
+      if (!ods) return;
 
       let year = item.year ?? 0;
       let month = item.month ?? 0;
-      if (monthKey && row[monthKey]) {
-        const s = row[monthKey];
+      if (monthIdx >= 0) {
+        const s = (cells[monthIdx] ?? "").trim();
         if (/^\d{6}$/.test(s)) { year = +s.slice(0, 4); month = +s.slice(4, 6); }
       }
-      if (yearKey && row[yearKey] && /^\d{4}$/.test(row[yearKey])) {
-        year = +row[yearKey];
-        if (!monthKey) month = 0; // annual aggregate sentinel
+      if (yearIdx >= 0) {
+        const ys = (cells[yearIdx] ?? "").trim();
+        if (/^\d{4}$/.test(ys)) {
+          year = +ys;
+          if (monthIdx < 0) month = 0;
+        }
       }
-      if (!year) continue;
+      if (!year) return;
 
       const key = `${ods}|${year}|${month}`;
-      const items = itemsKey ? num(row[itemsKey]) : 0;
-
       let cur = agg.get(key);
       if (!cur) {
         cur = {
           ods_code: ods,
-          name: nameKey ? row[nameKey] || ods : ods,
-          region: regionKey ? row[regionKey] || null : null,
+          name: nameIdx >= 0 ? ((cells[nameIdx] ?? "").trim() || ods) : ods,
+          region: regionIdx >= 0 ? ((cells[regionIdx] ?? "").trim() || null) : null,
           year, month, items: 0, payments: blankPayments(),
         };
         agg.set(key, cur);
-      } else {
-        cur.items += 0; // placeholder; updated below
       }
-      cur.items += items;
+      if (itemsIdx >= 0) cur.items += num(cells[itemsIdx]);
       for (const f of Object.keys(PAYMENT_FIELDS) as PField[]) {
-        const k = paymentKeyByField[f];
-        if (k) cur.payments[f] += num(row[k]);
+        const idx = paymentIdxByField[f];
+        if (idx !== undefined) cur.payments[f] += num(cells[idx]);
       }
+    });
+
+    if (odsIdx < 0) throw new Error("No ods code column found");
+    if (rowCount <= 1) throw new Error("Empty CSV");
+
+    // Log missing payment columns once per file (not per row)
+    for (const f of missingPayments) {
+      await supabaseAdmin.from("schema_alerts").insert({
+        source: SOURCE, dataset: item.dataset, resource_url: item.resource_url,
+        missing_field: f, tried_variants: PAYMENT_FIELDS[f], available_headers: headers,
+      });
     }
+
+
 
 
     // Upsert pharmacies in chunks
@@ -401,19 +399,31 @@ async function processQueueItem(item: {
   }
 }
 
+// Priority order: contractor-activity (payment data) first, then prescribed-dispensed,
+// then the heavy prescriptions-in-the-community files.
+const DATASET_PRIORITY = [
+  "community-pharmacy-contractor-activity",
+  "prescribed-dispensed",
+  "prescriptions-in-the-community",
+];
+
 async function runBatch(batchSize = 3) {
-  const { data: queue, error } = await supabaseAdmin
-    .from("ingestion_queue")
-    .select("id, dataset, resource_url, year, month")
-    .eq("source", SOURCE)
-    .eq("status", "pending")
-    .order("year", { ascending: false })
-    .order("month", { ascending: false })
-    .limit(batchSize);
-  if (error) throw error;
-  if (!queue?.length) return [];
-  return Promise.all(queue.map(processQueueItem));
+  for (const ds of DATASET_PRIORITY) {
+    const { data: queue, error } = await supabaseAdmin
+      .from("ingestion_queue")
+      .select("id, dataset, resource_url, year, month")
+      .eq("source", SOURCE)
+      .eq("status", "pending")
+      .eq("dataset", ds)
+      .order("year", { ascending: false })
+      .order("month", { ascending: false })
+      .limit(batchSize);
+    if (error) throw error;
+    if (queue?.length) return Promise.all(queue.map(processQueueItem));
+  }
+  return [];
 }
+
 
 export const Route = createFileRoute("/api/public/hooks/ingest-scotland")({
   server: {
