@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAll } from "@/lib/fetchAll";
 import { PageHeader } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
@@ -54,12 +55,19 @@ function Compare() {
 
   useEffect(() => {
     (async () => {
-      const [{ data: p }, { data: d }] = await Promise.all([
-        supabase.from("pharmacies").select("id,name,region,country,postcode").order("name"),
-        supabase.from("dispensing_data").select("pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations"),
+      const [p, d] = await Promise.all([
+        fetchAll<Pharm>((from, to) =>
+          supabase.from("pharmacies").select("id,name,region,country,postcode").order("name").range(from, to)
+        ),
+        fetchAll<Row>((from, to) =>
+          supabase
+            .from("dispensing_data")
+            .select("pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations")
+            .range(from, to)
+        ),
       ]);
-      setPharms((p || []) as Pharm[]);
-      setRows((d || []) as Row[]);
+      setPharms(p);
+      setRows(d);
 
       if (user) {
         const { data: up } = await supabase
