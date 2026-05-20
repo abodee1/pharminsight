@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAll } from "@/lib/fetchAll";
 import { PageHeader } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,12 +27,12 @@ function Benchmarking() {
 
   useEffect(() => {
     (async () => {
-      const [{ data: p }, { data: d }] = await Promise.all([
-        supabase.from("pharmacies").select("*"),
-        supabase.from("dispensing_data").select("*"),
+      const [p, d] = await Promise.all([
+        fetchAll<any>((from, to) => supabase.from("pharmacies").select("*").range(from, to)),
+        fetchAll<any>((from, to) => supabase.from("dispensing_data").select("*").range(from, to)),
       ]);
-      setPharms(p || []);
-      setRows(d || []);
+      setPharms(p);
+      setRows(d);
       if (user) {
         const { data: up } = await supabase.from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle();
         if (up) {

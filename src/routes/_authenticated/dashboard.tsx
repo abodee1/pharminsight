@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAll } from "@/lib/fetchAll";
 import { PageHeader, StatCard } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import {
@@ -43,10 +44,13 @@ function Dashboard() {
       if (!ph) return;
       setPharmacy(ph as Pharmacy);
 
-      const { data: all } = await supabase
-        .from("dispensing_data")
-        .select("pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count");
-      const rows = (all || []) as Row[];
+      const all = await fetchAll<Row>((from, to) =>
+        supabase
+          .from("dispensing_data")
+          .select("pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count")
+          .range(from, to)
+      );
+      const rows = all;
 
       // build 12-month series for mine vs national avg
       const periods = Array.from(
