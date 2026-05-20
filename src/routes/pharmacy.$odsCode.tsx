@@ -62,6 +62,8 @@ function PharmacyProfile() {
   const [hasUserPharmacy, setHasUserPharmacy] = useState<boolean | null>(null);
   const [ranks, setRanks] = useState<Partial<Record<RankKey, { rank: number; total: number }>>>({});
   const [hasFp34c, setHasFp34c] = useState(false);
+  const [pfPeerAvg, setPfPeerAvg] = useState<Record<string, number> | null>(null);
+  const [pfPeerCount, setPfPeerCount] = useState(0);
 
   useEffect(() => {
     (async () => {
