@@ -74,6 +74,7 @@ export type Database = {
           nms_count: number
           pharmacy_first_count: number
           pharmacy_first_payment: number
+          pharmacy_first_services: Json
           pharmacy_id: string
           smoking_cessation: number
           smoking_cessation_payment: number
@@ -101,6 +102,7 @@ export type Database = {
           nms_count?: number
           pharmacy_first_count?: number
           pharmacy_first_payment?: number
+          pharmacy_first_services?: Json
           pharmacy_id: string
           smoking_cessation?: number
           smoking_cessation_payment?: number
@@ -128,6 +130,7 @@ export type Database = {
           nms_count?: number
           pharmacy_first_count?: number
           pharmacy_first_payment?: number
+          pharmacy_first_services?: Json
           pharmacy_id?: string
           smoking_cessation?: number
           smoking_cessation_payment?: number
