@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAll } from "@/lib/fetchAll";
 import { PageHeader } from "@/components/PageHeader";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -54,14 +55,16 @@ function SettingsPage() {
 
   useEffect(() => {
     (async () => {
-      const [{ data: p }, { data: ups }] = await Promise.all([
-        supabase.from("pharmacies").select("*").order("name"),
+      const [p, ups] = await Promise.all([
+        fetchAll<any>((from, to) =>
+          supabase.from("pharmacies").select("*").order("name").range(from, to)
+        ),
         user
-          ? supabase.from("private_uploads").select("*").eq("user_id", user.id).order("created_at", { ascending: false })
-          : Promise.resolve({ data: [] as any[] }),
+          ? supabase.from("private_uploads").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).then((r) => r.data || [])
+          : Promise.resolve([] as any[]),
       ]);
-      setPharms(p || []);
-      setUploads(ups || []);
+      setPharms(p);
+      setUploads(ups);
       if (user) {
         const { data: up } = await supabase
           .from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle();
