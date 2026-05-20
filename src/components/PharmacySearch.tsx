@@ -149,6 +149,8 @@ export function PharmacySearch({
       setOpen(false);
       setQ("");
       setResults([]);
+      setGoogleResults([]);
+    } else {
     } else {
       inputRef.current?.focus();
     }
