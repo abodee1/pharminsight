@@ -9,6 +9,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X } from "lucide-react";
+import { PharmacySearch } from "@/components/PharmacySearch";
 
 export const Route = createFileRoute("/pharmacy/$odsCode")({ component: PharmacyProfile });
 
