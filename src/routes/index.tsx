@@ -5,7 +5,7 @@ export const Route = createFileRoute("/")({
   component: Landing,
   head: () => ({
     meta: [
-      { title: "PharmIQ — NHS pharmacy analytics & smart insights" },
+      { title: "PharmInsight — NHS pharmacy analytics & smart insights" },
       {
         name: "description",
         content:
@@ -21,7 +21,7 @@ function Landing() {
       <header className="border-b border-border">
         <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xl font-bold tracking-tight text-primary">PharmIQ</span>
+            <span className="text-xl font-bold tracking-tight text-primary">PharmInsight</span>
           </div>
           <div className="flex items-center gap-3">
             <Link

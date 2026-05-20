@@ -33,7 +33,7 @@ function Register() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm rounded-lg bg-card border border-border p-8 shadow-sm">
         <Link to="/" className="block text-center">
-          <span className="text-xl font-bold tracking-tight text-primary">PharmIQ</span>
+          <span className="text-xl font-bold tracking-tight text-primary">PharmInsight</span>
         </Link>
         <h1 className="mt-6 text-xl font-semibold text-center">Create account</h1>
         <form onSubmit={onSubmit} className="mt-6 space-y-4">

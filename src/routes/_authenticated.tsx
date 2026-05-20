@@ -61,7 +61,7 @@ function RolePrompt({ onSet }: { onSet: () => Promise<void> }) {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-background">
       <div className="max-w-md w-full rounded-lg bg-card border border-border p-8 shadow-sm text-center">
-        <h1 className="text-xl font-semibold">Welcome to PharmIQ</h1>
+        <h1 className="text-xl font-semibold">Welcome to PharmInsight</h1>
         <p className="text-sm text-muted-foreground mt-2">
           Tell us how you'll be using the platform.
         </p>

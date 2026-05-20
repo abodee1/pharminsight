@@ -51,7 +51,7 @@ export function AppSidebar() {
       <div className="px-5 py-5 border-b border-sidebar-border">
         <Link to="/dashboard" className="flex items-center gap-2">
           <span className="text-xl font-bold tracking-tight text-sidebar-foreground">
-            PharmIQ
+            PharmInsight
           </span>
         </Link>
         <p className="text-xs text-sidebar-muted mt-1">NHS pharmacy analytics</p>
