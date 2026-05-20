@@ -29,6 +29,7 @@ type Row = {
   mcr_payment: number | string | null;
   ehc_items: number; methadone_items: number; smoking_cessation: number;
   final_payment: number | string | null;
+  is_actual_payment: boolean;
 };
 
 type RankKey = "items_dispensed" | "nms_count" | "pharmacy_first_count" | "flu_vaccinations" | "eps_items";
