@@ -11,6 +11,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { PharmacySearch } from "./PharmacySearch";
 
 const links = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
