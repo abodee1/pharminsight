@@ -396,7 +396,8 @@ function PharmacyProfile() {
             <MiniChart title="Gross cost (£)" data={chartData} dataKey="cost" />
           </div>
 
-          {isScotland && latest && latest.pharmacy_first_services && (
+          {/* Pharmacy First service mix hidden for now */}
+          {false && isScotland && latest && latest.pharmacy_first_services && (
             <PFServiceMix
               services={latest.pharmacy_first_services}
               peerAvg={pfPeerAvg}
