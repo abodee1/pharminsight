@@ -528,6 +528,12 @@ function PharmacyProfile() {
             </section>
           )}
 
+          <LocalLandscape
+            pharmacyName={pharmacy.name}
+            postcode={pharmacy.postcode}
+            address={pharmacy.address}
+          />
+
           {/* Pharmacy First service mix hidden for now
           {isScotland && latest && latest.pharmacy_first_services && (
             <PFServiceMix
