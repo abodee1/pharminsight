@@ -63,6 +63,7 @@ export type Database = {
           flu_vaccinations: number
           gross_cost: number
           id: string
+          is_actual_payment: boolean
           is_provisional: boolean
           items_dispensed: number
           mcr_payment: number
@@ -85,6 +86,7 @@ export type Database = {
           flu_vaccinations?: number
           gross_cost?: number
           id?: string
+          is_actual_payment?: boolean
           is_provisional?: boolean
           items_dispensed?: number
           mcr_payment?: number
@@ -107,6 +109,7 @@ export type Database = {
           flu_vaccinations?: number
           gross_cost?: number
           id?: string
+          is_actual_payment?: boolean
           is_provisional?: boolean
           items_dispensed?: number
           mcr_payment?: number

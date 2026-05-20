@@ -31,6 +31,7 @@ const RowSchema = z.object({
 const BodySchema = z.object({
   rows: z.array(RowSchema).min(1).max(5000),
   data_source: z.string().min(1).max(64).optional(),
+  is_actual_payment: z.boolean().optional(),
 });
 
 export const Route = createFileRoute("/api/public/ingest/pharmacy-payments")({
@@ -62,7 +63,7 @@ export const Route = createFileRoute("/api/public/ingest/pharmacy-payments")({
           const id = idByCode.get(r.ods_code.toUpperCase());
           if (!id) { unknown.push(r.ods_code); return []; }
           const { ods_code, ...rest } = r;
-          return [{ pharmacy_id: id, data_source: parsed.data_source ?? "manual", ...rest }];
+          return [{ pharmacy_id: id, data_source: parsed.data_source ?? "manual", is_actual_payment: parsed.is_actual_payment ?? false, ...rest }];
         });
 
         if (payload.length === 0) {

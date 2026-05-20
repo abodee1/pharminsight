@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
-import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X, ShieldCheck } from "lucide-react";
 import { PharmacySearch } from "@/components/PharmacySearch";
 
 export const Route = createFileRoute("/pharmacy/$odsCode")({ component: PharmacyProfile });
@@ -44,6 +44,20 @@ function PharmacyProfile() {
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [hasUserPharmacy, setHasUserPharmacy] = useState<boolean | null>(null);
   const [ranks, setRanks] = useState<Partial<Record<RankKey, { rank: number; total: number }>>>({});
+  const [hasFp34c, setHasFp34c] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      if (!user || !pharmacy) { setHasFp34c(false); return; }
+      const { count } = await supabase
+        .from("private_uploads")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("pharmacy_id", pharmacy.id)
+        .eq("upload_type", "fp34c");
+      setHasFp34c((count ?? 0) > 0);
+    })();
+  }, [user, pharmacy]);
 
   useEffect(() => {
     (async () => {
@@ -222,6 +236,15 @@ function PharmacyProfile() {
             {isMine && (
               <span className="inline-flex items-center gap-1 rounded-full bg-gold/15 border border-gold/40 px-2.5 py-0.5 text-xs font-semibold text-gold">
                 <Star className="h-3 w-3 fill-current" /> Your pharmacy
+              </span>
+            )}
+            {((pharmacy.country || "").toLowerCase() === "scotland" || hasFp34c) ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/40 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                <ShieldCheck className="h-3 w-3" /> Verified payment data
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                Estimated income
               </span>
             )}
           </div>
