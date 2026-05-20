@@ -409,10 +409,11 @@ function Compare() {
               {/* Side-by-side + Radar */}
               <div className="grid lg:grid-cols-2 gap-6 mb-6">
                 <div className="rounded-xl bg-card border border-border p-6 shadow-sm">
-                  <h2 className="text-sm font-semibold mb-4">Latest month — every service</h2>
+                  <h2 className="text-sm font-semibold mb-1">Latest month — service volumes</h2>
+                  <p className="text-xs text-muted-foreground mb-3">Raw monthly counts</p>
                   <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={sideBySide} margin={{ top: 5, right: 12, bottom: 0, left: -10 }}>
+                      <BarChart data={sideBySide.filter((d) => METRICS.find((m) => m.short === d.metric)?.group === "volume")} margin={{ top: 5, right: 12, bottom: 0, left: -10 }}>
                         <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                         <XAxis dataKey="metric" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
                         <YAxis tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
