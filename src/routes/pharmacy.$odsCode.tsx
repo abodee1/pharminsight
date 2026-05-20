@@ -311,8 +311,8 @@ function PharmacyProfile() {
 
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
             <MiniChart title="Items dispensed" data={chartData} dataKey="items" />
-            <MiniChart title="EPS items" data={chartData} dataKey="eps_items" />
-            <MiniChart title="NMS" data={chartData} dataKey="nms" />
+            {!isScotland && <MiniChart title="EPS items" data={chartData} dataKey="eps_items" />}
+            {!isScotland && <MiniChart title="NMS" data={chartData} dataKey="nms" />}
             <MiniChart title="Pharmacy First" data={chartData} dataKey="pf" />
             <MiniChart title="Flu vaccinations" data={chartData} dataKey="flu" />
             <MiniChart title="Gross cost (£)" data={chartData} dataKey="cost" />
