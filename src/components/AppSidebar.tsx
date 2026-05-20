@@ -42,7 +42,9 @@ export function AppSidebar() {
     <aside className="hidden md:flex w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
       <div className="px-5 py-5 border-b border-sidebar-border">
         <Link to="/dashboard" className="flex items-center gap-2">
-          <span className="text-xl font-bold tracking-tight text-gold">PharmIQ</span>
+          <span className="text-xl font-bold tracking-tight text-sidebar-foreground">
+            PharmIQ
+          </span>
         </Link>
         <p className="text-xs text-sidebar-muted mt-1">NHS pharmacy analytics</p>
       </div>
@@ -57,12 +59,12 @@ export function AppSidebar() {
               className={[
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors relative",
                 active
-                  ? "bg-sidebar-accent text-gold font-medium"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                  ? "bg-sidebar-accent text-sidebar-foreground font-semibold"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
               ].join(" ")}
             >
               {active && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-0.5 bg-gold rounded-r" />
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-0.5 bg-sidebar-foreground rounded-r" />
               )}
               <Icon className="h-4 w-4" />
               {label}
@@ -73,7 +75,7 @@ export function AppSidebar() {
 
       <div className="border-t border-sidebar-border p-3">
         <div className="flex items-center gap-3 px-2 py-2">
-          <div className="h-9 w-9 rounded-full bg-gold text-gold-foreground flex items-center justify-center text-xs font-semibold">
+          <div className="h-9 w-9 rounded-full bg-sidebar-foreground text-sidebar flex items-center justify-center text-xs font-semibold">
             {initials}
           </div>
           <div className="flex-1 min-w-0">
@@ -88,7 +90,7 @@ export function AppSidebar() {
             await signOut();
             navigate({ to: "/login" });
           }}
-          className="mt-2 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+          className="mt-2 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
         >
           <LogOut className="h-4 w-4" />
           Sign out
