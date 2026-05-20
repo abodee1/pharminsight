@@ -329,9 +329,9 @@ function PharmacyProfile() {
                   <tr>
                     <th className="text-left px-3 py-2 font-medium">Month</th>
                     <th className="text-right px-3 py-2 font-medium">Items</th>
-                    <th className="text-right px-3 py-2 font-medium">EPS items</th>
-                    <th className="text-right px-3 py-2 font-medium">EPS nom.</th>
-                    <th className="text-right px-3 py-2 font-medium">NMS</th>
+                    {!isScotland && <th className="text-right px-3 py-2 font-medium">EPS items</th>}
+                    {!isScotland && <th className="text-right px-3 py-2 font-medium">EPS nom.</th>}
+                    {!isScotland && <th className="text-right px-3 py-2 font-medium">NMS</th>}
                     <th className="text-right px-3 py-2 font-medium">PF</th>
                     <th className="text-right px-3 py-2 font-medium">PF £</th>
                     <th className="text-right px-3 py-2 font-medium">Flu</th>
