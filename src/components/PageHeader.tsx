@@ -12,7 +12,7 @@ export function PageHeader({
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
-  backTo?: "/dashboard" | "/leaderboards" | "/benchmarking" | "/insights" | "/upload" | "/settings";
+  backTo?: "/dashboard" | "/leaderboards" | "/benchmarking" | "/compare" | "/insights" | "/upload" | "/settings";
   backLabel?: string;
   showBack?: boolean;
 }) {
