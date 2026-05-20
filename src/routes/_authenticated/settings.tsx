@@ -292,11 +292,50 @@ function SettingsPage() {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name, ODS code, region or postcode"
+                placeholder="Search by postcode (e.g. KY11), ODS code, name or region"
                 className="pl-9"
               />
             </div>
-            <div className="mt-3 divide-y divide-border max-h-96 overflow-y-auto rounded-md border border-border">
+
+            {countries.length > 1 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCountryFilter("all")}
+                  className={[
+                    "text-xs px-3 py-1 rounded-full border transition-colors",
+                    countryFilter === "all" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary",
+                  ].join(" ")}
+                >
+                  All ({pharms.length})
+                </button>
+                {countries.map((c) => {
+                  const count = pharms.filter((p) => p.country === c).length;
+                  const active = countryFilter === c;
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setCountryFilter(c as any)}
+                      className={[
+                        "text-xs px-3 py-1 rounded-full border transition-colors",
+                        active ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary",
+                      ].join(" ")}
+                    >
+                      {c} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground mt-3">
+              {search.trim()
+                ? `${filtered.length} ${filtered.length === 1 ? "match" : "matches"}`
+                : `Showing first 50 of ${countryFilter === "all" ? pharms.length : pharms.filter((p) => p.country === countryFilter).length}. Start typing to search.`}
+            </p>
+
+            <div className="mt-2 divide-y divide-border max-h-96 overflow-y-auto rounded-md border border-border">
               {filtered.length === 0 && (
                 <p className="text-sm text-muted-foreground p-4">No matches.</p>
               )}
@@ -314,7 +353,7 @@ function SettingsPage() {
                     <div className="min-w-0">
                       <p className="font-medium truncate">{p.name}</p>
                       <p className="text-xs text-muted-foreground truncate">
-                        {[p.region, p.country, p.postcode].filter(Boolean).join(" · ")}
+                        {[p.postcode, p.region, p.country].filter(Boolean).join(" · ")}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -327,6 +366,7 @@ function SettingsPage() {
             </div>
           </section>
         </TabsContent>
+
 
         {/* UPLOADS */}
         <TabsContent value="uploads" className="mt-6">
