@@ -265,24 +265,39 @@ function PharmacyProfile() {
                     <th className="text-right px-3 py-2 font-medium">EPS items</th>
                     <th className="text-right px-3 py-2 font-medium">EPS nom.</th>
                     <th className="text-right px-3 py-2 font-medium">NMS</th>
-                    <th className="text-right px-3 py-2 font-medium">Pharm. First</th>
+                    <th className="text-right px-3 py-2 font-medium">PF</th>
+                    <th className="text-right px-3 py-2 font-medium">PF £</th>
                     <th className="text-right px-3 py-2 font-medium">Flu</th>
-                    <th className="text-right px-3 py-2 font-medium">Gross cost</th>
+                    <th className="text-right px-3 py-2 font-medium">EHC</th>
+                    <th className="text-right px-3 py-2 font-medium">Meth.</th>
+                    <th className="text-right px-3 py-2 font-medium">Smoke.</th>
+                    <th className="text-right px-3 py-2 font-medium">MCR £</th>
+                    <th className="text-right px-3 py-2 font-medium">Gross £</th>
+                    <th className="text-right px-3 py-2 font-medium">Final £</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {tableRows.map((r) => (
-                    <tr key={`${r.year}-${r.month}`} className="border-t border-border">
-                      <td className="px-3 py-2 whitespace-nowrap">{MONTHS[r.month - 1]} {r.year}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{r.items_dispensed.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{r.eps_items.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{r.eps_nominations.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{r.nms_count.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{r.pharmacy_first_count.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{r.flu_vaccinations.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">£{(Number(r.gross_cost) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-                    </tr>
-                  ))}
+                  {tableRows.map((r) => {
+                    const fmt£ = (v: number | string | null) => "£" + (Number(v) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+                    return (
+                      <tr key={`${r.year}-${r.month}`} className="border-t border-border">
+                        <td className="px-3 py-2 whitespace-nowrap">{MONTHS[r.month - 1]} {r.year}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{r.items_dispensed.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{r.eps_items.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{r.eps_nominations.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{r.nms_count.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{r.pharmacy_first_count.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{fmt£(r.pharmacy_first_payment)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{r.flu_vaccinations.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{r.ehc_items.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{r.methadone_items.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{r.smoking_cessation.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{fmt£(r.mcr_payment)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{fmt£(r.gross_cost)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{fmt£(r.final_payment)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
