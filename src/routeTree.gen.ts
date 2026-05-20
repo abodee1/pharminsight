@@ -24,6 +24,7 @@ import { Route as AuthenticatedCompareRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedBenchmarkingRouteImport } from './routes/_authenticated/benchmarking'
 import { Route as AuthenticatedAdminPaymentsImportRouteImport } from './routes/_authenticated/admin.payments-import'
 import { Route as AuthenticatedAdminDataRouteImport } from './routes/_authenticated/admin.data'
+import { Route as AuthenticatedAcquisitionOdsCodeRouteImport } from './routes/_authenticated/acquisition.$odsCode'
 import { Route as ApiPublicIngestPharmacyPaymentsRouteImport } from './routes/api/public/ingest.pharmacy-payments'
 import { Route as ApiPublicHooksIngestScotlandRouteImport } from './routes/api/public/hooks/ingest-scotland'
 import { Route as ApiPublicHooksIngestNiRouteImport } from './routes/api/public/hooks/ingest-ni'
@@ -106,6 +107,12 @@ const AuthenticatedAdminDataRoute = AuthenticatedAdminDataRouteImport.update({
   path: '/admin/data',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAcquisitionOdsCodeRoute =
+  AuthenticatedAcquisitionOdsCodeRouteImport.update({
+    id: '/acquisition/$odsCode',
+    path: '/acquisition/$odsCode',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const ApiPublicIngestPharmacyPaymentsRoute =
   ApiPublicIngestPharmacyPaymentsRouteImport.update({
     id: '/api/public/ingest/pharmacy-payments',
@@ -143,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/upload': typeof AuthenticatedUploadRoute
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
+  '/acquisition/$odsCode': typeof AuthenticatedAcquisitionOdsCodeRoute
   '/admin/data': typeof AuthenticatedAdminDataRoute
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
@@ -163,6 +171,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/upload': typeof AuthenticatedUploadRoute
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
+  '/acquisition/$odsCode': typeof AuthenticatedAcquisitionOdsCodeRoute
   '/admin/data': typeof AuthenticatedAdminDataRoute
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
@@ -185,6 +194,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/upload': typeof AuthenticatedUploadRoute
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
+  '/_authenticated/acquisition/$odsCode': typeof AuthenticatedAcquisitionOdsCodeRoute
   '/_authenticated/admin/data': typeof AuthenticatedAdminDataRoute
   '/_authenticated/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
@@ -207,6 +217,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/upload'
     | '/pharmacy/$odsCode'
+    | '/acquisition/$odsCode'
     | '/admin/data'
     | '/admin/payments-import'
     | '/api/public/hooks/ingest-england'
@@ -227,6 +238,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/upload'
     | '/pharmacy/$odsCode'
+    | '/acquisition/$odsCode'
     | '/admin/data'
     | '/admin/payments-import'
     | '/api/public/hooks/ingest-england'
@@ -248,6 +260,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/upload'
     | '/pharmacy/$odsCode'
+    | '/_authenticated/acquisition/$odsCode'
     | '/_authenticated/admin/data'
     | '/_authenticated/admin/payments-import'
     | '/api/public/hooks/ingest-england'
@@ -375,6 +388,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminDataRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/acquisition/$odsCode': {
+      id: '/_authenticated/acquisition/$odsCode'
+      path: '/acquisition/$odsCode'
+      fullPath: '/acquisition/$odsCode'
+      preLoaderRoute: typeof AuthenticatedAcquisitionOdsCodeRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/api/public/ingest/pharmacy-payments': {
       id: '/api/public/ingest/pharmacy-payments'
       path: '/api/public/ingest/pharmacy-payments'
@@ -415,6 +435,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedLeaderboardsRoute: typeof AuthenticatedLeaderboardsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedUploadRoute: typeof AuthenticatedUploadRoute
+  AuthenticatedAcquisitionOdsCodeRoute: typeof AuthenticatedAcquisitionOdsCodeRoute
   AuthenticatedAdminDataRoute: typeof AuthenticatedAdminDataRoute
   AuthenticatedAdminPaymentsImportRoute: typeof AuthenticatedAdminPaymentsImportRoute
 }
@@ -428,6 +449,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedLeaderboardsRoute: AuthenticatedLeaderboardsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedUploadRoute: AuthenticatedUploadRoute,
+  AuthenticatedAcquisitionOdsCodeRoute: AuthenticatedAcquisitionOdsCodeRoute,
   AuthenticatedAdminDataRoute: AuthenticatedAdminDataRoute,
   AuthenticatedAdminPaymentsImportRoute: AuthenticatedAdminPaymentsImportRoute,
 }
