@@ -320,7 +320,17 @@ function SettingsPage() {
             )}
 
             <div className="mt-4">
-              <PharmacySearchInline />
+              <PharmacySearchInline
+                placeholder="Search by pharmacy name, postcode, or ODS code..."
+                onSelect={async (p) => {
+                  // Ensure the pharmacy is in our local cache so the
+                  // selected-card render below has its details.
+                  if (!pharms.some((x) => x.id === p.id)) {
+                    setPharms((prev) => [...prev, p as any]);
+                  }
+                  await setPharmacy(p.id);
+                }}
+              />
             </div>
           </section>
         </TabsContent>
