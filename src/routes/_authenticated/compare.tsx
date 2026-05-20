@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetchAll";
 import { PageHeader } from "@/components/PageHeader";
@@ -18,13 +18,46 @@ export const Route = createFileRoute("/_authenticated/compare")({ component: Com
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-const METRICS = [
-  { key: "items_dispensed", label: "Items dispensed", short: "Items" },
-  { key: "nms_count", label: "NMS", short: "NMS" },
-  { key: "pharmacy_first_count", label: "Pharmacy First", short: "PF" },
-  
-  { key: "eps_items", label: "EPS items", short: "EPS" },
-] as const;
+type MetricDef = {
+  key: string;
+  label: string;
+  short: string;
+  group: "volume" | "rate";
+  compute: (r: Row | undefined) => number;
+  format: (v: number) => string;
+};
+
+const fmtInt = (v: number) => Math.round(v).toLocaleString();
+const fmtRate = (v: number) => v.toFixed(1);
+const fmtPct = (v: number) => `${v.toFixed(1)}%`;
+
+const METRICS: MetricDef[] = [
+  // Raw volume metrics
+  { key: "items_dispensed", label: "Items dispensed", short: "Items", group: "volume",
+    compute: (r) => r?.items_dispensed ?? 0, format: fmtInt },
+  { key: "nms_count", label: "NMS consultations", short: "NMS", group: "volume",
+    compute: (r) => r?.nms_count ?? 0, format: fmtInt },
+  { key: "pharmacy_first_count", label: "Pharmacy First", short: "PF", group: "volume",
+    compute: (r) => r?.pharmacy_first_count ?? 0, format: fmtInt },
+  { key: "eps_items", label: "EPS items", short: "EPS", group: "volume",
+    compute: (r) => r?.eps_items ?? 0, format: fmtInt },
+  // Derived service-intensity metrics — far more comparable across pharmacy size
+  { key: "pf_per_1k", label: "PF per 1k items", short: "PF/1k", group: "rate",
+    compute: (r) => {
+      const items = r?.items_dispensed ?? 0;
+      return items > 0 ? ((r?.pharmacy_first_count ?? 0) * 1000) / items : 0;
+    }, format: fmtRate },
+  { key: "nms_per_1k", label: "NMS per 1k items", short: "NMS/1k", group: "rate",
+    compute: (r) => {
+      const items = r?.items_dispensed ?? 0;
+      return items > 0 ? ((r?.nms_count ?? 0) * 1000) / items : 0;
+    }, format: fmtRate },
+  { key: "eps_share", label: "EPS share", short: "EPS %", group: "rate",
+    compute: (r) => {
+      const items = r?.items_dispensed ?? 0;
+      return items > 0 ? ((r?.eps_items ?? 0) / items) * 100 : 0;
+    }, format: fmtPct },
+];
 
 const SERIES_COLORS = [
   "var(--cmp-1)",
@@ -110,7 +143,7 @@ function Compare() {
         const point: Record<string, any> = { label: `${MONTHS[m - 1]} ${String(y).slice(2)}` };
         selectedPharms.forEach((ph) => {
           const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-          point[ph.id] = row ? (row[mt.key] as number) : 0;
+          point[ph.id] = mt.compute(row);
         });
         return point;
       }),
@@ -125,7 +158,7 @@ function Compare() {
       const point: Record<string, any> = { metric: mt.short };
       selectedPharms.forEach((ph) => {
         const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-        point[ph.id] = row ? (row[mt.key] as number) : 0;
+        point[ph.id] = mt.compute(row);
       });
       return point;
     });
@@ -139,7 +172,7 @@ function Compare() {
       const point: Record<string, any> = { metric: mt.short };
       const vals = selectedPharms.map((ph) => {
         const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-        return row ? (row[mt.key] as number) : 0;
+        return mt.compute(row);
       });
       const max = Math.max(1, ...vals);
       selectedPharms.forEach((ph, i) => {
@@ -158,8 +191,8 @@ function Compare() {
       const cur = rows.find((r) => r.pharmacy_id === ph.id && r.year === ly && r.month === lm);
       const prv = prev ? rows.find((r) => r.pharmacy_id === ph.id && r.year === py && r.month === pm) : null;
       const metrics = METRICS.map((mt) => {
-        const v = cur ? (cur[mt.key] as number) : 0;
-        const p = prv ? (prv[mt.key] as number) : 0;
+        const v = mt.compute(cur);
+        const p = mt.compute(prv ?? undefined);
         const diff = v - p;
         const pct = p ? Math.round((diff / p) * 100) : 0;
         return { mt, value: v, diff, pct };
@@ -178,7 +211,7 @@ function Compare() {
       let id = "";
       selectedPharms.forEach((ph) => {
         const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-        const v = row ? (row[mt.key] as number) : 0;
+        const v = mt.compute(row);
         if (v > best) { best = v; id = ph.id; }
       });
       out[mt.key] = id;
@@ -301,7 +334,7 @@ function Compare() {
                     return (
                       <div key={mt.key} className="rounded-md bg-secondary/40 px-2 py-1.5">
                         <p className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">{mt.short}</p>
-                        <p className="text-base font-semibold tabular-nums leading-tight">{value.toLocaleString()}</p>
+                        <p className="text-base font-semibold tabular-nums leading-tight">{value > 0 ? mt.format(value) : "—"}</p>
                         <div className="mt-0.5 flex items-center gap-0.5 text-[10px]">
                           {flat ? (
                             <Minus className="h-3 w-3 text-muted-foreground" />
@@ -376,10 +409,11 @@ function Compare() {
               {/* Side-by-side + Radar */}
               <div className="grid lg:grid-cols-2 gap-6 mb-6">
                 <div className="rounded-xl bg-card border border-border p-6 shadow-sm">
-                  <h2 className="text-sm font-semibold mb-4">Latest month — every service</h2>
+                  <h2 className="text-sm font-semibold mb-1">Latest month — service volumes</h2>
+                  <p className="text-xs text-muted-foreground mb-3">Raw monthly counts</p>
                   <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={sideBySide} margin={{ top: 5, right: 12, bottom: 0, left: -10 }}>
+                      <BarChart data={sideBySide.filter((d) => METRICS.find((m) => m.short === d.metric)?.group === "volume")} margin={{ top: 5, right: 12, bottom: 0, left: -10 }}>
                         <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                         <XAxis dataKey="metric" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
                         <YAxis tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
@@ -431,7 +465,7 @@ function Compare() {
                       const [y, m] = latest.split("-").map(Number);
                       const vals = selectedPharms.map((ph) => {
                         const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-                        return { ph, v: row ? (row[mt.key] as number) : 0 };
+                        return { ph, v: mt.compute(row) };
                       }).sort((a, b) => b.v - a.v);
                       const leader = vals[0];
                       const runner = vals[1];
@@ -440,7 +474,7 @@ function Compare() {
                         <div key={mt.key} className="border-l-2 pl-3" style={{ borderColor: colorFor(leader.ph.id) }}>
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{mt.label}</p>
                           <p className="text-sm font-semibold truncate" title={leader.ph.name}>{leader.ph.name}</p>
-                          <p className="text-lg font-bold tabular-nums">{leader.v.toLocaleString()}</p>
+                          <p className="text-lg font-bold tabular-nums">{leader.v > 0 ? mt.format(leader.v) : "—"}</p>
                           {runner && (
                             <p className="text-xs text-muted-foreground mt-0.5">
                               {margin !== null
@@ -478,34 +512,43 @@ function Compare() {
                       </tr>
                     </thead>
                     <tbody>
-                      {METRICS.map((mt) => {
-                        const [y, m] = (latest || "0-0").split("-").map(Number);
-                        const winnerId = winners[mt.key];
-                        return (
-                          <tr key={mt.key} className="border-t border-border">
-                            <td className="px-6 py-3 font-medium">{mt.label}</td>
-                            {selectedPharms.map((ph) => {
-                              const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-                              const v = row ? (row[mt.key] as number) : 0;
-                              const isWin = ph.id === winnerId && selectedPharms.length > 1;
-                              return (
-                                <td
-                                  key={ph.id}
-                                  className={[
-                                    "px-6 py-3 text-right tabular-nums",
-                                    isWin ? "font-semibold text-foreground" : "text-muted-foreground",
-                                  ].join(" ")}
-                                >
-                                  <div className="inline-flex items-center gap-2 justify-end">
-                                    {v.toLocaleString()}
-                                    {isWin && <Badge variant="secondary" className="text-[10px] py-0">Best</Badge>}
-                                  </div>
-                                </td>
-                              );
-                            })}
+                      {(["volume", "rate"] as const).map((group) => (
+                        <Fragment key={group}>
+                          <tr className="bg-secondary/40 border-t border-border">
+                            <td colSpan={selectedPharms.length + 1} className="px-6 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                              {group === "volume" ? "Monthly volumes" : "Service intensity (size-adjusted)"}
+                            </td>
                           </tr>
-                        );
-                      })}
+                          {METRICS.filter((mt) => mt.group === group).map((mt) => {
+                            const [y, m] = (latest || "0-0").split("-").map(Number);
+                            const winnerId = winners[mt.key];
+                            return (
+                              <tr key={mt.key} className="border-t border-border">
+                                <td className="px-6 py-3 font-medium">{mt.label}</td>
+                                {selectedPharms.map((ph) => {
+                                  const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
+                                  const v = mt.compute(row);
+                                  const isWin = ph.id === winnerId && selectedPharms.length > 1 && v > 0;
+                                  return (
+                                    <td
+                                      key={ph.id}
+                                      className={[
+                                        "px-6 py-3 text-right tabular-nums",
+                                        isWin ? "font-semibold text-foreground" : "text-muted-foreground",
+                                      ].join(" ")}
+                                    >
+                                      <div className="inline-flex items-center gap-2 justify-end">
+                                        {v > 0 ? mt.format(v) : "—"}
+                                        {isWin && <Badge variant="secondary" className="text-[10px] py-0">Best</Badge>}
+                                      </div>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                        </Fragment>
+                      ))}
                     </tbody>
                   </table>
                 </div>
