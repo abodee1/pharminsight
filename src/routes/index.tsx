@@ -43,14 +43,9 @@ function Landing() {
       <main className="mx-auto max-w-6xl px-6">
         <section className="py-24 text-center">
           <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-foreground">
-            NHS pharmacy analytics,
-            <br />
-            <span className="text-gold">made simple</span>
+            Pharmacy analytics,{" "}
+            <span className="text-gold">made simple.</span>
           </h1>
-          <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Benchmark your pharmacy, understand your performance, and unlock insights from
-            open NHS data — in seconds.
-          </p>
           <div className="mt-10 flex items-center justify-center gap-3">
             <Link
               to="/register"
