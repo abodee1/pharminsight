@@ -143,7 +143,7 @@ function Compare() {
         const point: Record<string, any> = { label: `${MONTHS[m - 1]} ${String(y).slice(2)}` };
         selectedPharms.forEach((ph) => {
           const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-          point[ph.id] = row ? (row[mt.key] as number) : 0;
+          point[ph.id] = mt.compute(row);
         });
         return point;
       }),
@@ -158,7 +158,7 @@ function Compare() {
       const point: Record<string, any> = { metric: mt.short };
       selectedPharms.forEach((ph) => {
         const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-        point[ph.id] = row ? (row[mt.key] as number) : 0;
+        point[ph.id] = mt.compute(row);
       });
       return point;
     });
@@ -172,7 +172,7 @@ function Compare() {
       const point: Record<string, any> = { metric: mt.short };
       const vals = selectedPharms.map((ph) => {
         const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-        return row ? (row[mt.key] as number) : 0;
+        return mt.compute(row);
       });
       const max = Math.max(1, ...vals);
       selectedPharms.forEach((ph, i) => {
@@ -191,8 +191,8 @@ function Compare() {
       const cur = rows.find((r) => r.pharmacy_id === ph.id && r.year === ly && r.month === lm);
       const prv = prev ? rows.find((r) => r.pharmacy_id === ph.id && r.year === py && r.month === pm) : null;
       const metrics = METRICS.map((mt) => {
-        const v = cur ? (cur[mt.key] as number) : 0;
-        const p = prv ? (prv[mt.key] as number) : 0;
+        const v = mt.compute(cur);
+        const p = mt.compute(prv);
         const diff = v - p;
         const pct = p ? Math.round((diff / p) * 100) : 0;
         return { mt, value: v, diff, pct };
@@ -211,7 +211,7 @@ function Compare() {
       let id = "";
       selectedPharms.forEach((ph) => {
         const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-        const v = row ? (row[mt.key] as number) : 0;
+        const v = mt.compute(row);
         if (v > best) { best = v; id = ph.id; }
       });
       out[mt.key] = id;
