@@ -233,11 +233,14 @@ export function AnnotatedSparkline({
   label,
   points,
   unit = "",
+  caption,
 }: {
   label: string;
   points: { period: string; value: number }[];
   unit?: string;
+  caption?: string;
 }) {
+
   if (points.length < 2) {
     return (
       <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
