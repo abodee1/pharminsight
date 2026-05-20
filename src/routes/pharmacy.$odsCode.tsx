@@ -142,6 +142,45 @@ function PharmacyProfile() {
     })();
   }, [rows, pharmacy]);
 
+  // Peer PF service mix — average per pharmacy for the same region+month.
+  useEffect(() => {
+    (async () => {
+      if (!pharmacy || rows.length === 0) return;
+      if ((pharmacy.country || "").toLowerCase() !== "scotland") { setPfPeerAvg(null); return; }
+      let latest = rows[rows.length - 1];
+      for (let i = rows.length - 1; i >= 0; i--) {
+        if (rows[i].is_actual_payment) { latest = rows[i]; break; }
+      }
+      const peers = await supabase
+        .from("pharmacies")
+        .select("id")
+        .eq("country", "Scotland")
+        .eq("region", pharmacy.region ?? "");
+      const peerIds = (peers.data ?? []).map((p) => p.id);
+      if (peerIds.length === 0) { setPfPeerAvg(null); return; }
+      // Chunk in 500s to keep URL length sane.
+      const sums: Record<string, number> = {};
+      let counted = 0;
+      for (let i = 0; i < peerIds.length; i += 500) {
+        const { data } = await supabase
+          .from("dispensing_data")
+          .select("pharmacy_first_services")
+          .eq("year", latest.year).eq("month", latest.month)
+          .in("pharmacy_id", peerIds.slice(i, i + 500));
+        for (const r of data ?? []) {
+          const svc = (r as { pharmacy_first_services: Record<string, number> | null }).pharmacy_first_services || {};
+          counted++;
+          for (const k of Object.keys(svc)) sums[k] = (sums[k] ?? 0) + (Number(svc[k]) || 0);
+        }
+      }
+      if (counted === 0) { setPfPeerAvg(null); return; }
+      const avg: Record<string, number> = {};
+      for (const k of Object.keys(sums)) avg[k] = sums[k] / counted;
+      setPfPeerAvg(avg);
+      setPfPeerCount(counted);
+    })();
+  }, [rows, pharmacy]);
+
   const claimAsMine = async () => {
     if (!user || !pharmacy) {
       navigate({ to: "/login" });
