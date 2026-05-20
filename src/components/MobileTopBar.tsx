@@ -21,6 +21,7 @@ export const NAV_LINKS = [
 
 export function MobileTopBar() {
   const [open, setOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const { profile, user, signOut } = useAuth();
   const navigate = useNavigate();
