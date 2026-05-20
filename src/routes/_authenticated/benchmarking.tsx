@@ -68,11 +68,14 @@ function Benchmarking() {
     };
 
     const data = METRICS.map((m) => ({
+      key: m.key,
       label: m.label,
       mine: mine[m.key] || 0,
       local: avg(local, m.key),
       national: avg(cur, m.key),
       top10: top10pct(m.key),
+      nationalValues: cur.map((r) => r[m.key] as number),
+      localValues: local.map((r) => r[m.key] as number),
     }));
 
     // Normalize radar to 0-100 vs top10
