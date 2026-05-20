@@ -79,7 +79,7 @@ function Dashboard() {
         supabase
           .from("dispensing_data")
           .select(
-            "pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,pharmacy_first_payment,mcr_payment,smoking_cessation_payment,final_payment,gross_cost",
+            "pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,pharmacy_first_payment,mcr_payment,smoking_cessation_payment,final_payment,gross_cost,is_actual_payment",
           )
           .gte("year", nowYear - 2)
           .range(from, to),
