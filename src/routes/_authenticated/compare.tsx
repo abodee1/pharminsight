@@ -165,13 +165,6 @@ function Compare() {
     return out;
   }, [latest, selectedPharms, rows]);
 
-  function toggle(id: string) {
-    setSelected((cur) => {
-      if (cur.includes(id)) return cur.filter((x) => x !== id);
-      if (cur.length >= MAX_SELECT) return cur;
-      return [...cur, id];
-    });
-  }
 
   function remove(id: string) {
     setSelected((cur) => cur.filter((x) => x !== id));
