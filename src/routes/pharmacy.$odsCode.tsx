@@ -396,6 +396,16 @@ function PharmacyProfile() {
             <MiniChart title="Gross cost (£)" data={chartData} dataKey="cost" />
           </div>
 
+          {isScotland && latest && latest.pharmacy_first_services && (
+            <PFServiceMix
+              services={latest.pharmacy_first_services}
+              peerAvg={pfPeerAvg}
+              peerCount={pfPeerCount}
+              region={pharmacy.region}
+              period={`${MONTHS[latest.month - 1]} ${latest.year}`}
+            />
+          )}
+
           <div className="mt-6 rounded-lg bg-card border border-border shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-border flex items-center justify-between">
               <h2 className="text-sm font-semibold">Monthly history — last 24 months</h2>
