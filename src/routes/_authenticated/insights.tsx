@@ -103,31 +103,47 @@ function Insights() {
         {history.length === 0 && (
           <p className="text-sm text-muted-foreground">No insights yet. Generate your first one above.</p>
         )}
-        {history.map((h) => (
-          <div key={h.id} className="rounded-lg bg-card border border-border p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-semibold uppercase tracking-wide px-2 py-1 rounded bg-gold/15 text-gold">
-                  {h.insight_type}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(h.generated_at).toLocaleString("en-GB")}
-                </span>
+        {history.map((h) => {
+          const isReport = h.insight_type === "acquisition_report";
+          return (
+            <div key={h.id} className="rounded-lg bg-card border border-border p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-xs font-semibold uppercase tracking-wide px-2 py-1 rounded bg-gold/15 text-gold whitespace-nowrap">
+                    {LABELS[h.insight_type] ?? h.insight_type}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(h.generated_at).toLocaleString("en-GB")}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setExpanded(expanded === h.id ? null : h.id)}
+                  className="text-sm text-primary font-medium hover:underline whitespace-nowrap"
+                >
+                  {expanded === h.id ? "Collapse" : "Expand"}
+                </button>
               </div>
-              <button
-                onClick={() => setExpanded(expanded === h.id ? null : h.id)}
-                className="text-sm text-primary font-medium hover:underline"
-              >
-                {expanded === h.id ? "Collapse" : "Expand"}
-              </button>
+              {expanded === h.id && (
+                isReport ? (
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    Open this pharmacy's profile and click <span className="font-semibold text-foreground">Acquisition report</span> to view the full brief.
+                  </p>
+                ) : (
+                  <article className="mt-5 prose prose-sm md:prose-base max-w-none
+                    prose-headings:font-semibold prose-headings:tracking-tight
+                    prose-h2:mt-8 prose-h2:mb-3 prose-h2:text-xl prose-h2:border-b prose-h2:border-border prose-h2:pb-2
+                    prose-h3:mt-6 prose-h3:mb-2 prose-h3:text-base
+                    prose-p:leading-relaxed prose-p:text-foreground/90
+                    prose-strong:text-foreground
+                    prose-li:my-1 prose-ul:my-3 prose-ol:my-3
+                    prose-a:text-primary">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{h.insight_text}</ReactMarkdown>
+                  </article>
+                )
+              )}
             </div>
-            {expanded === h.id && (
-              <div className="mt-4 text-sm whitespace-pre-wrap leading-relaxed text-foreground">
-                {h.insight_text}
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
