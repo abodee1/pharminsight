@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
+  BarChart, Bar, Cell,
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X, ShieldCheck } from "lucide-react";
 import { PharmacySearch } from "@/components/PharmacySearch";
@@ -14,6 +15,17 @@ import { PharmacySearch } from "@/components/PharmacySearch";
 export const Route = createFileRoute("/pharmacy/$odsCode")({ component: PharmacyProfile });
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+const PF_SERVICES: { key: string; label: string }[] = [
+  { key: "acute", label: "Acute conditions" },
+  { key: "uti", label: "UTI" },
+  { key: "impetigo", label: "Impetigo" },
+  { key: "skin_infection", label: "Skin infection" },
+  { key: "sexual_health", label: "Sexual health" },
+  { key: "hayfever", label: "Hayfever" },
+  { key: "bridging_contraception", label: "Bridging contraception" },
+  { key: "emergency_contraception", label: "Emergency contraception" },
+];
 
 type Pharmacy = {
   id: string; ods_code: string; name: string;
@@ -33,6 +45,7 @@ type Row = {
   smoking_cessation_payment: number | string | null;
   final_payment: number | string | null;
   is_actual_payment: boolean;
+  pharmacy_first_services: Record<string, number> | null;
 };
 
 type RankKey = "items_dispensed" | "nms_count" | "pharmacy_first_count" | "flu_vaccinations" | "eps_items";
