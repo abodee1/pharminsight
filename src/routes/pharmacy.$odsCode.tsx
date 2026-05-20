@@ -214,7 +214,7 @@ function PharmacyProfile() {
     : [];
   const metrics = [...baseMetrics, ...scottishMetrics];
 
-  const tableRows = [...rows].slice(-24).reverse();
+  const tableRows = [...trimmedRows].slice(-24).reverse();
 
   const backTo = user ? "/dashboard" : "/";
   const backLabel = user ? "Back to dashboard" : "Back home";
