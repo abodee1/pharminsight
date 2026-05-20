@@ -8,9 +8,9 @@ import { DataAttribution } from "@/components/DataAttribution";
 import {
   PercentileRail,
   AnnotatedSparkline,
-  ShareDonut,
   DistributionStrip,
 } from "@/components/Infographics";
+
 import {
   ResponsiveContainer,
   LineChart,
