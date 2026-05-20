@@ -42,6 +42,7 @@ function SettingsPage() {
 
   // Pharmacy search
   const [search, setSearch] = useState("");
+  const [countryFilter, setCountryFilter] = useState<"all" | "England" | "Scotland" | "Wales" | "Northern Ireland">("all");
 
   const initials = (profile?.full_name || user?.email || "?")
     .split(/\s+|@/).map((s) => s[0]).slice(0, 2).join("").toUpperCase();
@@ -73,17 +74,45 @@ function SettingsPage() {
     })();
   }, [user]);
 
+  const countries = useMemo(() => {
+    const set = new Set<string>();
+    pharms.forEach((p) => p.country && set.add(p.country));
+    return Array.from(set).sort();
+  }, [pharms]);
+
   const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    if (!q) return pharms.slice(0, 8);
-    return pharms
-      .filter((p) =>
-        p.name.toLowerCase().includes(q) ||
-        (p.ods_code || "").toLowerCase().includes(q) ||
-        (p.postcode || "").toLowerCase().includes(q) ||
-        (p.region || "").toLowerCase().includes(q))
-      .slice(0, 25);
-  }, [pharms, search]);
+    const base = countryFilter === "all" ? pharms : pharms.filter((p) => p.country === countryFilter);
+    const q = search.toLowerCase().trim().replace(/\s+/g, " ");
+    if (!q) return base.slice(0, 50);
+    const qNoSpace = q.replace(/\s+/g, "");
+    const scored = base
+      .map((p) => {
+        const name = (p.name || "").toLowerCase();
+        const ods = (p.ods_code || "").toLowerCase();
+        const postcode = (p.postcode || "").toLowerCase();
+        const postcodeNoSpace = postcode.replace(/\s+/g, "");
+        const outward = postcode.split(" ")[0] || "";
+        const region = (p.region || "").toLowerCase();
+        const address = (p.address || "").toLowerCase();
+
+        let score = 0;
+        if (ods === q) score = 1000;
+        else if (postcodeNoSpace === qNoSpace) score = 900;
+        else if (outward === q) score = 800;
+        else if (postcodeNoSpace.startsWith(qNoSpace)) score = 700;
+        else if (ods.startsWith(q)) score = 600;
+        else if (name.startsWith(q)) score = 500;
+        else if (name.includes(q)) score = 300;
+        else if (region.includes(q)) score = 200;
+        else if (address.includes(q)) score = 100;
+        return { p, score };
+      })
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name))
+      .slice(0, 50)
+      .map((x) => x.p);
+    return scored;
+  }, [pharms, search, countryFilter]);
 
   const setPharmacy = async (id: string) => {
     if (!user) return;
@@ -263,11 +292,50 @@ function SettingsPage() {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name, ODS code, region or postcode"
+                placeholder="Search by postcode (e.g. KY11), ODS code, name or region"
                 className="pl-9"
               />
             </div>
-            <div className="mt-3 divide-y divide-border max-h-96 overflow-y-auto rounded-md border border-border">
+
+            {countries.length > 1 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCountryFilter("all")}
+                  className={[
+                    "text-xs px-3 py-1 rounded-full border transition-colors",
+                    countryFilter === "all" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary",
+                  ].join(" ")}
+                >
+                  All ({pharms.length})
+                </button>
+                {countries.map((c) => {
+                  const count = pharms.filter((p) => p.country === c).length;
+                  const active = countryFilter === c;
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setCountryFilter(c as any)}
+                      className={[
+                        "text-xs px-3 py-1 rounded-full border transition-colors",
+                        active ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary",
+                      ].join(" ")}
+                    >
+                      {c} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground mt-3">
+              {search.trim()
+                ? `${filtered.length} ${filtered.length === 1 ? "match" : "matches"}`
+                : `Showing first 50 of ${countryFilter === "all" ? pharms.length : pharms.filter((p) => p.country === countryFilter).length}. Start typing to search.`}
+            </p>
+
+            <div className="mt-2 divide-y divide-border max-h-96 overflow-y-auto rounded-md border border-border">
               {filtered.length === 0 && (
                 <p className="text-sm text-muted-foreground p-4">No matches.</p>
               )}
@@ -285,7 +353,7 @@ function SettingsPage() {
                     <div className="min-w-0">
                       <p className="font-medium truncate">{p.name}</p>
                       <p className="text-xs text-muted-foreground truncate">
-                        {[p.region, p.country, p.postcode].filter(Boolean).join(" · ")}
+                        {[p.postcode, p.region, p.country].filter(Boolean).join(" · ")}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -298,6 +366,7 @@ function SettingsPage() {
             </div>
           </section>
         </TabsContent>
+
 
         {/* UPLOADS */}
         <TabsContent value="uploads" className="mt-6">
