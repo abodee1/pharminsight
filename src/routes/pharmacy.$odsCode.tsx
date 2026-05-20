@@ -350,9 +350,9 @@ function PharmacyProfile() {
                       <tr key={`${r.year}-${r.month}`} className="border-t border-border">
                         <td className="px-3 py-2 whitespace-nowrap">{MONTHS[r.month - 1]} {r.year}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{r.items_dispensed.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{r.eps_items.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{r.eps_nominations.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{r.nms_count.toLocaleString()}</td>
+                        {!isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.eps_items.toLocaleString()}</td>}
+                        {!isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.eps_nominations.toLocaleString()}</td>}
+                        {!isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.nms_count.toLocaleString()}</td>}
                         <td className="px-3 py-2 text-right tabular-nums">{r.pharmacy_first_count.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.pharmacy_first_payment)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{r.flu_vaccinations.toLocaleString()}</td>
