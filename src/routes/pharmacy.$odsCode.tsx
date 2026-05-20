@@ -238,6 +238,15 @@ function PharmacyProfile() {
                 <Star className="h-3 w-3 fill-current" /> Your pharmacy
               </span>
             )}
+            {((pharmacy.country || "").toLowerCase() === "scotland" || hasFp34c) ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/40 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                <ShieldCheck className="h-3 w-3" /> Verified payment data
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                Estimated income
+              </span>
+            )}
           </div>
           <p className="text-sm text-muted-foreground mt-2">
             {[pharmacy.address, pharmacy.postcode].filter(Boolean).join(", ")}
