@@ -14,7 +14,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { Trophy, BarChart2, Upload } from "lucide-react";
+import { Trophy, BarChart2, Upload, GitCompare, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
 
@@ -128,23 +128,49 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="mt-6 grid md:grid-cols-3 gap-4">
-        <Link to="/leaderboards" className="rounded-lg bg-card border border-border p-5 shadow-sm hover:border-gold transition-colors">
-          <Trophy className="h-5 w-5 text-gold" />
+      <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Link to="/compare" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md transition-all">
+          <div className="h-9 w-9 rounded-lg bg-secondary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            <GitCompare className="h-4.5 w-4.5" />
+          </div>
+          <p className="mt-3 font-semibold text-sm">Compare pharmacies</p>
+          <p className="text-xs text-muted-foreground mt-1">Side-by-side, up to 4 at once</p>
+        </Link>
+        <Link to="/leaderboards" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md transition-all">
+          <div className="h-9 w-9 rounded-lg bg-secondary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            <Trophy className="h-4.5 w-4.5" />
+          </div>
           <p className="mt-3 font-semibold text-sm">Leaderboards</p>
           <p className="text-xs text-muted-foreground mt-1">Rank by service across the UK</p>
         </Link>
-        <Link to="/benchmarking" className="rounded-lg bg-card border border-border p-5 shadow-sm hover:border-gold transition-colors">
-          <BarChart2 className="h-5 w-5 text-gold" />
+        <Link to="/benchmarking" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md transition-all">
+          <div className="h-9 w-9 rounded-lg bg-secondary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            <BarChart2 className="h-4.5 w-4.5" />
+          </div>
           <p className="mt-3 font-semibold text-sm">Benchmarking</p>
-          <p className="text-xs text-muted-foreground mt-1">Compare vs local & national peers</p>
+          <p className="text-xs text-muted-foreground mt-1">Vs local & national peers</p>
         </Link>
-        <Link to="/upload" className="rounded-lg bg-card border border-border p-5 shadow-sm hover:border-gold transition-colors">
-          <Upload className="h-5 w-5 text-gold" />
-          <p className="mt-3 font-semibold text-sm">Upload private data</p>
-          <p className="text-xs text-muted-foreground mt-1">GLP-1, aesthetics & more</p>
+        <Link to="/insights" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md transition-all">
+          <div className="h-9 w-9 rounded-lg bg-secondary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            <Sparkles className="h-4.5 w-4.5" />
+          </div>
+          <p className="mt-3 font-semibold text-sm">AI Insights</p>
+          <p className="text-xs text-muted-foreground mt-1">SWOT, gaps & commentary</p>
         </Link>
       </div>
+
+      <Link to="/upload" className="mt-4 group flex items-center justify-between rounded-xl border border-dashed border-border bg-secondary/30 p-5 hover:border-foreground/40 hover:bg-secondary transition-colors">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-lg bg-card border border-border flex items-center justify-center">
+            <Upload className="h-4.5 w-4.5" />
+          </div>
+          <div>
+            <p className="font-semibold text-sm">Upload private data</p>
+            <p className="text-xs text-muted-foreground">GLP-1, aesthetics & more — stays in your private workspace</p>
+          </div>
+        </div>
+        <span className="text-xs text-muted-foreground group-hover:text-foreground">Open →</span>
+      </Link>
 
       <DataAttribution />
     </div>
