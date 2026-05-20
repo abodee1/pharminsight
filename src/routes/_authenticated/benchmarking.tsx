@@ -5,6 +5,7 @@ import { fetchAll } from "@/lib/fetchAll";
 import { PageHeader } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
+import { PercentileRail } from "@/components/Infographics";
 import {
   ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend, Tooltip,
 } from "recharts";
