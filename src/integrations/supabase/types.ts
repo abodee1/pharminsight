@@ -14,27 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _pf_services_staging: {
-        Row: {
-          month: number
-          ods_code: string
-          services: Json
-          year: number
-        }
-        Insert: {
-          month: number
-          ods_code: string
-          services: Json
-          year: number
-        }
-        Update: {
-          month?: number
-          ods_code?: string
-          services?: Json
-          year?: number
-        }
-        Relationships: []
-      }
       ai_insights: {
         Row: {
           generated_at: string
@@ -444,7 +423,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      _apply_pf_services: { Args: never; Returns: number }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
