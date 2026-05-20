@@ -48,7 +48,6 @@ function Compare() {
   const [rows, setRows] = useState<Row[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   // Preload the user's primary pharmacy as the first selection.
   useEffect(() => {
