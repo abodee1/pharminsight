@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { generateInsight } from "@/lib/insights.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,9 +13,17 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/_authenticated/insights")({ component: Insights });
 
 const TYPES = [
-  { key: "swot", title: "SWOT Analysis", desc: "Strengths, weaknesses, opportunities and threats from your dispensing trends and service uptake." },
-  { key: "benchmark", title: "Performance Commentary", desc: "Plain-English summary of the last three months versus benchmarks." },
+  { key: "swot", title: "SWOT Analysis", desc: "Board-grade strengths, weaknesses, opportunities and threats — grounded in your real NHS dispensing data, peer benchmarks and local landscape." },
+  { key: "benchmark", title: "Performance Commentary", desc: "An investor-ready narrative of how your pharmacy is performing vs its own history and country peers, with quantified wins, leaks and a 90-day action list." },
 ] as const;
+
+const LABELS: Record<string, string> = {
+  swot: "SWOT analysis",
+  benchmark: "Performance commentary",
+  acquisition_report: "Acquisition report",
+  trend: "Trend analysis",
+  acquisition: "Acquisition note",
+};
 
 function Insights() {
   const { user } = useAuth();
@@ -37,15 +47,11 @@ function Insights() {
     try {
       const { data: up } = await supabase.from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle();
       const pharmacy_id = up?.pharmacy_id ?? null;
-      let ctx: any = { note: "No pharmacy set." };
-      if (pharmacy_id) {
-        const [{ data: ph }, { data: rows }] = await Promise.all([
-          supabase.from("pharmacies").select("*").eq("id", pharmacy_id).single(),
-          supabase.from("dispensing_data").select("*").eq("pharmacy_id", pharmacy_id),
-        ]);
-        ctx = { pharmacy: ph, monthly: rows };
+      if (!pharmacy_id) {
+        toast.error("Set a primary pharmacy first to generate insights.");
+        return;
       }
-      await generate({ data: { insight_type: type, pharmacy_id, context: ctx } });
+      await generate({ data: { insight_type: type, pharmacy_id, context: {} } });
       toast.success("Insight generated");
       await loadHistory();
     } catch (e: any) {
@@ -97,31 +103,47 @@ function Insights() {
         {history.length === 0 && (
           <p className="text-sm text-muted-foreground">No insights yet. Generate your first one above.</p>
         )}
-        {history.map((h) => (
-          <div key={h.id} className="rounded-lg bg-card border border-border p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-semibold uppercase tracking-wide px-2 py-1 rounded bg-gold/15 text-gold">
-                  {h.insight_type}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(h.generated_at).toLocaleString("en-GB")}
-                </span>
+        {history.map((h) => {
+          const isReport = h.insight_type === "acquisition_report";
+          return (
+            <div key={h.id} className="rounded-lg bg-card border border-border p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-xs font-semibold uppercase tracking-wide px-2 py-1 rounded bg-gold/15 text-gold whitespace-nowrap">
+                    {LABELS[h.insight_type] ?? h.insight_type}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(h.generated_at).toLocaleString("en-GB")}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setExpanded(expanded === h.id ? null : h.id)}
+                  className="text-sm text-primary font-medium hover:underline whitespace-nowrap"
+                >
+                  {expanded === h.id ? "Collapse" : "Expand"}
+                </button>
               </div>
-              <button
-                onClick={() => setExpanded(expanded === h.id ? null : h.id)}
-                className="text-sm text-primary font-medium hover:underline"
-              >
-                {expanded === h.id ? "Collapse" : "Expand"}
-              </button>
+              {expanded === h.id && (
+                isReport ? (
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    Open this pharmacy's profile and click <span className="font-semibold text-foreground">Acquisition report</span> to view the full brief.
+                  </p>
+                ) : (
+                  <article className="mt-5 prose prose-sm md:prose-base max-w-none
+                    prose-headings:font-semibold prose-headings:tracking-tight
+                    prose-h2:mt-8 prose-h2:mb-3 prose-h2:text-xl prose-h2:border-b prose-h2:border-border prose-h2:pb-2
+                    prose-h3:mt-6 prose-h3:mb-2 prose-h3:text-base
+                    prose-p:leading-relaxed prose-p:text-foreground/90
+                    prose-strong:text-foreground
+                    prose-li:my-1 prose-ul:my-3 prose-ol:my-3
+                    prose-a:text-primary">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{h.insight_text}</ReactMarkdown>
+                  </article>
+                )
+              )}
             </div>
-            {expanded === h.id && (
-              <div className="mt-4 text-sm whitespace-pre-wrap leading-relaxed text-foreground">
-                {h.insight_text}
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
