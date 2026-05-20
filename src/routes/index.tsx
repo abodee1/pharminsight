@@ -5,7 +5,7 @@ export const Route = createFileRoute("/")({
   component: Landing,
   head: () => ({
     meta: [
-      { title: "PharmIQ — NHS pharmacy analytics, powered by AI" },
+      { title: "PharmIQ — NHS pharmacy analytics & smart insights" },
       {
         name: "description",
         content:
@@ -45,7 +45,7 @@ function Landing() {
           <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-foreground">
             NHS pharmacy analytics,
             <br />
-            <span className="text-gold">powered by AI</span>
+            <span className="text-gold">made simple</span>
           </h1>
           <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             Benchmark your pharmacy, understand your performance, and unlock insights from
@@ -81,7 +81,7 @@ function Landing() {
             },
             {
               icon: Sparkles,
-              title: "AI Insights",
+              title: "Smart Insights",
               body: "Generate SWOT analyses, performance commentary, and acquisition assessments grounded in your real NHS data.",
             },
           ].map((f) => (

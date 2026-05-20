@@ -77,7 +77,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "PharmIQ — NHS pharmacy analytics" },
       { name: "description", content: "Benchmark your pharmacy, understand your performance, and unlock insights from open NHS data." },
       { property: "og:title", content: "PharmIQ" },
-      { property: "og:description", content: "NHS pharmacy analytics powered by AI." },
+      { property: "og:description", content: "NHS pharmacy analytics and smart insights." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

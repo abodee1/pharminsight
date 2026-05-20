@@ -286,7 +286,7 @@ function SettingsPage() {
           <section className="rounded-xl bg-card border border-border p-6 shadow-sm">
             <h2 className="font-semibold">My pharmacy</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Your default pharmacy is used for benchmarking, leaderboards and AI insights.
+              Your default pharmacy is used for benchmarking, leaderboards and smart insights.
             </p>
 
             {mine ? (

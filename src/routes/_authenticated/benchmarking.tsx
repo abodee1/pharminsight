@@ -174,7 +174,7 @@ function Benchmarking() {
               to="/insights"
               className="inline-block mt-4 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90"
             >
-              Generate AI Insight for this data
+              Generate Smart Insight for this data
             </Link>
           </div>
         </>

@@ -158,7 +158,7 @@ function Dashboard() {
           <div className="h-9 w-9 rounded-lg bg-secondary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
             <Sparkles className="h-4.5 w-4.5" />
           </div>
-          <p className="mt-3 font-semibold text-sm">AI Insights</p>
+          <p className="mt-3 font-semibold text-sm">Smart Insights</p>
           <p className="text-xs text-muted-foreground mt-1">SWOT, gaps & commentary</p>
         </Link>
       </div>
