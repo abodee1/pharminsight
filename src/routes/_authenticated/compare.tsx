@@ -48,31 +48,47 @@ function Compare() {
   const [rows, setRows] = useState<Row[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [metric, setMetric] = useState<(typeof METRICS)[number]["key"]>("items_dispensed");
-  
+  const [loading, setLoading] = useState(false);
 
+  // Preload the user's primary pharmacy as the first selection.
   useEffect(() => {
+    if (!user) return;
     (async () => {
-      const [p, d] = await Promise.all([
-        fetchAll<Pharm>((from, to) =>
-          supabase.from("pharmacies").select("id,name,region,country,postcode").order("name").range(from, to)
-        ),
-        fetchAll<Row>((from, to) =>
-          supabase
-            .from("dispensing_data")
-            .select("pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations")
-            .range(from, to)
-        ),
-      ]);
-      setPharms(p);
-      setRows(d);
-
-      if (user) {
-        const { data: up } = await supabase
-          .from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle();
-        if (up?.pharmacy_id) setSelected([up.pharmacy_id]);
+      const { data: up } = await supabase
+        .from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle();
+      if (!up?.pharmacy_id) return;
+      const { data: ph } = await supabase
+        .from("pharmacies").select("id,name,region,country,postcode")
+        .eq("id", up.pharmacy_id).maybeSingle();
+      if (ph) {
+        setPharms((cur) => (cur.some((x) => x.id === ph.id) ? cur : [...cur, ph as Pharm]));
+        setSelected((cur) => (cur.includes(ph.id) ? cur : [...cur, ph.id]));
       }
     })();
   }, [user]);
+
+  // Fetch dispensing data only for the selected pharmacies (last 24 months).
+  useEffect(() => {
+    if (selected.length === 0) { setRows([]); return; }
+    setLoading(true);
+    (async () => {
+      const now = new Date();
+      const cutoff = new Date(now.getFullYear(), now.getMonth() - 24, 1);
+      const cutoffYear = cutoff.getFullYear();
+      const data = await fetchAll<Row>((from, to) =>
+        supabase
+          .from("dispensing_data")
+          .select("pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations")
+          .in("pharmacy_id", selected)
+          .gte("year", cutoffYear)
+          .order("year", { ascending: true })
+          .order("month", { ascending: true })
+          .range(from, to)
+      );
+      setRows(data);
+      setLoading(false);
+    })();
+  }, [selected]);
 
   const selectedPharms = useMemo(
     () => selected.map((id) => pharms.find((p) => p.id === id)).filter(Boolean) as Pharm[],
