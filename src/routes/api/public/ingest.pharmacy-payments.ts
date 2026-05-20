@@ -31,6 +31,7 @@ const RowSchema = z.object({
 const BodySchema = z.object({
   rows: z.array(RowSchema).min(1).max(5000),
   data_source: z.string().min(1).max(64).optional(),
+  is_actual_payment: z.boolean().optional(),
 });
 
 export const Route = createFileRoute("/api/public/ingest/pharmacy-payments")({
