@@ -76,6 +76,7 @@ function AdminDataPage() {
   const trigger = async (source: string, opts?: { reingest?: boolean }) => {
     const key = source + (opts?.reingest ? ":reingest" : "");
     setTriggering(key);
+    const toastId = `ingest-${key}`;
     try {
       const basePath =
         source === "PHS_SCOTLAND"
@@ -85,22 +86,46 @@ function AdminDataPage() {
         toast.info("Ingest endpoint not wired for this source yet.");
         return;
       }
-      const path = opts?.reingest ? `${basePath}?reingest=1` : basePath;
-      const res = await fetch(path, { method: "POST" });
-      const text = await res.text();
-      let json: { ok?: boolean; error?: string; reset?: number; queued?: number; processed?: number; pending?: number } = {};
-      try { json = JSON.parse(text); } catch {
-        throw new Error(`Server returned non-JSON (HTTP ${res.status}): ${text.slice(0, 140)}`);
+
+      const callOnce = async (qs: string) => {
+        const res = await fetch(`${basePath}${qs}`, { method: "POST" });
+        const text = await res.text();
+        let json: { ok?: boolean; error?: string; reset?: number; queued?: number; processed?: number; pending?: number } = {};
+        try { json = JSON.parse(text); } catch {
+          throw new Error(`Server returned non-JSON (HTTP ${res.status}): ${text.slice(0, 140)}`);
+        }
+        if (!res.ok || !json.ok) throw new Error(json.error || `HTTP ${res.status}`);
+        return json;
+      };
+
+      // Initial call — does reset+discover if reingest, otherwise discover+1 item.
+      let json = await callOnce(opts?.reingest ? "?reingest=1" : "");
+      const total = (json.queued ?? 0) + (json.pending ?? 0);
+      let done = json.processed ?? 0;
+      toast.loading(`Ingesting Scotland… ${done}/${total || "?"} (${json.pending ?? 0} pending)`, { id: toastId });
+
+      // Drain the queue: keep calling until pending === 0. Stop after a safety cap.
+      let safety = 500;
+      let consecutiveNoProgress = 0;
+      while ((json.pending ?? 0) > 0 && safety-- > 0) {
+        json = await callOnce("");
+        const processedThisCall = json.processed ?? 0;
+        done += processedThisCall;
+        if (processedThisCall === 0) {
+          consecutiveNoProgress += 1;
+          if (consecutiveNoProgress >= 3) {
+            throw new Error(`Stalled with ${json.pending} item(s) still pending — check failures in the log below.`);
+          }
+        } else {
+          consecutiveNoProgress = 0;
+        }
+        toast.loading(`Ingesting Scotland… ${done}/${total || done} (${json.pending ?? 0} pending)`, { id: toastId });
       }
-      if (!res.ok || !json.ok) throw new Error(json.error || `HTTP ${res.status}`);
-      toast.success(
-        opts?.reingest
-          ? `Re-ingest started — reset ${json.reset ?? 0}, queued ${json.queued ?? 0}, processed ${json.processed ?? 0}`
-          : `Queued ${json.queued ?? 0}, processed ${json.processed ?? 0}, pending ${json.pending ?? 0}`,
-      );
+
+      toast.success(`Done — processed ${done} file(s), ${json.pending ?? 0} pending`, { id: toastId });
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      toast.error(e instanceof Error ? e.message : String(e), { id: toastId });
     } finally {
       setTriggering(null);
     }
