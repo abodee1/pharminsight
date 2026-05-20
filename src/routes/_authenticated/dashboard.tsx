@@ -296,6 +296,20 @@ function Dashboard() {
         )}
       </div>
 
+      {peerItems.length > 8 && (
+        <div className="mt-6">
+          <DistributionStrip
+            label={`How ${pharmacy?.country || "the country"} dispenses — ${stats.period}`}
+            values={peerItems}
+            highlightValue={pharmacy ? stats.items : undefined}
+            highlightLabel={pharmacy?.name}
+            caption="Each bar is a band of pharmacies grouped by monthly items dispensed."
+          />
+        </div>
+      )}
+
+
+
 
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link to="/compare" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md transition-all">
