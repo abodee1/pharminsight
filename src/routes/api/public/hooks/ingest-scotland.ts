@@ -70,45 +70,51 @@ function isProvisional(year: number | null, month: number | null) {
   return false;
 }
 
-// Minimal RFC-4180-ish CSV parser (handles quoted fields, commas, newlines).
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
+// Streaming CSV parser — never holds the full file in memory.
+// Calls onRow(cells) for each row as it arrives.
+async function streamCsv(url: string, onRow: (cells: string[]) => void) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Fetch ${res.status}`);
+  if (!res.body) throw new Error("Response has no body stream");
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
   let row: string[] = [];
   let cell = "";
   let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (text[i + 1] === '"') { cell += '"'; i++; }
-        else inQuotes = false;
-      } else cell += ch;
-    } else {
-      if (ch === '"') inQuotes = true;
-      else if (ch === ",") { row.push(cell); cell = ""; }
-      else if (ch === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; }
-      else if (ch === "\r") { /* skip */ }
-      else cell += ch;
+  const flushRow = () => { row.push(cell); onRow(row); row = []; cell = ""; };
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const text = decoder.decode(value, { stream: true });
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { cell += '"'; i++; }
+          else inQuotes = false;
+        } else cell += ch;
+      } else {
+        if (ch === '"') inQuotes = true;
+        else if (ch === ",") { row.push(cell); cell = ""; }
+        else if (ch === "\n") { flushRow(); }
+        else if (ch === "\r") { /* skip */ }
+        else cell += ch;
+      }
     }
   }
-  if (cell.length || row.length) { row.push(cell); rows.push(row); }
-  return rows;
+  // Tail
+  const tail = decoder.decode();
+  for (let i = 0; i < tail.length; i++) {
+    const ch = tail[i];
+    if (inQuotes) { if (ch === '"') inQuotes = false; else cell += ch; }
+    else if (ch === ",") { row.push(cell); cell = ""; }
+    else if (ch === "\n") { flushRow(); }
+    else if (ch !== "\r") cell += ch;
+  }
+  if (cell.length || row.length) flushRow();
 }
 
-function csvToObjects(text: string): Record<string, string>[] {
-  const rows = parseCsv(text);
-  if (rows.length < 2) return [];
-  const header = rows[0].map((h) => h.trim());
-  const out: Record<string, string>[] = [];
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
-    if (r.length === 1 && r[0] === "") continue;
-    const obj: Record<string, string> = {};
-    header.forEach((h, idx) => (obj[h] = (r[idx] ?? "").trim()));
-    out.push(obj);
-  }
-  return out;
-}
+
 
 async function discover() {
   // Pre-fetch the full set of already-successful URLs for this source in one go.
