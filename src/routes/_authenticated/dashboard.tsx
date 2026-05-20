@@ -137,6 +137,37 @@ function Dashboard() {
         </div>
       </div>
 
+      {pharmacy && peerItems.length > 0 && (
+        <div className="mt-6 grid md:grid-cols-2 gap-4">
+          <PercentileRail
+            label="Items dispensed · this month"
+            value={stats.items}
+            values={peerItems}
+            peerLabel="National avg"
+            nationalLabel="Highest"
+            caption={`Your pharmacy versus ${peerItems.length.toLocaleString()} reporting peers nationwide.`}
+          />
+          <PercentileRail
+            label="Pharmacy First · this month"
+            value={stats.pf}
+            values={peerPf}
+            peerLabel="National avg"
+            nationalLabel="Highest"
+            caption="Consultations delivered through the Pharmacy First / CPCS clinical pathway."
+          />
+        </div>
+      )}
+
+      {pharmacy && series.length >= 6 && (
+        <div className="mt-6">
+          <AnnotatedSparkline
+            label="Items dispensed — your 12-month arc"
+            points={series.map((s) => ({ period: s.label, value: s.mine }))}
+          />
+        </div>
+      )}
+
+
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link to="/compare" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md transition-all">
           <div className="h-9 w-9 rounded-lg bg-secondary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
