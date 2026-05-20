@@ -74,15 +74,28 @@ function Dashboard() {
       const countryById = new Map<string, string>();
       allPharm.forEach((p) => countryById.set(p.id, p.country || "Unknown"));
 
-      // Pull last 2 years of dispensing_data by date filter (avoid huge .in() URL)
-      const nowYear = new Date().getFullYear();
+      // Window: last ~13 months ending at the latest substantive period.
+      // Avoid pulling the entire 2-year backlog (hundreds of thousands of rows)
+      // — it both delays the dashboard and risks request timeouts.
+      const latestPeriod = await getLatestSubstantialPeriod();
+      const endY = latestPeriod?.year ?? new Date().getFullYear();
+      const endM = latestPeriod?.month ?? new Date().getMonth() + 1;
+      const startKey = endY * 12 + (endM - 1) - 12; // 13 months inclusive
+      const startY = Math.floor(startKey / 12);
+      const startM = (startKey % 12) + 1;
+
       const allRecent = await fetchAll<Row & { year: number; month: number }>((from, to) =>
         supabase
           .from("dispensing_data")
           .select(
             "pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,pharmacy_first_payment,mcr_payment,smoking_cessation_payment,final_payment,gross_cost,is_actual_payment",
           )
-          .gte("year", nowYear - 2)
+          .or(
+            `and(year.gt.${startY}),and(year.eq.${startY},month.gte.${startM})`,
+          )
+          .or(
+            `and(year.lt.${endY}),and(year.eq.${endY},month.lte.${endM})`,
+          )
           .range(from, to),
       );
 
