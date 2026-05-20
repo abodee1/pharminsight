@@ -125,9 +125,11 @@ async function discover() {
   {
     const { data } = await supabaseAdmin
       .from("ingestion_queue")
-      .select("resource_url")
+      .select("resource_url, status")
       .eq("source", SOURCE);
-    for (const r of data ?? []) successUrls.add(r.resource_url);
+    for (const r of data ?? []) {
+      if (["pending", "processing", "done"].includes(r.status)) successUrls.add(r.resource_url);
+    }
   }
 
   const toQueue: Array<{
@@ -151,6 +153,7 @@ async function discover() {
       const { year, month } = parseYearMonth(r.url, r.name, r.created ?? r.last_modified);
       toQueue.push({
         source: SOURCE, dataset: ds.id, resource_url: r.url, year, month, status: "pending",
+        error: null,
       });
     }
   }
@@ -160,7 +163,7 @@ async function discover() {
     const chunk = toQueue.slice(i, i + 200);
     const { error } = await supabaseAdmin
       .from("ingestion_queue")
-      .upsert(chunk, { onConflict: "source,dataset,resource_url", ignoreDuplicates: true });
+      .upsert(chunk, { onConflict: "source,dataset,resource_url" });
     if (!error) queued += chunk.length;
   }
   return queued;
