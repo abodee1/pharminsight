@@ -117,10 +117,11 @@ export function PharmacySearch({ compact = false }: { compact?: boolean }) {
 }
 
 async function runSearch(term: string): Promise<Pharmacy[]> {
-  const cols = "id,ods_code,name,address,postcode,country";
+  const cols = "id,ods_code,name,address,postcode,country,region";
   const looksLikeOds = ODS_RE.test(term);
   const looksLikePostcode = POSTCODE_RE.test(term);
   const upper = term.toUpperCase();
+  const esc = (s: string) => s.replace(/[%_,()]/g, " ").trim();
 
   const queries: PromiseLike<Pharmacy[]>[] = [];
 
@@ -131,32 +132,51 @@ async function runSearch(term: string): Promise<Pharmacy[]> {
     );
   }
 
-  // 2. Postcode prefix
+  // 2. Postcode prefix (also try with whitespace stripped, since stored postcodes
+  // sometimes lack the space e.g. "KY112RA")
   if (looksLikePostcode || /^[A-Za-z]{1,2}[0-9]/.test(term)) {
+    const compact = term.replace(/\s+/g, "");
     queries.push(
       supabase
         .from("pharmacies")
         .select(cols)
-        .ilike("postcode", `${term}%`)
+        .or(`postcode.ilike.${esc(term)}%,postcode.ilike.${esc(compact)}%`)
         .order("postcode", { ascending: true })
         .limit(20)
         .then((r) => (r.data || []) as Pharmacy[])
     );
   }
 
-  // 3. Name (starts-with then contains) + address (contains)
-  const escaped = term.replace(/[%_]/g, "\\$&");
-  queries.push(
-    supabase
-      .from("pharmacies")
-      .select(cols)
-      .or(`name.ilike.${escaped}%,name.ilike.%${escaped}%,address.ilike.%${escaped}%`)
-      .limit(20)
-      .then((r) => (r.data || []) as Pharmacy[])
-  );
+  // 3. Tokenised multi-word search. Each token must appear in at least one of
+  // name/address/postcode/region. We seed with the most distinctive token
+  // (longest) via an OR filter, then AND the rest in-memory.
+  const tokens = term.split(/\s+/).map(esc).filter((t) => t.length >= 2);
+  if (tokens.length) {
+    const seed = [...tokens].sort((a, b) => b.length - a.length)[0];
+    queries.push(
+      supabase
+        .from("pharmacies")
+        .select(cols)
+        .or(
+          `name.ilike.%${seed}%,address.ilike.%${seed}%,postcode.ilike.%${seed}%,region.ilike.%${seed}%`,
+        )
+        .limit(200)
+        .then((r) => {
+          const rows = (r.data || []) as Pharmacy[];
+          const lowers = tokens.map((t) => t.toLowerCase());
+          return rows.filter((p) => {
+            const hay = [p.name, p.address, p.postcode, (p as any).region]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase();
+            return lowers.every((t) => hay.includes(t));
+          });
+        })
+    );
+  }
 
   // 4. ODS prefix (fallback)
-  if (!looksLikeOds && /^[A-Za-z][A-Za-z0-9]/.test(term)) {
+  if (!looksLikeOds && /^[A-Za-z][A-Za-z0-9]/.test(term) && !term.includes(" ")) {
     queries.push(
       supabase
         .from("pharmacies")
