@@ -134,7 +134,7 @@ async function discover() {
 
   const toQueue: Array<{
     source: string; dataset: string; resource_url: string;
-    year: number | null; month: number | null; status: string;
+    year: number | null; month: number | null; status: string; error: string | null;
   }> = [];
 
   for (const ds of DATASETS) {
