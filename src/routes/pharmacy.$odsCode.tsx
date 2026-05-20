@@ -452,6 +452,7 @@ function PharmacyProfile() {
                   values={peerDistribution.items_dispensed}
                   peerLabel={`${pharmacy.country} avg`}
                   nationalLabel="Highest"
+                  caption="Where this pharmacy's monthly prescription volume sits against every reporting peer in the country. The marker is this pharmacy; ticks show the country average and the top reporter."
                 />
                 <PercentileRail
                   label="Pharmacy First consultations"
@@ -459,6 +460,7 @@ function PharmacyProfile() {
                   values={peerDistribution.pharmacy_first_count}
                   peerLabel={`${pharmacy.country} avg`}
                   nationalLabel="Highest"
+                  caption="Clinical consultations delivered under the Pharmacy First pathway this month, ranked against country peers."
                 />
                 {!isScotland && (
                   <PercentileRail
@@ -467,6 +469,7 @@ function PharmacyProfile() {
                     values={peerDistribution.nms_count}
                     peerLabel={`${pharmacy.country} avg`}
                     nationalLabel="Highest"
+                    caption="NMS interventions completed this month versus other pharmacies in the country."
                   />
                 )}
                 {!isScotland && (
@@ -476,6 +479,7 @@ function PharmacyProfile() {
                     values={peerDistribution.eps_items}
                     peerLabel={`${pharmacy.country} avg`}
                     nationalLabel="Highest"
+                    caption="Items dispensed electronically via EPS this month, ranked against country peers."
                   />
                 )}
               </div>
@@ -487,13 +491,16 @@ function PharmacyProfile() {
               <AnnotatedSparkline
                 label="Items dispensed — 24-month arc"
                 points={chartData.map((d) => ({ period: d.label, value: d.items }))}
+                caption="Two-year trajectory of monthly prescription volume. Dots mark the peak and trough months in the window."
               />
               <AnnotatedSparkline
                 label="Pharmacy First — 24-month arc"
                 points={chartData.map((d) => ({ period: d.label, value: d.pf }))}
+                caption="Two-year trajectory of Pharmacy First consultations, with peak and trough months highlighted."
               />
             </section>
           )}
+
 
           {isScotland && latest && (
             <section className="mt-6">

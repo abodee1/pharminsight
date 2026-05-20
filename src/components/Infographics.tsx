@@ -233,11 +233,14 @@ export function AnnotatedSparkline({
   label,
   points,
   unit = "",
+  caption,
 }: {
   label: string;
   points: { period: string; value: number }[];
   unit?: string;
+  caption?: string;
 }) {
+
   if (points.length < 2) {
     return (
       <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
@@ -293,9 +296,11 @@ export function AnnotatedSparkline({
           Low: <span className="font-semibold text-foreground">{fmt(min)}{unit}</span> · {points[troughIdx].period}
         </span>
       </div>
+      {caption && <p className="mt-3 text-xs italic text-muted-foreground border-t border-border pt-2">{caption}</p>}
     </div>
   );
 }
+
 
 /* ----------------------------------------------------------------
  * ShareDonut
