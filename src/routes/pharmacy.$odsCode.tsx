@@ -9,6 +9,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X } from "lucide-react";
+import { PharmacySearch } from "@/components/PharmacySearch";
 
 export const Route = createFileRoute("/pharmacy/$odsCode")({ component: PharmacyProfile });
 
@@ -175,8 +176,26 @@ function PharmacyProfile() {
 
   const tableRows = [...rows].slice(-24).reverse();
 
+  const backTo = user ? "/dashboard" : "/";
+  const backLabel = user ? "Back to dashboard" : "Back home";
+
   return (
-    <div className="p-6 md:p-10 max-w-6xl mx-auto">
+    <div>
+      <div className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+        <div className="max-w-6xl mx-auto px-4 md:px-10 py-3 flex items-center gap-3">
+          <Link
+            to={backTo}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">{backLabel}</span>
+          </Link>
+          <div className="flex-1 min-w-0 max-w-xl ml-auto">
+            <PharmacySearch compact placeholder="Search another pharmacy…" />
+          </div>
+        </div>
+      </div>
+      <div className="p-6 md:p-10 max-w-6xl mx-auto">
+
       {showClaimBanner && (
         <div className="mb-6 rounded-lg border border-gold/40 bg-gold/10 p-4 flex items-start gap-3">
           <Star className="h-5 w-5 text-gold shrink-0 mt-0.5" />
@@ -317,6 +336,7 @@ function PharmacyProfile() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
