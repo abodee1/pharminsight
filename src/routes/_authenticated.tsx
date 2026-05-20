@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { AppSidebar } from "@/components/AppSidebar";
+import { MobileTopBar } from "@/components/MobileTopBar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -31,9 +32,12 @@ function AuthLayout() {
   return (
     <div className="min-h-screen flex bg-background">
       <AppSidebar />
-      <main className="flex-1 overflow-x-hidden">
-        <Outlet />
-      </main>
+      <div className="flex-1 flex flex-col min-w-0">
+        <MobileTopBar />
+        <main className="flex-1 overflow-x-hidden">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
