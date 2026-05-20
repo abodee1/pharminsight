@@ -396,8 +396,8 @@ function PharmacyProfile() {
             <MiniChart title="Gross cost (£)" data={chartData} dataKey="cost" />
           </div>
 
-          {/* Pharmacy First service mix hidden for now */}
-          {false && isScotland && latest && latest.pharmacy_first_services && (
+          {/* Pharmacy First service mix hidden for now
+          {isScotland && latest && latest.pharmacy_first_services && (
             <PFServiceMix
               services={latest.pharmacy_first_services}
               peerAvg={pfPeerAvg}
@@ -406,6 +406,7 @@ function PharmacyProfile() {
               period={`${MONTHS[latest.month - 1]} ${latest.year}`}
             />
           )}
+          */}
 
           <div className="mt-6 rounded-lg bg-card border border-border shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-border flex items-center justify-between">
