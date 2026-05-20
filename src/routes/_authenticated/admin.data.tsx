@@ -73,22 +73,26 @@ function AdminDataPage() {
     return byKey;
   }, [logs]);
 
-  const trigger = async (source: string) => {
-    setTriggering(source);
+  const trigger = async (source: string, opts?: { reingest?: boolean }) => {
+    const key = source + (opts?.reingest ? ":reingest" : "");
+    setTriggering(key);
     try {
-      const path =
+      const basePath =
         source === "PHS_SCOTLAND"
           ? "/api/public/hooks/ingest-scotland"
           : null;
-      if (!path) {
+      if (!basePath) {
         toast.info("Ingest endpoint not wired for this source yet.");
         return;
       }
+      const path = opts?.reingest ? `${basePath}?reingest=1` : basePath;
       const res = await fetch(path, { method: "POST" });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || `HTTP ${res.status}`);
       toast.success(
-        `Queued ${json.queued ?? 0}, processed ${json.processed ?? 0}, pending ${json.pending ?? 0}`,
+        opts?.reingest
+          ? `Re-ingest started — reset ${json.reset ?? 0}, queued ${json.queued ?? 0}, processed ${json.processed ?? 0}`
+          : `Queued ${json.queued ?? 0}, processed ${json.processed ?? 0}, pending ${json.pending ?? 0}`,
       );
       await load();
     } catch (e) {
