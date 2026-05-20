@@ -278,7 +278,7 @@ function PharmacyProfile() {
                 </thead>
                 <tbody>
                   {tableRows.map((r) => {
-                    const fmt£ = (v: number | string | null) => "£" + (Number(v) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+                    const fmtGbp = (v: number | string | null) => "£" + (Number(v) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
                     return (
                       <tr key={`${r.year}-${r.month}`} className="border-t border-border">
                         <td className="px-3 py-2 whitespace-nowrap">{MONTHS[r.month - 1]} {r.year}</td>
@@ -287,14 +287,14 @@ function PharmacyProfile() {
                         <td className="px-3 py-2 text-right tabular-nums">{r.eps_nominations.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{r.nms_count.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{r.pharmacy_first_count.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{fmt£(r.pharmacy_first_payment)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.pharmacy_first_payment)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{r.flu_vaccinations.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{r.ehc_items.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{r.methadone_items.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{r.smoking_cessation.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{fmt£(r.mcr_payment)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{fmt£(r.gross_cost)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{fmt£(r.final_payment)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.mcr_payment)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.gross_cost)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.final_payment)}</td>
                       </tr>
                     );
                   })}
