@@ -33,6 +33,8 @@ function Dashboard() {
   const [pharmacy, setPharmacy] = useState<Pharmacy | null>(null);
   const [series, setSeries] = useState<{ label: string; mine: number; national: number }[]>([]);
   const [stats, setStats] = useState({ items: 0, pf: 0, nms: 0, rank: 0, total: 0 });
+  const [peerItems, setPeerItems] = useState<number[]>([]);
+  const [peerPf, setPeerPf] = useState<number[]>([]);
 
   useEffect(() => {
     (async () => {
