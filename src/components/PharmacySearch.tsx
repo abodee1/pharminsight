@@ -122,7 +122,7 @@ async function runSearch(term: string): Promise<Pharmacy[]> {
   const looksLikePostcode = POSTCODE_RE.test(term);
   const upper = term.toUpperCase();
 
-  const queries: Promise<Pharmacy[]>[] = [];
+  const queries: PromiseLike<Pharmacy[]>[] = [];
 
   // 1. Exact ODS match
   if (looksLikeOds) {
