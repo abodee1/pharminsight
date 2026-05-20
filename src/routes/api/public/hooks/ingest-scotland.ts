@@ -311,14 +311,19 @@ async function processQueueItem(item: {
           ods_code: ods,
           name: nameIdx >= 0 ? ((cells[nameIdx] ?? "").trim() || ods) : ods,
           region: regionIdx >= 0 ? ((cells[regionIdx] ?? "").trim() || null) : null,
-          year, month, items: 0, payments: blankPayments(),
+          year, month, items: 0, payments: blankPayments(), pf_services: blankPFServices(),
         };
         agg.set(key, cur);
       }
-      if (itemsIdx >= 0) cur.items += num(cells[itemsIdx]);
+      const row = cur;
+      if (itemsIdx >= 0) row.items += num(cells[itemsIdx]);
       for (const f of Object.keys(PAYMENT_FIELDS) as PField[]) {
         const idx = paymentIdxByField[f];
-        if (idx !== undefined) cur.payments[f] += num(cells[idx]);
+        if (idx !== undefined) row.payments[f] += num(cells[idx]);
+      }
+      for (const s of Object.keys(PF_SERVICE_FIELDS) as PFService[]) {
+        const idx = pfServiceIdxByField[s];
+        if (idx !== undefined) row.pf_services[s] += num(cells[idx]);
       }
     });
 
