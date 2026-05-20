@@ -464,7 +464,7 @@ function Compare() {
                       const [y, m] = latest.split("-").map(Number);
                       const vals = selectedPharms.map((ph) => {
                         const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-                        return { ph, v: row ? (row[mt.key] as number) : 0 };
+                        return { ph, v: mt.compute(row) };
                       }).sort((a, b) => b.v - a.v);
                       const leader = vals[0];
                       const runner = vals[1];
@@ -473,7 +473,7 @@ function Compare() {
                         <div key={mt.key} className="border-l-2 pl-3" style={{ borderColor: colorFor(leader.ph.id) }}>
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{mt.label}</p>
                           <p className="text-sm font-semibold truncate" title={leader.ph.name}>{leader.ph.name}</p>
-                          <p className="text-lg font-bold tabular-nums">{leader.v.toLocaleString()}</p>
+                          <p className="text-lg font-bold tabular-nums">{leader.v > 0 ? mt.format(leader.v) : "—"}</p>
                           {runner && (
                             <p className="text-xs text-muted-foreground mt-0.5">
                               {margin !== null
@@ -519,7 +519,7 @@ function Compare() {
                             <td className="px-6 py-3 font-medium">{mt.label}</td>
                             {selectedPharms.map((ph) => {
                               const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-                              const v = row ? (row[mt.key] as number) : 0;
+                              const v = mt.compute(row);
                               const isWin = ph.id === winnerId && selectedPharms.length > 1;
                               return (
                                 <td
