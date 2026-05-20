@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetchAll";
+import { getLatestSubstantialPeriod } from "@/lib/latestPeriod";
 import { PageHeader } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,24 +47,17 @@ function Leaderboards() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [pData, lastData, upData] = await Promise.all([
+      const [pData, last, upData] = await Promise.all([
         fetchAll<Pharm>((from, to) =>
           supabase.from("pharmacies").select("id,name,region,country,postcode").eq("country", country).range(from, to)
         ),
-        supabase
-          .from("dispensing_data")
-          .select("year,month")
-          .order("year", { ascending: false })
-          .order("month", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+        getLatestSubstantialPeriod(),
         user ? supabase.from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null }),
       ]);
       setPharms(pData);
       setMyPharmId((upData as any)?.data?.pharmacy_id ?? null);
 
       // Build last 36 months list from max period
-      const last = (lastData as any)?.data;
       if (last) {
         const list: string[] = [];
         let y = last.year, m = last.month;

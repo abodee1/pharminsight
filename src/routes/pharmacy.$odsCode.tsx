@@ -611,7 +611,7 @@ function PharmacyProfile() {
         <div className="mt-8 rounded-lg border border-border bg-secondary/40 p-5 text-sm">
           <p className="font-semibold">Want deeper insights?</p>
           <p className="text-muted-foreground mt-1">
-            Create a free PharmIQ account to benchmark, compare, and unlock expert commentary.
+            Create a free PharmInsight account to benchmark, compare, and unlock expert commentary.
           </p>
           <div className="mt-3 flex gap-2">
             <Link to="/register"><Button size="sm">Create account</Button></Link>

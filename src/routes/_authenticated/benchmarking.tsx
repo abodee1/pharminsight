@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetchAll";
+import { getLatestSubstantialPeriod } from "@/lib/latestPeriod";
 import { PageHeader } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,14 +37,8 @@ function Benchmarking() {
         const { data: ph } = await supabase.from("pharmacies").select("*").eq("id", up.pharmacy_id).maybeSingle();
         setPharmacy(ph);
       }
-      const { data: last } = await supabase
-        .from("dispensing_data")
-        .select("year,month")
-        .order("year", { ascending: false })
-        .order("month", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (last) setLatest({ year: last.year, month: last.month });
+      const last = await getLatestSubstantialPeriod();
+      if (last) setLatest(last);
     })();
   }, [user]);
 

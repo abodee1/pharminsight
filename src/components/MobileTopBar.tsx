@@ -45,7 +45,7 @@ export function MobileTopBar() {
         <SheetContent side="left" className="bg-sidebar text-sidebar-foreground border-sidebar-border p-0 w-72">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="px-5 py-5 border-b border-sidebar-border">
-            <p className="text-xl font-bold tracking-tight">PharmIQ</p>
+            <p className="text-xl font-bold tracking-tight">PharmInsight</p>
             <p className="text-xs text-sidebar-muted mt-1">NHS pharmacy analytics</p>
           </div>
           <nav className="p-3 space-y-1">
@@ -91,7 +91,7 @@ export function MobileTopBar() {
       </Sheet>
 
       <Link to="/dashboard" className="font-bold tracking-tight text-foreground">
-        PharmIQ
+        PharmInsight
       </Link>
 
       <div className="flex items-center gap-2">
