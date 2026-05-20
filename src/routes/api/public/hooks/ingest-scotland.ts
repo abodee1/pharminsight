@@ -177,15 +177,58 @@ async function processQueueItem(item: {
 
     // Identify ods/name/region/items columns flexibly
     const first = rows[0];
-    const odsKey = ["DispensLocationCode", "DispenserLocationCode", "ContractorCode"].find((k) => k in first);
-    const nameKey = ["DispensLocationName", "DispenserLocationName", "ContractorName"].find((k) => k in first);
-    const regionKey = ["HBName", "HealthBoardName"].find((k) => k in first);
-    const itemsKey = ["NumberOfPaidItems", "PaidQuantity", "Items"].find((k) => k in first);
-    const costKey = ["GrossIngredientCost", "GIC"].find((k) => k in first);
-    const monthKey = ["PaidDateMonth"].find((k) => k in first);
-    const yearKey = ["Year"].find((k) => k in first);
+    const headers = Object.keys(first);
+    const findHeader = (variants: string[]): string | undefined => {
+      const lower = new Map(headers.map((h) => [h.toLowerCase().replace(/[\s_]/g, ""), h]));
+      for (const v of variants) {
+        const norm = v.toLowerCase().replace(/[\s_]/g, "");
+        const found = lower.get(norm);
+        if (found) return found;
+      }
+      return undefined;
+    };
+    const logMissing = async (field: string, variants: string[]) => {
+      await supabaseAdmin.from("schema_alerts").insert({
+        source: SOURCE,
+        dataset: item.dataset,
+        resource_url: item.resource_url,
+        missing_field: field,
+        tried_variants: variants,
+        available_headers: headers,
+      });
+    };
+
+    const odsKey = findHeader(["DispensLocationCode", "DispenserLocationCode", "ContractorCode"]);
+    const nameKey = findHeader(["DispensLocationName", "DispenserLocationName", "ContractorName"]);
+    const regionKey = findHeader(["HBName", "HealthBoardName"]);
+    const itemsKey = findHeader(["NumberOfPaidItems", "PaidQuantity", "Items"]);
+    const monthKey = findHeader(["PaidDateMonth"]);
+    const yearKey = findHeader(["Year"]);
+
+    // Payment / service field mapping with multiple known variants per field.
+    const PAYMENT_FIELDS = {
+      pharmacy_first_payment: ["PharmacyFirstPayment", "Pharmacy_First_Payment", "PF_Payment", "PharmFirstPayment"],
+      mcr_payment: ["MCRPayment", "MCR_Payment", "MedicinesCareReview", "MCR_Total"],
+      ehc_items: ["EHCItems", "EHC_Items", "EHC", "EmergencyContraception"],
+      methadone_items: ["MethadoneItems", "Methadone_Items", "Methadone", "MethadoneSupervised"],
+      smoking_cessation: ["SmokingCessation", "Smoking_Cessation", "SmokingCessationItems", "SC_Items"],
+      gross_cost: ["GrossIngredientCost", "Gross_Cost", "GIC", "GrossIngCost", "GICTotal"],
+      final_payment: ["FinalPayment", "Final_Payment", "TotalPayment", "NetPayment", "Total_Net_Payment"],
+    } as const;
+    type PField = keyof typeof PAYMENT_FIELDS;
+
+    const paymentKeyByField: Partial<Record<PField, string>> = {};
+    const isContractorActivity = item.dataset === "community-pharmacy-contractor-activity";
+    for (const f of Object.keys(PAYMENT_FIELDS) as PField[]) {
+      const k = findHeader([...PAYMENT_FIELDS[f]]);
+      if (k) paymentKeyByField[f] = k;
+      else if (isContractorActivity) await logMissing(f, [...PAYMENT_FIELDS[f]]);
+    }
 
     if (!odsKey) throw new Error("No ods code column found");
+
+    const num = (v: string | undefined) =>
+      v ? Number(String(v).replace(/[£,]/g, "")) || 0 : 0;
 
     // Aggregate rows by (ods_code, year, month)
     type Agg = {
@@ -195,8 +238,12 @@ async function processQueueItem(item: {
       year: number;
       month: number;
       items: number;
-      cost: number;
+      payments: Record<PField, number>;
     };
+    const blankPayments = (): Record<PField, number> => ({
+      pharmacy_first_payment: 0, mcr_payment: 0, ehc_items: 0,
+      methadone_items: 0, smoking_cessation: 0, gross_cost: 0, final_payment: 0,
+    });
     const agg = new Map<string, Agg>();
 
     for (const row of rows) {
@@ -216,22 +263,27 @@ async function processQueueItem(item: {
       if (!year) continue;
 
       const key = `${ods}|${year}|${month}`;
-      const items = itemsKey ? Number(row[itemsKey].replace(/,/g, "")) || 0 : 0;
-      const cost = costKey ? Number(row[costKey].replace(/[£,]/g, "")) || 0 : 0;
+      const items = itemsKey ? num(row[itemsKey]) : 0;
 
-      const cur = agg.get(key);
-      if (cur) {
-        cur.items += items;
-        cur.cost += cost;
-      } else {
-        agg.set(key, {
+      let cur = agg.get(key);
+      if (!cur) {
+        cur = {
           ods_code: ods,
           name: nameKey ? row[nameKey] || ods : ods,
           region: regionKey ? row[regionKey] || null : null,
-          year, month, items, cost,
-        });
+          year, month, items: 0, payments: blankPayments(),
+        };
+        agg.set(key, cur);
+      } else {
+        cur.items += 0; // placeholder; updated below
+      }
+      cur.items += items;
+      for (const f of Object.keys(PAYMENT_FIELDS) as PField[]) {
+        const k = paymentKeyByField[f];
+        if (k) cur.payments[f] += num(row[k]);
       }
     }
+
 
     // Upsert pharmacies in chunks
     const pharmacies = Array.from(
