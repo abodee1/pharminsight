@@ -18,7 +18,7 @@ const links = [
   { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/insights", label: "AI Insights", icon: Sparkles },
   { to: "/upload", label: "Upload Data", icon: Upload },
-  { to: "/settings", label: "Settings", icon: Settings },
+  { to: "/settings", label: "My Account", icon: Settings },
 ];
 
 export function AppSidebar() {
