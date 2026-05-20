@@ -15,7 +15,7 @@ const METRICS = [
   { key: "items_dispensed", label: "Items" },
   { key: "nms_count", label: "NMS" },
   { key: "pharmacy_first_count", label: "Pharmacy First" },
-  { key: "flu_vaccinations", label: "Flu" },
+  
   { key: "eps_nominations", label: "EPS Nom." },
 ] as const;
 

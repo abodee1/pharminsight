@@ -254,7 +254,7 @@ function EstimateView({
             <LineRow label="Dispensing fees" sub={`${fmtInt(latest.items_dispensed)} × ${fmtGbp(DISPENSING_FEE_PER_ITEM)}`} value={est.dispensing} />
             <LineRow label="Pharmacy First" sub={`${fmtInt(latest.pharmacy_first_count)} × ${fmtGbp(PHARMACY_FIRST_FEE)}`} value={est.pf} />
             <LineRow label="NMS" sub={`${fmtInt(latest.nms_count)} × ${fmtGbp(NMS_FEE)}`} value={est.nms} />
-            <LineRow label="Flu vaccinations" sub={`${fmtInt(latest.flu_vaccinations)} × ${fmtGbp(FLU_FEE)}`} value={est.flu} />
+            
             <LineRow label="DMS" sub="Data not tracked — assumed 0" value={est.dms} />
             <LineRow
               label="Estimated discount deduction"

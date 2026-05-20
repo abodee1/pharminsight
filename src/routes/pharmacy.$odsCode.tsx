@@ -260,7 +260,7 @@ function PharmacyProfile() {
             { label: "EPS nominations", key: "items_dispensed", value: latest.eps_nominations, prior: prior?.eps_nominations ?? 0, yoy: yoy?.eps_nominations ?? 0 },
             { label: "NMS", key: "nms_count", value: latest.nms_count, prior: prior?.nms_count ?? 0, yoy: yoy?.nms_count ?? 0 },
             { label: "Pharmacy First", key: "pharmacy_first_count", value: latest.pharmacy_first_count, prior: prior?.pharmacy_first_count ?? 0, yoy: yoy?.pharmacy_first_count ?? 0 },
-            { label: "Flu vaccinations", key: "flu_vaccinations", value: latest.flu_vaccinations, prior: prior?.flu_vaccinations ?? 0, yoy: yoy?.flu_vaccinations ?? 0 },
+            
           ])
     : [];
   const scottishMetrics = isScotland && latest
@@ -392,7 +392,6 @@ function PharmacyProfile() {
             {!isScotland && <MiniChart title="EPS items" data={chartData} dataKey="eps_items" />}
             {!isScotland && <MiniChart title="NMS" data={chartData} dataKey="nms" />}
             <MiniChart title="Pharmacy First" data={chartData} dataKey="pf" />
-            {!isScotland && <MiniChart title="Flu vaccinations" data={chartData} dataKey="flu" />}
             <MiniChart title="Gross cost (£)" data={chartData} dataKey="cost" />
           </div>
 
@@ -424,7 +423,6 @@ function PharmacyProfile() {
                     {!isScotland && <th className="text-right px-3 py-2 font-medium">NMS</th>}
                     <th className="text-right px-3 py-2 font-medium">PF</th>
                     <th className="text-right px-3 py-2 font-medium">PF £</th>
-                    <th className="text-right px-3 py-2 font-medium">Flu</th>
                     {isScotland && <th className="text-right px-3 py-2 font-medium">EHC</th>}
                     {isScotland && <th className="text-right px-3 py-2 font-medium">Meth.</th>}
                     {isScotland && <th className="text-right px-3 py-2 font-medium">Smoke.</th>}
@@ -445,7 +443,6 @@ function PharmacyProfile() {
                         {!isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.nms_count.toLocaleString()}</td>}
                         <td className="px-3 py-2 text-right tabular-nums">{r.pharmacy_first_count.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.pharmacy_first_payment)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{r.flu_vaccinations.toLocaleString()}</td>
                         {isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.ehc_items.toLocaleString()}</td>}
                         {isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.methadone_items.toLocaleString()}</td>}
                         {isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.smoking_cessation.toLocaleString()}</td>}
