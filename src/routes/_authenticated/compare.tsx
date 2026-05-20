@@ -102,18 +102,21 @@ function Compare() {
   const latest = periods[periods.length - 1];
   const prev = periods[periods.length - 2];
 
-  // Trend data
-  const trend = useMemo(() => {
-    return periods.map((p) => {
-      const [y, m] = p.split("-").map(Number);
-      const point: Record<string, any> = { label: `${MONTHS[m - 1]} ${String(y).slice(2)}` };
-      selectedPharms.forEach((ph) => {
-        const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-        point[ph.id] = row ? (row[metric] as number) : 0;
-      });
-      return point;
-    });
-  }, [periods, selectedPharms, rows, metric]);
+  // Trend data — one series per metric, x-axis = period, lines = selected pharmacies
+  const trendByMetric = useMemo(() => {
+    return METRICS.map((mt) => ({
+      metric: mt,
+      data: periods.map((p) => {
+        const [y, m] = p.split("-").map(Number);
+        const point: Record<string, any> = { label: `${MONTHS[m - 1]} ${String(y).slice(2)}` };
+        selectedPharms.forEach((ph) => {
+          const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
+          point[ph.id] = row ? (row[mt.key] as number) : 0;
+        });
+        return point;
+      }),
+    }));
+  }, [periods, selectedPharms, rows]);
 
   // Side-by-side metric data
   const sideBySide = useMemo(() => {
