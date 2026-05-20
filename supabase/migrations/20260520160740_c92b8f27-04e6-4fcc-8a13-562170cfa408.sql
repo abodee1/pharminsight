@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public._apply_pf_counts(jsonb);

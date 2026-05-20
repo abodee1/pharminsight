@@ -408,7 +408,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      _apply_pf_counts: { Args: { payload: Json }; Returns: number }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
