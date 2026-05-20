@@ -120,7 +120,7 @@ function Leaderboards() {
           {SERVICES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
         </select>
         <select value={region} onChange={(e) => { setRegion(e.target.value); setPage(0); }} className="rounded-md border border-input bg-card px-3 py-2 text-sm">
-          <option value="all">All regions</option>
+          <option value="all">All {country === "Scotland" ? "Health Boards" : "ICBs"}</option>
           {regions.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
         <select value={period} onChange={(e) => setPeriod(e.target.value)} className="rounded-md border border-input bg-card px-3 py-2 text-sm">
@@ -152,7 +152,7 @@ function Leaderboards() {
             <tr>
               <th className="text-left px-4 py-2 font-medium">#</th>
               <th className="text-left px-4 py-2 font-medium">Pharmacy</th>
-              <th className="text-left px-4 py-2 font-medium">Location</th>
+              <th className="text-left px-4 py-2 font-medium">{country === "Scotland" ? "Health Board" : "ICB"}</th>
               <th className="text-right px-4 py-2 font-medium">Count</th>
               <th className="text-right px-4 py-2 font-medium">vs prior</th>
             </tr>
