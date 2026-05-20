@@ -155,6 +155,16 @@ function Leaderboards() {
         </div>
       </div>
 
+      <div className="mb-4">
+        <DistributionStrip
+          label={`Distribution · ${SERVICES.find((s) => s.key === service)?.label} across ${country}${region !== "all" ? ` · ${region}` : ""}`}
+          values={board.map((r) => r.value)}
+          highlightValue={myPharmId ? board.find((r) => r.ph.id === myPharmId)?.value : undefined}
+          highlightLabel="Your pharmacy"
+          caption="Each bar is a slice of the cohort. The taller the bar, the more pharmacies cluster at that volume. The dark bar marks where the leading pharmacies sit, your own pharmacy is highlighted if it appears in this view."
+        />
+      </div>
+
       <div className="rounded-lg bg-card border border-border shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-muted-foreground">
