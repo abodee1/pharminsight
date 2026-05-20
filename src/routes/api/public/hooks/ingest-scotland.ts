@@ -194,13 +194,13 @@ async function processQueueItem(item: {
       | "pharmacy_first_payment" | "mcr_payment" | "ehc_items"
       | "methadone_items" | "smoking_cessation" | "gross_cost" | "final_payment";
     const PAYMENT_FIELDS: Record<PField, string[]> = {
-      pharmacy_first_payment: ["PharmacyFirstPayment", "Pharmacy_First_Payment", "PF_Payment", "PFPayment", "PharmFirstPayment"],
-      mcr_payment: ["MCRPayment", "MCR_Payment", "MedicinesCareReview", "MCR_Total"],
+      pharmacy_first_payment: ["PFPayment", "PharmacyFirstPayment", "Pharmacy_First_Payment", "PF_Payment", "PharmFirstPayment"],
+      mcr_payment: ["MedicinesCareandReviewPayment", "MedicinesCareReviewPayment", "MCRPayment", "MCR_Payment", "MCR_Total", "CMSCapitationPayment"],
       ehc_items: ["EHCItems", "EHC_Items", "EHC", "EmergencyContraception"],
       methadone_items: ["MethadoneItems", "Methadone_Items", "Methadone", "MethadoneSupervised", "MethadoneDispensingFeeNumber", "SupervisedDispensingFeeNumber"],
-      smoking_cessation: ["SmokingCessation", "Smoking_Cessation", "SmokingCessationItems", "SC_Items"],
+      smoking_cessation: ["SmokingCessationItems", "SmokingCessation", "Smoking_Cessation", "SC_Items"],
       gross_cost: ["GrossIngredientCost", "Gross_Cost", "GIC", "GrossIngCost", "GICTotal"],
-      final_payment: ["FinalPayment", "FinalPayments", "Final_Payment", "TotalPayment", "NetPayment", "Total_Net_Payment"],
+      final_payment: ["FinalPayments", "FinalPayment", "Final_Payment", "TotalPayment", "NetPayment", "Total_Net_Payment"],
     };
     const blankPayments = (): Record<PField, number> => ({
       pharmacy_first_payment: 0, mcr_payment: 0, ehc_items: 0,
@@ -355,13 +355,18 @@ async function processQueueItem(item: {
         is_provisional: isProvisional(a.year, a.month),
       }));
 
+    // Contractor-activity is the authoritative source for per-pharmacy payment data,
+    // so it does a full upsert. Other datasets only insert rows that don't already
+    // exist (ignoreDuplicates) so they never overwrite verified payment data.
+    const isAuthoritative = item.dataset === "community-pharmacy-contractor-activity";
     let inserted = 0;
     for (let i = 0; i < dispRows.length; i += 500) {
+      const slice = dispRows.slice(i, i + 500);
       const { error } = await supabaseAdmin
         .from("dispensing_data")
-        .upsert(dispRows.slice(i, i + 500), { onConflict: "pharmacy_id,year,month" });
+        .upsert(slice, { onConflict: "pharmacy_id,year,month", ignoreDuplicates: !isAuthoritative });
       if (error) throw error;
-      inserted += Math.min(500, dispRows.length - i);
+      inserted += slice.length;
     }
 
     await supabaseAdmin.from("ingestion_log").insert({
