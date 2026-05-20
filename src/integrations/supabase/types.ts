@@ -66,7 +66,9 @@ export type Database = {
           is_actual_payment: boolean
           is_provisional: boolean
           items_dispensed: number
+          mcr_items: number
           mcr_payment: number
+          mcr_registrations: number
           methadone_items: number
           month: number
           nms_count: number
@@ -74,6 +76,8 @@ export type Database = {
           pharmacy_first_payment: number
           pharmacy_id: string
           smoking_cessation: number
+          smoking_cessation_payment: number
+          supervised_methadone_doses: number
           year: number
         }
         Insert: {
@@ -89,7 +93,9 @@ export type Database = {
           is_actual_payment?: boolean
           is_provisional?: boolean
           items_dispensed?: number
+          mcr_items?: number
           mcr_payment?: number
+          mcr_registrations?: number
           methadone_items?: number
           month: number
           nms_count?: number
@@ -97,6 +103,8 @@ export type Database = {
           pharmacy_first_payment?: number
           pharmacy_id: string
           smoking_cessation?: number
+          smoking_cessation_payment?: number
+          supervised_methadone_doses?: number
           year: number
         }
         Update: {
@@ -112,7 +120,9 @@ export type Database = {
           is_actual_payment?: boolean
           is_provisional?: boolean
           items_dispensed?: number
+          mcr_items?: number
           mcr_payment?: number
+          mcr_registrations?: number
           methadone_items?: number
           month?: number
           nms_count?: number
@@ -120,6 +130,8 @@ export type Database = {
           pharmacy_first_payment?: number
           pharmacy_id?: string
           smoking_cessation?: number
+          smoking_cessation_payment?: number
+          supervised_methadone_doses?: number
           year?: number
         }
         Relationships: [

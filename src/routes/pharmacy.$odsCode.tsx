@@ -27,7 +27,10 @@ type Row = {
   gross_cost: number | string | null;
   pharmacy_first_payment: number | string | null;
   mcr_payment: number | string | null;
-  ehc_items: number; methadone_items: number; smoking_cessation: number;
+  mcr_registrations: number; mcr_items: number;
+  ehc_items: number; methadone_items: number; supervised_methadone_doses: number;
+  smoking_cessation: number;
+  smoking_cessation_payment: number | string | null;
   final_payment: number | string | null;
   is_actual_payment: boolean;
 };
@@ -72,7 +75,7 @@ function PharmacyProfile() {
       if (p) {
         const { data: d } = await supabase
           .from("dispensing_data")
-          .select("month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations,gross_cost,pharmacy_first_payment,mcr_payment,ehc_items,methadone_items,smoking_cessation,final_payment,is_actual_payment")
+          .select("month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations,gross_cost,pharmacy_first_payment,mcr_payment,mcr_registrations,mcr_items,ehc_items,methadone_items,supervised_methadone_doses,smoking_cessation,smoking_cessation_payment,final_payment,is_actual_payment")
           .eq("pharmacy_id", (p as Pharmacy).id)
           .order("year", { ascending: true })
           .order("month", { ascending: true });
@@ -208,9 +211,13 @@ function PharmacyProfile() {
     : [];
   const scottishMetrics = isScotland && latest
     ? [
+        { label: "MCR registrations", key: "items_dispensed" as RankKey, value: latest.mcr_registrations, prior: prior?.mcr_registrations ?? 0, yoy: yoy?.mcr_registrations ?? 0 },
+        { label: "MCR items", key: "items_dispensed" as RankKey, value: latest.mcr_items, prior: prior?.mcr_items ?? 0, yoy: yoy?.mcr_items ?? 0 },
         { label: "EHC items", key: "items_dispensed" as RankKey, value: latest.ehc_items, prior: prior?.ehc_items ?? 0, yoy: yoy?.ehc_items ?? 0 },
         { label: "Methadone items", key: "items_dispensed" as RankKey, value: latest.methadone_items, prior: prior?.methadone_items ?? 0, yoy: yoy?.methadone_items ?? 0 },
+        { label: "Supervised doses", key: "items_dispensed" as RankKey, value: latest.supervised_methadone_doses, prior: prior?.supervised_methadone_doses ?? 0, yoy: yoy?.supervised_methadone_doses ?? 0 },
         { label: "Smoking cessation", key: "items_dispensed" as RankKey, value: latest.smoking_cessation, prior: prior?.smoking_cessation ?? 0, yoy: yoy?.smoking_cessation ?? 0 },
+        { label: "Smoking cessation £", key: "money" as const, value: Number(latest.smoking_cessation_payment) || 0, prior: Number(prior?.smoking_cessation_payment) || 0, yoy: Number(yoy?.smoking_cessation_payment) || 0, format: gbp },
         { label: "Pharmacy First £", key: "money" as const, value: Number(latest.pharmacy_first_payment) || 0, prior: Number(prior?.pharmacy_first_payment) || 0, yoy: Number(yoy?.pharmacy_first_payment) || 0, format: gbp },
         { label: "MCR payment", key: "money" as const, value: Number(latest.mcr_payment) || 0, prior: Number(prior?.mcr_payment) || 0, yoy: Number(yoy?.mcr_payment) || 0, format: gbp },
         { label: "Gross cost", key: "money" as const, value: Number(latest.gross_cost) || 0, prior: Number(prior?.gross_cost) || 0, yoy: Number(yoy?.gross_cost) || 0, format: gbp },
