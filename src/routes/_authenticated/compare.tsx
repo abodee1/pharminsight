@@ -48,7 +48,7 @@ function Compare() {
   const [rows, setRows] = useState<Row[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [metric, setMetric] = useState<(typeof METRICS)[number]["key"]>("items_dispensed");
-  const [open, setOpen] = useState(false);
+  
 
   useEffect(() => {
     (async () => {
