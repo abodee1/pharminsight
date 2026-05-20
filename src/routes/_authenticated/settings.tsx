@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { z } from "zod";
 import { User as UserIcon, Lock, Building2, FileText, Search, Check, Trash2 } from "lucide-react";
+import { PharmacySearch as PharmacySearchInline } from "@/components/PharmacySearch";
 
 export const Route = createFileRoute("/_authenticated/settings")({ component: SettingsPage });
 
@@ -283,89 +284,48 @@ function SettingsPage() {
         {/* PHARMACY */}
         <TabsContent value="pharmacy" className="mt-6">
           <section className="rounded-xl bg-card border border-border p-6 shadow-sm">
-            <h2 className="font-semibold">Primary pharmacy</h2>
+            <h2 className="font-semibold">My pharmacy</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              {mine ? <>Currently set to <strong className="text-foreground">{mine.name}</strong> — {mine.region}</> : "No pharmacy set. Pick one to unlock benchmarking and insights."}
+              Your default pharmacy is used for benchmarking, leaderboards and AI insights.
             </p>
-            <div className="relative mt-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by postcode (e.g. KY11), ODS code, name or region"
-                className="pl-9"
-              />
-            </div>
 
-            {countries.length > 1 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCountryFilter("all")}
-                  className={[
-                    "text-xs px-3 py-1 rounded-full border transition-colors",
-                    countryFilter === "all" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary",
-                  ].join(" ")}
-                >
-                  All ({pharms.length})
-                </button>
-                {countries.map((c) => {
-                  const count = pharms.filter((p) => p.country === c).length;
-                  const active = countryFilter === c;
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setCountryFilter(c as any)}
-                      className={[
-                        "text-xs px-3 py-1 rounded-full border transition-colors",
-                        active ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary",
-                      ].join(" ")}
-                    >
-                      {c} ({count})
-                    </button>
-                  );
-                })}
+            {mine ? (
+              <div className="mt-4 rounded-lg border border-border bg-secondary/40 p-4">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <p className="font-semibold">{mine.name}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {[mine.address, mine.postcode].filter(Boolean).join(", ")}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1 font-mono">{mine.ods_code}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      if (!user) return;
+                      await supabase.from("user_pharmacy").delete().eq("user_id", user.id);
+                      setMine(null);
+                      toast.success("Primary pharmacy cleared");
+                    }}
+                  >
+                    Change
+                  </Button>
+                </div>
               </div>
+            ) : (
+              <p className="text-sm text-muted-foreground mt-4">
+                No pharmacy set. Search below and click a result to open it, then claim it as yours.
+              </p>
             )}
 
-            <p className="text-xs text-muted-foreground mt-3">
-              {search.trim()
-                ? `${filtered.length} ${filtered.length === 1 ? "match" : "matches"}`
-                : `Showing first 50 of ${countryFilter === "all" ? pharms.length : pharms.filter((p) => p.country === countryFilter).length}. Start typing to search.`}
-            </p>
-
-            <div className="mt-2 divide-y divide-border max-h-96 overflow-y-auto rounded-md border border-border">
-              {filtered.length === 0 && (
-                <p className="text-sm text-muted-foreground p-4">No matches.</p>
-              )}
-              {filtered.map((p) => {
-                const isMine = mine?.id === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => setPharmacy(p.id)}
-                    className={[
-                      "w-full text-left px-4 py-3 text-sm hover:bg-secondary flex justify-between items-center gap-3 transition-colors",
-                      isMine ? "bg-secondary" : "",
-                    ].join(" ")}
-                  >
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{p.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {[p.postcode, p.region, p.country].filter(Boolean).join(" · ")}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs text-muted-foreground font-mono">{p.ods_code}</span>
-                      {isMine && <Check className="h-4 w-4 text-primary" />}
-                    </div>
-                  </button>
-                );
-              })}
+            <div className="mt-4">
+              <PharmacySearchInline />
             </div>
           </section>
         </TabsContent>
+
+
 
 
         {/* UPLOADS */}

@@ -11,6 +11,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { PharmacySearch } from "./PharmacySearch";
 
 const links = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -52,6 +53,11 @@ export function AppSidebar() {
         </Link>
         <p className="text-xs text-sidebar-muted mt-1">NHS pharmacy analytics</p>
       </div>
+
+      <div className="px-3 pt-3">
+        <PharmacySearch compact />
+      </div>
+
 
       <nav className="flex-1 p-3 space-y-1">
         {links.map(({ to, label, icon: Icon }) => {

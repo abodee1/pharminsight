@@ -2,10 +2,12 @@ import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   LayoutDashboard, Trophy, BarChart2, GitCompare, Sparkles, Upload, Settings,
-  LogOut, Menu, User as UserIcon,
+  LogOut, Menu, User as UserIcon, Search as SearchIcon,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
+import { PharmacySearch } from "./PharmacySearch";
 
 export const NAV_LINKS = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -19,6 +21,7 @@ export const NAV_LINKS = [
 
 export function MobileTopBar() {
   const [open, setOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const { profile, user, signOut } = useAuth();
   const navigate = useNavigate();
@@ -91,13 +94,29 @@ export function MobileTopBar() {
         PharmIQ
       </Link>
 
-      <Link
-        to="/settings"
-        aria-label="My account"
-        className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary text-primary-foreground text-xs font-semibold"
-      >
-        {initials || <UserIcon className="h-4 w-4" />}
-      </Link>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setSearchOpen(true)}
+          aria-label="Search pharmacies"
+          className="inline-flex items-center justify-center h-9 w-9 rounded-md border border-border hover:bg-secondary"
+        >
+          <SearchIcon className="h-4 w-4" />
+        </button>
+        <Link
+          to="/settings"
+          aria-label="My account"
+          className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary text-primary-foreground text-xs font-semibold"
+        >
+          {initials || <UserIcon className="h-4 w-4" />}
+        </Link>
+      </div>
+
+      <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+        <DialogContent className="top-[15%] translate-y-0 max-w-lg p-4">
+          <DialogTitle className="text-sm font-semibold mb-2">Search pharmacies</DialogTitle>
+          <PharmacySearch />
+        </DialogContent>
+      </Dialog>
     </header>
   );
 }

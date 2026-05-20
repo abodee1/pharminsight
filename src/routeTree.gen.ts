@@ -13,6 +13,7 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PharmacyOdsCodeRouteImport } from './routes/pharmacy.$odsCode'
 import { Route as AuthenticatedUploadRouteImport } from './routes/_authenticated/upload'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedLeaderboardsRouteImport } from './routes/_authenticated/leaderboards'
@@ -40,6 +41,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PharmacyOdsCodeRoute = PharmacyOdsCodeRouteImport.update({
+  id: '/pharmacy/$odsCode',
+  path: '/pharmacy/$odsCode',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedUploadRoute = AuthenticatedUploadRouteImport.update({
@@ -102,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/upload': typeof AuthenticatedUploadRoute
+  '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/admin/data': typeof AuthenticatedAdminDataRoute
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
 }
@@ -116,6 +123,7 @@ export interface FileRoutesByTo {
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/upload': typeof AuthenticatedUploadRoute
+  '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/admin/data': typeof AuthenticatedAdminDataRoute
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
 }
@@ -132,6 +140,7 @@ export interface FileRoutesById {
   '/_authenticated/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/upload': typeof AuthenticatedUploadRoute
+  '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/_authenticated/admin/data': typeof AuthenticatedAdminDataRoute
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
 }
@@ -148,6 +157,7 @@ export interface FileRouteTypes {
     | '/leaderboards'
     | '/settings'
     | '/upload'
+    | '/pharmacy/$odsCode'
     | '/admin/data'
     | '/api/public/hooks/ingest-scotland'
   fileRoutesByTo: FileRoutesByTo
@@ -162,6 +172,7 @@ export interface FileRouteTypes {
     | '/leaderboards'
     | '/settings'
     | '/upload'
+    | '/pharmacy/$odsCode'
     | '/admin/data'
     | '/api/public/hooks/ingest-scotland'
   id:
@@ -177,6 +188,7 @@ export interface FileRouteTypes {
     | '/_authenticated/leaderboards'
     | '/_authenticated/settings'
     | '/_authenticated/upload'
+    | '/pharmacy/$odsCode'
     | '/_authenticated/admin/data'
     | '/api/public/hooks/ingest-scotland'
   fileRoutesById: FileRoutesById
@@ -186,6 +198,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
+  PharmacyOdsCodeRoute: typeof PharmacyOdsCodeRoute
   ApiPublicHooksIngestScotlandRoute: typeof ApiPublicHooksIngestScotlandRoute
 }
 
@@ -217,6 +230,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pharmacy/$odsCode': {
+      id: '/pharmacy/$odsCode'
+      path: '/pharmacy/$odsCode'
+      fullPath: '/pharmacy/$odsCode'
+      preLoaderRoute: typeof PharmacyOdsCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/upload': {
@@ -316,6 +336,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
+  PharmacyOdsCodeRoute: PharmacyOdsCodeRoute,
   ApiPublicHooksIngestScotlandRoute: ApiPublicHooksIngestScotlandRoute,
 }
 export const routeTree = rootRouteImport
