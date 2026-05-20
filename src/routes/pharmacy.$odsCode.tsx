@@ -185,6 +185,44 @@ function PharmacyProfile() {
     })();
   }, [rows, pharmacy]);
 
+  // National peer distribution for percentile rails — same country, same month.
+  useEffect(() => {
+    (async () => {
+      if (!pharmacy || rows.length === 0) return;
+      const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
+      let latest = rows[rows.length - 1];
+      if (isScot) {
+        for (let i = rows.length - 1; i >= 0; i--) {
+          if (rows[i].is_actual_payment) { latest = rows[i]; break; }
+        }
+      }
+      // Country-scoped peer ids
+      const peers = await supabase
+        .from("pharmacies").select("id").eq("country", pharmacy.country ?? "");
+      const peerIds = (peers.data ?? []).map((p) => p.id);
+      if (!peerIds.length) return;
+      const items: number[] = [];
+      const nms: number[] = [];
+      const pf: number[] = [];
+      const eps: number[] = [];
+      for (let i = 0; i < peerIds.length; i += 800) {
+        const { data } = await supabase
+          .from("dispensing_data")
+          .select("items_dispensed,nms_count,pharmacy_first_count,eps_items")
+          .eq("year", latest.year).eq("month", latest.month)
+          .in("pharmacy_id", peerIds.slice(i, i + 800));
+        for (const r of (data ?? []) as any[]) {
+          items.push(r.items_dispensed || 0);
+          nms.push(r.nms_count || 0);
+          pf.push(r.pharmacy_first_count || 0);
+          eps.push(r.eps_items || 0);
+        }
+      }
+      setPeerDistribution({ items_dispensed: items, nms_count: nms, pharmacy_first_count: pf, eps_items: eps });
+    })();
+  }, [rows, pharmacy]);
+
+
   const claimAsMine = async () => {
     if (!user || !pharmacy) {
       navigate({ to: "/login" });
