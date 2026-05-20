@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { CountryBadge } from "@/components/CountryBadge";
@@ -23,7 +23,10 @@ type Row = {
   month: number; year: number;
   items_dispensed: number; nms_count: number; pharmacy_first_count: number;
   flu_vaccinations: number; eps_items: number; eps_nominations: number;
+  gross_cost: number | string | null;
 };
+
+type RankKey = "items_dispensed" | "nms_count" | "pharmacy_first_count" | "flu_vaccinations" | "eps_items";
 
 function PharmacyProfile() {
   const { odsCode } = Route.useParams();
@@ -35,6 +38,7 @@ function PharmacyProfile() {
   const [myPharmacyId, setMyPharmacyId] = useState<string | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [hasUserPharmacy, setHasUserPharmacy] = useState<boolean | null>(null);
+  const [ranks, setRanks] = useState<Partial<Record<RankKey, { rank: number; total: number }>>>({});
 
   useEffect(() => {
     (async () => {
@@ -48,7 +52,7 @@ function PharmacyProfile() {
       if (p) {
         const { data: d } = await supabase
           .from("dispensing_data")
-          .select("month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations")
+          .select("month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations,gross_cost")
           .eq("pharmacy_id", (p as Pharmacy).id)
           .order("year", { ascending: true })
           .order("month", { ascending: true });
@@ -68,6 +72,32 @@ function PharmacyProfile() {
     })();
   }, [user]);
 
+  // National rank for latest month across the key metrics
+  useEffect(() => {
+    (async () => {
+      if (rows.length === 0) return;
+      const latest = rows[rows.length - 1];
+      const keys: RankKey[] = ["items_dispensed", "nms_count", "pharmacy_first_count", "flu_vaccinations", "eps_items"];
+      const out: Partial<Record<RankKey, { rank: number; total: number }>> = {};
+      await Promise.all(keys.map(async (k) => {
+        const value = (latest as any)[k] as number;
+        const totalQ = await supabase
+          .from("dispensing_data")
+          .select("pharmacy_id", { count: "exact", head: true })
+          .eq("year", latest.year).eq("month", latest.month);
+        const aheadQ = await supabase
+          .from("dispensing_data")
+          .select("pharmacy_id", { count: "exact", head: true })
+          .eq("year", latest.year).eq("month", latest.month)
+          .gt(k, value);
+        const total = totalQ.count ?? 0;
+        const rank = (aheadQ.count ?? 0) + 1;
+        out[k] = { rank, total };
+      }));
+      setRanks(out);
+    })();
+  }, [rows]);
+
   const claimAsMine = async () => {
     if (!user || !pharmacy) {
       navigate({ to: "/login" });
@@ -82,6 +112,23 @@ function PharmacyProfile() {
     setHasUserPharmacy(true);
     toast.success(`${pharmacy.name} set as your pharmacy`);
   };
+
+  const latest = rows[rows.length - 1];
+  const prior = rows[rows.length - 2];
+  const yoy = useMemo(() => {
+    if (!latest) return null;
+    return rows.find((r) => r.year === latest.year - 1 && r.month === latest.month) ?? null;
+  }, [rows, latest]);
+
+  const chartData = useMemo(() => rows.slice(-24).map((r) => ({
+    label: `${MONTHS[r.month - 1]} ${String(r.year).slice(2)}`,
+    items: r.items_dispensed,
+    eps_items: r.eps_items,
+    nms: r.nms_count,
+    pf: r.pharmacy_first_count,
+    flu: r.flu_vaccinations,
+    cost: Number(r.gross_cost) || 0,
+  })), [rows]);
 
   if (loading) {
     return <div className="p-10 text-sm text-muted-foreground">Loading pharmacy…</div>;
@@ -103,24 +150,19 @@ function PharmacyProfile() {
   const isMine = myPharmacyId === pharmacy.id;
   const showClaimBanner = user && hasUserPharmacy === false && !bannerDismissed;
 
-  // build latest + prior month metrics
-  const latest = rows[rows.length - 1];
-  const prior = rows[rows.length - 2];
-  const metrics: { label: string; value: number; prior: number }[] = latest
+  const metrics: { label: string; key: RankKey | "gross_cost"; value: number; prior: number; yoy: number; format?: (n: number) => string }[] = latest
     ? [
-        { label: "Items", value: latest.items_dispensed, prior: prior?.items_dispensed ?? 0 },
-        { label: "NMS", value: latest.nms_count, prior: prior?.nms_count ?? 0 },
-        { label: "Pharmacy First", value: latest.pharmacy_first_count, prior: prior?.pharmacy_first_count ?? 0 },
-        { label: "Flu Vaccinations", value: latest.flu_vaccinations, prior: prior?.flu_vaccinations ?? 0 },
-        { label: "EPS Items", value: latest.eps_items, prior: prior?.eps_items ?? 0 },
-        { label: "EPS Nominations", value: latest.eps_nominations, prior: prior?.eps_nominations ?? 0 },
+        { label: "Items dispensed", key: "items_dispensed", value: latest.items_dispensed, prior: prior?.items_dispensed ?? 0, yoy: yoy?.items_dispensed ?? 0 },
+        { label: "EPS items", key: "eps_items", value: latest.eps_items, prior: prior?.eps_items ?? 0, yoy: yoy?.eps_items ?? 0 },
+        { label: "EPS nominations", key: "items_dispensed", value: latest.eps_nominations, prior: prior?.eps_nominations ?? 0, yoy: yoy?.eps_nominations ?? 0 },
+        { label: "NMS", key: "nms_count", value: latest.nms_count, prior: prior?.nms_count ?? 0, yoy: yoy?.nms_count ?? 0 },
+        { label: "Pharmacy First", key: "pharmacy_first_count", value: latest.pharmacy_first_count, prior: prior?.pharmacy_first_count ?? 0, yoy: yoy?.pharmacy_first_count ?? 0 },
+        { label: "Flu vaccinations", key: "flu_vaccinations", value: latest.flu_vaccinations, prior: prior?.flu_vaccinations ?? 0, yoy: yoy?.flu_vaccinations ?? 0 },
+        { label: "Gross cost", key: "gross_cost", value: Number(latest.gross_cost) || 0, prior: Number(prior?.gross_cost) || 0, yoy: Number(yoy?.gross_cost) || 0, format: (n) => "£" + n.toLocaleString(undefined, { maximumFractionDigits: 0 }) },
       ]
     : [];
 
-  const chart = rows.slice(-12).map((r) => ({
-    label: `${MONTHS[r.month - 1]} ${String(r.year).slice(2)}`,
-    items: r.items_dispensed,
-  }));
+  const tableRows = [...rows].slice(-24).reverse();
 
   return (
     <div className="p-6 md:p-10 max-w-6xl mx-auto">
@@ -161,6 +203,7 @@ function PharmacyProfile() {
             {pharmacy.region && <span>{pharmacy.region}</span>}
             <span>·</span>
             <span className="font-mono">{pharmacy.ods_code}</span>
+            {latest && <><span>·</span><span>Latest: {MONTHS[latest.month - 1]} {latest.year}</span></>}
           </div>
         </div>
         {user && !isMine && !showClaimBanner && (
@@ -174,22 +217,63 @@ function PharmacyProfile() {
         <p className="mt-8 text-sm text-muted-foreground">No dispensing data available for this pharmacy yet.</p>
       ) : (
         <>
-          <div className="mt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {metrics.map((m) => <MetricCard key={m.label} {...m} />)}
+          <div className="mt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {metrics.map((m) => (
+              <MetricCard
+                key={m.label}
+                label={m.label}
+                value={m.value}
+                prior={m.prior}
+                yoy={m.yoy}
+                format={m.format}
+                rank={m.key !== "gross_cost" ? ranks[m.key as RankKey] : undefined}
+              />
+            ))}
           </div>
 
-          <div className="mt-6 rounded-lg bg-card border border-border p-6 shadow-sm">
-            <h2 className="text-sm font-semibold mb-4">Items dispensed — last 12 months</h2>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chart} margin={{ top: 5, right: 12, bottom: 0, left: -10 }}>
-                  <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                  <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12 }} />
-                  <Line type="monotone" dataKey="items" name="Items" stroke="var(--chart-2)" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <MiniChart title="Items dispensed" data={chartData} dataKey="items" />
+            <MiniChart title="EPS items" data={chartData} dataKey="eps_items" />
+            <MiniChart title="NMS" data={chartData} dataKey="nms" />
+            <MiniChart title="Pharmacy First" data={chartData} dataKey="pf" />
+            <MiniChart title="Flu vaccinations" data={chartData} dataKey="flu" />
+            <MiniChart title="Gross cost (£)" data={chartData} dataKey="cost" />
+          </div>
+
+          <div className="mt-6 rounded-lg bg-card border border-border shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+              <h2 className="text-sm font-semibold">Monthly history — last 24 months</h2>
+              <span className="text-xs text-muted-foreground">Newest first</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-secondary/40 text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium">Month</th>
+                    <th className="text-right px-3 py-2 font-medium">Items</th>
+                    <th className="text-right px-3 py-2 font-medium">EPS items</th>
+                    <th className="text-right px-3 py-2 font-medium">EPS nom.</th>
+                    <th className="text-right px-3 py-2 font-medium">NMS</th>
+                    <th className="text-right px-3 py-2 font-medium">Pharm. First</th>
+                    <th className="text-right px-3 py-2 font-medium">Flu</th>
+                    <th className="text-right px-3 py-2 font-medium">Gross cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableRows.map((r) => (
+                    <tr key={`${r.year}-${r.month}`} className="border-t border-border">
+                      <td className="px-3 py-2 whitespace-nowrap">{MONTHS[r.month - 1]} {r.year}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{r.items_dispensed.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{r.eps_items.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{r.eps_nominations.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{r.nms_count.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{r.pharmacy_first_count.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{r.flu_vaccinations.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">£{(Number(r.gross_cost) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </>
@@ -211,20 +295,55 @@ function PharmacyProfile() {
   );
 }
 
-function MetricCard({ label, value, prior }: { label: string; value: number; prior: number }) {
+function MetricCard({ label, value, prior, yoy, format, rank }: {
+  label: string; value: number; prior: number; yoy: number;
+  format?: (n: number) => string;
+  rank?: { rank: number; total: number };
+}) {
+  const fmt = format ?? ((n: number) => n.toLocaleString());
   const delta = prior ? ((value - prior) / prior) * 100 : 0;
+  const yoyDelta = yoy ? ((value - yoy) / yoy) * 100 : 0;
   const Icon = delta > 1 ? TrendingUp : delta < -1 ? TrendingDown : Minus;
   const color = delta > 1 ? "text-emerald-600" : delta < -1 ? "text-red-600" : "text-muted-foreground";
   return (
     <div className="rounded-lg bg-card border border-border p-4 shadow-sm">
       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xl font-bold">{value.toLocaleString()}</p>
+      <p className="mt-1 text-xl font-bold">{fmt(value)}</p>
       {prior > 0 && (
         <div className={`mt-1 flex items-center gap-1 text-xs ${color}`}>
           <Icon className="h-3 w-3" />
           {Math.abs(delta).toFixed(1)}% vs prior
         </div>
       )}
+      {yoy > 0 && (
+        <div className="mt-0.5 text-[11px] text-muted-foreground">
+          {yoyDelta >= 0 ? "+" : ""}{yoyDelta.toFixed(1)}% YoY
+        </div>
+      )}
+      {rank && rank.total > 0 && (
+        <div className="mt-1 text-[11px] text-muted-foreground">
+          Rank #{rank.rank.toLocaleString()} of {rank.total.toLocaleString()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MiniChart({ title, data, dataKey }: { title: string; data: any[]; dataKey: string }) {
+  return (
+    <div className="rounded-lg bg-card border border-border p-4 shadow-sm">
+      <h3 className="text-xs font-semibold mb-2 text-muted-foreground uppercase tracking-wide">{title}</h3>
+      <div className="h-44">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 5, right: 8, bottom: 0, left: -15 }}>
+            <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+            <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" interval="preserveStartEnd" />
+            <YAxis tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
+            <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12 }} />
+            <Line type="monotone" dataKey={dataKey} stroke="var(--chart-2)" strokeWidth={2} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
