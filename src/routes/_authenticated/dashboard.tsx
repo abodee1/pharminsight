@@ -162,25 +162,19 @@ function Dashboard() {
         { label: "Dispensing & other", value: other },
       ]);
 
-      // Country split donut — total items at latest period across all countries
-      const { data: latestAll } = await supabase
-        .from("dispensing_data")
-        .select("pharmacy_id,items_dispensed,year,month")
-        .eq("year", ly).eq("month", lm);
+      // Country split donut — use allRecent at latest period across all countries
       const split = new Map<string, number>();
-      (latestAll || []).forEach((r: any) => {
-        const c = countryById.get(r.pharmacy_id) || "Unknown";
-        split.set(c, (split.get(c) || 0) + (r.items_dispensed || 0));
-      });
+      allRecent
+        .filter((r) => r.year === ly && r.month === lm)
+        .forEach((r) => {
+          const c = countryById.get(r.pharmacy_id) || "Unknown";
+          split.set(c, (split.get(c) || 0) + (r.items_dispensed || 0));
+        });
       setCountrySplit([...split.entries()].map(([label, value]) => ({ label, value })));
 
-      // National trend (all countries) — total items per period last 12
+      // National trend (all countries) — total items per period last 12 from allRecent
       const natByPeriod = new Map<number, number>();
-      // re-use peer recent doesn't have all countries; use a lightweight national query
-      const { data: nat } = await supabase
-        .from("dispensing_data")
-        .select("year,month,items_dispensed");
-      (nat || []).forEach((r: any) => {
+      allRecent.forEach((r) => {
         const k = periodKey(r.year, r.month);
         natByPeriod.set(k, (natByPeriod.get(k) || 0) + (r.items_dispensed || 0));
       });
