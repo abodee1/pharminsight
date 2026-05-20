@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X, ShieldCheck } from "lucide-react";
 import { PharmacySearch } from "@/components/PharmacySearch";
+import { PercentileRail, AnnotatedSparkline, ShareDonut } from "@/components/Infographics";
 
 export const Route = createFileRoute("/pharmacy/$odsCode")({ component: PharmacyProfile });
 
@@ -64,6 +65,9 @@ function PharmacyProfile() {
   const [hasFp34c, setHasFp34c] = useState(false);
   const [pfPeerAvg, setPfPeerAvg] = useState<Record<string, number> | null>(null);
   const [pfPeerCount, setPfPeerCount] = useState(0);
+  const [peerDistribution, setPeerDistribution] = useState<{
+    items_dispensed: number[]; nms_count: number[]; pharmacy_first_count: number[]; eps_items: number[];
+  } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -180,6 +184,44 @@ function PharmacyProfile() {
       setPfPeerCount(counted);
     })();
   }, [rows, pharmacy]);
+
+  // National peer distribution for percentile rails — same country, same month.
+  useEffect(() => {
+    (async () => {
+      if (!pharmacy || rows.length === 0) return;
+      const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
+      let latest = rows[rows.length - 1];
+      if (isScot) {
+        for (let i = rows.length - 1; i >= 0; i--) {
+          if (rows[i].is_actual_payment) { latest = rows[i]; break; }
+        }
+      }
+      // Country-scoped peer ids
+      const peers = await supabase
+        .from("pharmacies").select("id").eq("country", pharmacy.country ?? "");
+      const peerIds = (peers.data ?? []).map((p) => p.id);
+      if (!peerIds.length) return;
+      const items: number[] = [];
+      const nms: number[] = [];
+      const pf: number[] = [];
+      const eps: number[] = [];
+      for (let i = 0; i < peerIds.length; i += 800) {
+        const { data } = await supabase
+          .from("dispensing_data")
+          .select("items_dispensed,nms_count,pharmacy_first_count,eps_items")
+          .eq("year", latest.year).eq("month", latest.month)
+          .in("pharmacy_id", peerIds.slice(i, i + 800));
+        for (const r of (data ?? []) as any[]) {
+          items.push(r.items_dispensed || 0);
+          nms.push(r.nms_count || 0);
+          pf.push(r.pharmacy_first_count || 0);
+          eps.push(r.eps_items || 0);
+        }
+      }
+      setPeerDistribution({ items_dispensed: items, nms_count: nms, pharmacy_first_count: pf, eps_items: eps });
+    })();
+  }, [rows, pharmacy]);
+
 
   const claimAsMine = async () => {
     if (!user || !pharmacy) {
@@ -394,6 +436,89 @@ function PharmacyProfile() {
             <MiniChart title="Pharmacy First" data={chartData} dataKey="pf" />
             <MiniChart title="Gross cost (£)" data={chartData} dataKey="cost" />
           </div>
+
+          {peerDistribution && latest && (
+            <section className="mt-8">
+              <div className="flex items-baseline justify-between mb-3">
+                <h2 className="text-sm font-semibold tracking-tight">How this pharmacy ranks in {pharmacy.country}</h2>
+                <p className="text-xs text-muted-foreground italic">
+                  {MONTHS[latest.month - 1]} {latest.year} · {peerDistribution.items_dispensed.length.toLocaleString()} peers
+                </p>
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <PercentileRail
+                  label="Items dispensed"
+                  value={latest.items_dispensed}
+                  values={peerDistribution.items_dispensed}
+                  peerLabel={`${pharmacy.country} avg`}
+                  nationalLabel="Highest"
+                />
+                <PercentileRail
+                  label="Pharmacy First consultations"
+                  value={latest.pharmacy_first_count}
+                  values={peerDistribution.pharmacy_first_count}
+                  peerLabel={`${pharmacy.country} avg`}
+                  nationalLabel="Highest"
+                />
+                {!isScotland && (
+                  <PercentileRail
+                    label="New Medicine Service"
+                    value={latest.nms_count}
+                    values={peerDistribution.nms_count}
+                    peerLabel={`${pharmacy.country} avg`}
+                    nationalLabel="Highest"
+                  />
+                )}
+                {!isScotland && (
+                  <PercentileRail
+                    label="EPS items"
+                    value={latest.eps_items}
+                    values={peerDistribution.eps_items}
+                    peerLabel={`${pharmacy.country} avg`}
+                    nationalLabel="Highest"
+                  />
+                )}
+              </div>
+            </section>
+          )}
+
+          {chartData.length >= 6 && (
+            <section className="mt-6 grid md:grid-cols-2 gap-4">
+              <AnnotatedSparkline
+                label="Items dispensed — 24-month arc"
+                points={chartData.map((d) => ({ period: d.label, value: d.items }))}
+              />
+              <AnnotatedSparkline
+                label="Pharmacy First — 24-month arc"
+                points={chartData.map((d) => ({ period: d.label, value: d.pf }))}
+              />
+            </section>
+          )}
+
+          {isScotland && latest && (
+            <section className="mt-6">
+              <ShareDonut
+                label={`Payment composition · ${MONTHS[latest.month - 1]} ${latest.year}`}
+                caption="Where this month's NHS revenue came from. Pharmacy First, MCR and smoking-cessation are shown as paid fees; dispensing is the residual gross cost minus these service streams."
+                formatValue={(n) => "£" + n.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                segments={[
+                  { label: "Pharmacy First", value: Number(latest.pharmacy_first_payment) || 0 },
+                  { label: "MCR", value: Number(latest.mcr_payment) || 0 },
+                  { label: "Smoking cessation", value: Number(latest.smoking_cessation_payment) || 0 },
+                  {
+                    label: "Dispensing & other",
+                    value: Math.max(
+                      0,
+                      (Number(latest.gross_cost) || 0)
+                        - (Number(latest.pharmacy_first_payment) || 0)
+                        - (Number(latest.mcr_payment) || 0)
+                        - (Number(latest.smoking_cessation_payment) || 0),
+                    ),
+                  },
+                ]}
+              />
+            </section>
+          )}
 
           {/* Pharmacy First service mix hidden for now
           {isScotland && latest && latest.pharmacy_first_services && (

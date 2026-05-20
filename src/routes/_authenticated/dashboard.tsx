@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetchAll";
 import { PageHeader, StatCard } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
+import { PercentileRail, AnnotatedSparkline } from "@/components/Infographics";
 import {
   ResponsiveContainer,
   LineChart,
@@ -32,6 +33,8 @@ function Dashboard() {
   const [pharmacy, setPharmacy] = useState<Pharmacy | null>(null);
   const [series, setSeries] = useState<{ label: string; mine: number; national: number }[]>([]);
   const [stats, setStats] = useState({ items: 0, pf: 0, nms: 0, rank: 0, total: 0 });
+  const [peerItems, setPeerItems] = useState<number[]>([]);
+  const [peerPf, setPeerPf] = useState<number[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -81,6 +84,8 @@ function Dashboard() {
         rank,
         total: latestRows.length,
       });
+      setPeerItems(latestRows.map((r) => r.items_dispensed || 0));
+      setPeerPf(latestRows.map((r) => r.pharmacy_first_count || 0));
     })();
   }, [user]);
 
@@ -131,6 +136,37 @@ function Dashboard() {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {pharmacy && peerItems.length > 0 && (
+        <div className="mt-6 grid md:grid-cols-2 gap-4">
+          <PercentileRail
+            label="Items dispensed · this month"
+            value={stats.items}
+            values={peerItems}
+            peerLabel="National avg"
+            nationalLabel="Highest"
+            caption={`Your pharmacy versus ${peerItems.length.toLocaleString()} reporting peers nationwide.`}
+          />
+          <PercentileRail
+            label="Pharmacy First · this month"
+            value={stats.pf}
+            values={peerPf}
+            peerLabel="National avg"
+            nationalLabel="Highest"
+            caption="Consultations delivered through the Pharmacy First / CPCS clinical pathway."
+          />
+        </div>
+      )}
+
+      {pharmacy && series.length >= 6 && (
+        <div className="mt-6">
+          <AnnotatedSparkline
+            label="Items dispensed — your 12-month arc"
+            points={series.map((s) => ({ period: s.label, value: s.mine }))}
+          />
+        </div>
+      )}
+
 
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link to="/compare" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md transition-all">

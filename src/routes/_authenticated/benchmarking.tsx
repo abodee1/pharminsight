@@ -5,6 +5,7 @@ import { fetchAll } from "@/lib/fetchAll";
 import { PageHeader } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
+import { PercentileRail } from "@/components/Infographics";
 import {
   ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend, Tooltip,
 } from "recharts";
@@ -67,11 +68,14 @@ function Benchmarking() {
     };
 
     const data = METRICS.map((m) => ({
+      key: m.key,
       label: m.label,
       mine: mine[m.key] || 0,
       local: avg(local, m.key),
       national: avg(cur, m.key),
       top10: top10pct(m.key),
+      nationalValues: cur.map((r) => r[m.key] as number),
+      localValues: local.map((r) => r[m.key] as number),
     }));
 
     // Normalize radar to 0-100 vs top10
@@ -150,29 +154,38 @@ function Benchmarking() {
             </div>
           </div>
 
-          <div className="mt-6 rounded-lg bg-card border border-border p-6 shadow-sm">
-            <h2 className="text-sm font-semibold mb-3">Gap analysis</h2>
-            <div className="space-y-2 text-sm">
+          <div className="mt-6">
+            <div className="flex items-baseline justify-between mb-3">
+              <h2 className="text-sm font-semibold tracking-tight">Where you sit nationally</h2>
+              <p className="text-xs text-muted-foreground italic">
+                Marker = you. Tick = peer average. Shaded band = middle 50%.
+              </p>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
               {analysis.data.map((d) => {
-                const diff = d.mine - d.national;
-                const pct = Math.round((diff / Math.max(1, d.national)) * 100);
-                const above = diff >= 0;
+                const diff = d.mine - d.local;
+                const pct = Math.round((diff / Math.max(1, d.local)) * 100);
+                const caption =
+                  Math.abs(pct) < 5
+                    ? `In line with ${pharmacy.region} peers — within ±5% of the local average.`
+                    : `${pct >= 0 ? "Outperforming" : "Trailing"} the ${pharmacy.region} average by ${Math.abs(pct)}% this month.`;
                 return (
-                  <p key={d.label}>
-                    <span className="font-medium">{d.label}:</span>{" "}
-                    <span className={above ? "text-emerald-700" : "text-rose-700"}>
-                      {above ? "Above" : "Below"} national average by {Math.abs(pct)}%
-                    </span>{" "}
-                    <span className="text-muted-foreground">
-                      ({d.mine.toLocaleString()} vs {d.national.toLocaleString()})
-                    </span>
-                  </p>
+                  <PercentileRail
+                    key={d.label}
+                    label={d.label}
+                    value={d.mine}
+                    values={d.nationalValues}
+                    peerLabel={`${pharmacy.region} avg`}
+                    nationalLabel="National peak"
+                    caption={caption}
+                  />
                 );
               })}
             </div>
+
             <Link
               to="/insights"
-              className="inline-block mt-4 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90"
+              className="inline-block mt-6 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90"
             >
               Generate Smart Insight for this data
             </Link>
