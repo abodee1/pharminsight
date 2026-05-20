@@ -130,7 +130,7 @@ function PharmacyProfile() {
           <div className="flex-1 text-sm">
             <p className="font-semibold">Is this your pharmacy?</p>
             <p className="text-muted-foreground mt-0.5">
-              Set it as your default for personalised benchmarking and AI insights.
+              Set it as your default for personalised benchmarking and smart insights.
             </p>
             <div className="mt-3 flex gap-2">
               <Button size="sm" onClick={claimAsMine}>Yes, set as mine</Button>
@@ -199,7 +199,7 @@ function PharmacyProfile() {
         <div className="mt-8 rounded-lg border border-border bg-secondary/40 p-5 text-sm">
           <p className="font-semibold">Want deeper insights?</p>
           <p className="text-muted-foreground mt-1">
-            Create a free PharmIQ account to benchmark, compare, and unlock AI commentary.
+            Create a free PharmIQ account to benchmark, compare, and unlock expert commentary.
           </p>
           <div className="mt-3 flex gap-2">
             <Link to="/register"><Button size="sm">Create account</Button></Link>

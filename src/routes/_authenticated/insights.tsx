@@ -59,7 +59,7 @@ function Insights() {
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto">
       <PageHeader
-        title="AI-Powered Pharmacy Analysis"
+        title="Smart Pharmacy Insights"
         subtitle="Generate a SWOT analysis, benchmark commentary, or acquisition assessment using your pharmacy's NHS data."
       />
 
