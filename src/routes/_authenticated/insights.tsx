@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { generateInsight } from "@/lib/insights.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,9 +13,17 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/_authenticated/insights")({ component: Insights });
 
 const TYPES = [
-  { key: "swot", title: "SWOT Analysis", desc: "Strengths, weaknesses, opportunities and threats from your dispensing trends and service uptake." },
-  { key: "benchmark", title: "Performance Commentary", desc: "Plain-English summary of the last three months versus benchmarks." },
+  { key: "swot", title: "SWOT Analysis", desc: "Board-grade strengths, weaknesses, opportunities and threats — grounded in your real NHS dispensing data, peer benchmarks and local landscape." },
+  { key: "benchmark", title: "Performance Commentary", desc: "An investor-ready narrative of how your pharmacy is performing vs its own history and country peers, with quantified wins, leaks and a 90-day action list." },
 ] as const;
+
+const LABELS: Record<string, string> = {
+  swot: "SWOT analysis",
+  benchmark: "Performance commentary",
+  acquisition_report: "Acquisition report",
+  trend: "Trend analysis",
+  acquisition: "Acquisition note",
+};
 
 function Insights() {
   const { user } = useAuth();
@@ -37,15 +47,11 @@ function Insights() {
     try {
       const { data: up } = await supabase.from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle();
       const pharmacy_id = up?.pharmacy_id ?? null;
-      let ctx: any = { note: "No pharmacy set." };
-      if (pharmacy_id) {
-        const [{ data: ph }, { data: rows }] = await Promise.all([
-          supabase.from("pharmacies").select("*").eq("id", pharmacy_id).single(),
-          supabase.from("dispensing_data").select("*").eq("pharmacy_id", pharmacy_id),
-        ]);
-        ctx = { pharmacy: ph, monthly: rows };
+      if (!pharmacy_id) {
+        toast.error("Set a primary pharmacy first to generate insights.");
+        return;
       }
-      await generate({ data: { insight_type: type, pharmacy_id, context: ctx } });
+      await generate({ data: { insight_type: type, pharmacy_id, context: {} } });
       toast.success("Insight generated");
       await loadHistory();
     } catch (e: any) {
