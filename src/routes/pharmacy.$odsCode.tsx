@@ -237,7 +237,7 @@ function PharmacyProfile() {
                 prior={m.prior}
                 yoy={m.yoy}
                 format={m.format}
-                rank={m.key !== "gross_cost" ? ranks[m.key as RankKey] : undefined}
+                rank={m.key !== "money" ? ranks[m.key as RankKey] : undefined}
               />
             ))}
           </div>
