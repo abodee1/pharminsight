@@ -235,7 +235,9 @@ async function processQueueItem(item: {
 
     type Agg = {
       ods_code: string; name: string; region: string | null;
-      year: number; month: number; items: number; payments: Record<PField, number>;
+      year: number; month: number; items: number;
+      payments: Record<PField, number>;
+      pf_services: Record<PFService, number>;
     };
     const agg = new Map<string, Agg>();
 
@@ -243,6 +245,7 @@ async function processQueueItem(item: {
     let headerIdx: Record<string, number> = {};
     let odsIdx = -1, nameIdx = -1, regionIdx = -1, itemsIdx = -1, monthIdx = -1, yearIdx = -1;
     const paymentIdxByField: Partial<Record<PField, number>> = {};
+    const pfServiceIdxByField: Partial<Record<PFService, number>> = {};
     const missingPayments: PField[] = [];
 
     const findIdx = (variants: string[]): number => {
