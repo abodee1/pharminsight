@@ -22,7 +22,7 @@ const METRICS = [
   { key: "items_dispensed", label: "Items dispensed", short: "Items" },
   { key: "nms_count", label: "NMS", short: "NMS" },
   { key: "pharmacy_first_count", label: "Pharmacy First", short: "PF" },
-  { key: "flu_vaccinations", label: "Flu vaccinations", short: "Flu" },
+  
   { key: "eps_items", label: "EPS items", short: "EPS" },
 ] as const;
 
