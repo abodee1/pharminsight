@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { DistributionStrip } from "@/components/Infographics";
 
 export const Route = createFileRoute("/_authenticated/leaderboards")({ component: Leaderboards });
 
