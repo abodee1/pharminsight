@@ -54,6 +54,11 @@ export function AppSidebar() {
         <p className="text-xs text-sidebar-muted mt-1">NHS pharmacy analytics</p>
       </div>
 
+      <div className="px-3 pt-3">
+        <PharmacySearch compact />
+      </div>
+
+
       <nav className="flex-1 p-3 space-y-1">
         {links.map(({ to, label, icon: Icon }) => {
           const active = pathname === to || pathname.startsWith(to + "/");
