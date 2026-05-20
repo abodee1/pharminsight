@@ -111,7 +111,30 @@ function csvToObjects(text: string): Record<string, string>[] {
 }
 
 async function discover() {
-  let queued = 0;
+  // Pre-fetch the full set of already-successful URLs for this source in one go.
+  const successUrls = new Set<string>();
+  {
+    const { data } = await supabaseAdmin
+      .from("ingestion_log")
+      .select("resource_url")
+      .eq("source", SOURCE)
+      .eq("status", "success");
+    for (const r of data ?? []) successUrls.add(r.resource_url);
+  }
+  // Also skip URLs already pending/processing in the queue.
+  {
+    const { data } = await supabaseAdmin
+      .from("ingestion_queue")
+      .select("resource_url")
+      .eq("source", SOURCE);
+    for (const r of data ?? []) successUrls.add(r.resource_url);
+  }
+
+  const toQueue: Array<{
+    source: string; dataset: string; resource_url: string;
+    year: number | null; month: number | null; status: string;
+  }> = [];
+
   for (const ds of DATASETS) {
     const res = await fetch(`${CKAN_BASE}/package_show?id=${ds.id}`);
     if (!res.ok) {
@@ -124,34 +147,21 @@ async function discover() {
     );
 
     for (const r of resources) {
+      if (successUrls.has(r.url)) continue;
       const { year, month } = parseYearMonth(r.url, r.name, r.created ?? r.last_modified);
-
-      // Skip if already logged successfully
-      const { data: existing } = await supabaseAdmin
-        .from("ingestion_log")
-        .select("id")
-        .eq("source", SOURCE)
-        .eq("dataset", ds.id)
-        .eq("resource_url", r.url)
-        .eq("status", "success")
-        .maybeSingle();
-      if (existing) continue;
-
-      const { error } = await supabaseAdmin
-        .from("ingestion_queue")
-        .upsert(
-          {
-            source: SOURCE,
-            dataset: ds.id,
-            resource_url: r.url,
-            year,
-            month,
-            status: "pending",
-          },
-          { onConflict: "source,dataset,resource_url", ignoreDuplicates: true },
-        );
-      if (!error) queued++;
+      toQueue.push({
+        source: SOURCE, dataset: ds.id, resource_url: r.url, year, month, status: "pending",
+      });
     }
+  }
+
+  let queued = 0;
+  for (let i = 0; i < toQueue.length; i += 200) {
+    const chunk = toQueue.slice(i, i + 200);
+    const { error } = await supabaseAdmin
+      .from("ingestion_queue")
+      .upsert(chunk, { onConflict: "source,dataset,resource_url", ignoreDuplicates: true });
+    if (!error) queued += chunk.length;
   }
   return queued;
 }
