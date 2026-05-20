@@ -122,7 +122,7 @@ function PharmacyProfile() {
       }));
       setRanks(out);
     })();
-  }, [rows]);
+  }, [rows, pharmacy]);
 
   const claimAsMine = async () => {
     if (!user || !pharmacy) {
