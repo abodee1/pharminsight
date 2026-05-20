@@ -15,7 +15,6 @@ const SERVICES = [
   { key: "items_dispensed", label: "Items" },
   { key: "pharmacy_first_count", label: "Pharmacy First" },
   { key: "nms_count", label: "NMS" },
-  
   { key: "eps_items", label: "EPS Items" },
 ] as const;
 
@@ -25,69 +24,92 @@ type Row = {
 };
 type Pharm = { id: string; name: string; region: string | null; country: string | null; postcode: string | null };
 
+function prevPeriod(y: number, m: number): { year: number; month: number } {
+  return m === 1 ? { year: y - 1, month: 12 } : { year: y, month: m - 1 };
+}
+
 function Leaderboards() {
   const { user } = useAuth();
   const [country, setCountry] = useState<(typeof COUNTRIES)[number]>("England");
   const [service, setService] = useState<(typeof SERVICES)[number]["key"]>("items_dispensed");
   const [region, setRegion] = useState<string>("all");
   const [period, setPeriod] = useState<string>("");
+  const [periods, setPeriods] = useState<string[]>([]);
   const [page, setPage] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   const [pharms, setPharms] = useState<Pharm[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [myPharmId, setMyPharmId] = useState<string | null>(null);
 
+  // 1. Load pharmacies for selected country + user pharmacy + latest period
   useEffect(() => {
     (async () => {
-      const [p, d] = await Promise.all([
+      setLoading(true);
+      const [pData, lastData, upData] = await Promise.all([
         fetchAll<Pharm>((from, to) =>
-          supabase.from("pharmacies").select("id,name,region,country,postcode").range(from, to)
+          supabase.from("pharmacies").select("id,name,region,country,postcode").eq("country", country).range(from, to)
         ),
-        fetchAll<Row>((from, to) =>
-          supabase
-            .from("dispensing_data")
-            .select("pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items")
-            .range(from, to)
-        ),
+        supabase
+          .from("dispensing_data")
+          .select("year,month")
+          .order("year", { ascending: false })
+          .order("month", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        user ? supabase.from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null }),
       ]);
-      setPharms(p);
-      setRows(d);
-      const periods = Array.from(new Set(d.map((r) => `${r.year}-${String(r.month).padStart(2,"0")}`))).sort();
-      setPeriod(periods[periods.length - 1] || "");
-      if (user) {
-        const { data: up } = await supabase.from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle();
-        setMyPharmId(up?.pharmacy_id ?? null);
-      }
-    })();
-  }, [user]);
+      setPharms(pData);
+      setMyPharmId((upData as any)?.data?.pharmacy_id ?? null);
 
-  const periods = useMemo(
-    () => Array.from(new Set(rows.map((r) => `${r.year}-${String(r.month).padStart(2,"0")}`))).sort().reverse(),
-    [rows]
-  );
+      // Build last 36 months list from max period
+      const last = (lastData as any)?.data;
+      if (last) {
+        const list: string[] = [];
+        let y = last.year, m = last.month;
+        for (let i = 0; i < 36; i++) {
+          list.push(`${y}-${String(m).padStart(2, "0")}`);
+          ({ year: y, month: m } = prevPeriod(y, m));
+        }
+        setPeriods(list);
+        if (!period) setPeriod(list[0]);
+      }
+      setLoading(false);
+    })();
+  }, [country, user]);
+
+  // 2. Load dispensing for selected period + previous (only those two months)
+  useEffect(() => {
+    if (!period) return;
+    const [y, m] = period.split("-").map(Number);
+    const prev = prevPeriod(y, m);
+    (async () => {
+      setLoading(true);
+      const data = await fetchAll<Row>((from, to) =>
+        supabase
+          .from("dispensing_data")
+          .select("pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items")
+          .or(`and(year.eq.${y},month.eq.${m}),and(year.eq.${prev.year},month.eq.${prev.month})`)
+          .range(from, to)
+      );
+      setRows(data);
+      setLoading(false);
+    })();
+  }, [period]);
 
   const regions = useMemo(() => {
-    const inCountry = pharms.filter((p) => p.country === country);
-    return Array.from(new Set(inCountry.map((p) => p.region).filter(Boolean))) as string[];
-  }, [pharms, country]);
+    return Array.from(new Set(pharms.map((p) => p.region).filter(Boolean))) as string[];
+  }, [pharms]);
 
   const [py, pm] = (period || "0-0").split("-").map(Number);
-  const prevPeriodKey = useMemo(() => {
-    const idx = periods.indexOf(period);
-    return periods[idx + 1] || null;
-  }, [periods, period]);
 
   const board = useMemo(() => {
-    const inCountry = pharms.filter((p) => p.country === country && (region === "all" || p.region === region));
+    const inCountry = pharms.filter((p) => region === "all" || p.region === region);
     const idSet = new Set(inCountry.map((p) => p.id));
     const cur = rows.filter((r) => r.year === py && r.month === pm && idSet.has(r.pharmacy_id));
-    const prev = prevPeriodKey
-      ? rows.filter((r) => {
-          const [yy, mm] = prevPeriodKey.split("-").map(Number);
-          return r.year === yy && r.month === mm && idSet.has(r.pharmacy_id);
-        })
-      : [];
-    const prevMap = new Map(prev.map((r) => [r.pharmacy_id, r[service]]));
+    const prev = prevPeriod(py, pm);
+    const prevRows = rows.filter((r) => r.year === prev.year && r.month === prev.month && idSet.has(r.pharmacy_id));
+    const prevMap = new Map(prevRows.map((r) => [r.pharmacy_id, r[service]]));
     return cur
       .map((r) => {
         const ph = pharms.find((p) => p.id === r.pharmacy_id)!;
@@ -95,9 +117,10 @@ function Leaderboards() {
         const change = (r[service] as number) - prevVal;
         return { ph, value: r[service] as number, change };
       })
+      .filter((r) => r.ph)
       .sort((a, b) => b.value - a.value)
       .map((r, i) => ({ ...r, rank: i + 1 }));
-  }, [pharms, rows, country, region, py, pm, service, prevPeriodKey]);
+  }, [pharms, rows, region, py, pm, service]);
 
   const top10 = board.slice(0, 10).map((r) => ({ name: r.ph.name.replace(" Pharmacy", ""), value: r.value }));
   const pageSize = 25;
@@ -138,6 +161,7 @@ function Leaderboards() {
             return <option key={p} value={p}>{new Date(y, m - 1).toLocaleString("en-GB", { month: "long", year: "numeric" })}</option>;
           })}
         </select>
+        {loading && <span className="text-xs text-muted-foreground self-center">Loading…</span>}
       </div>
 
       <div className="rounded-lg bg-card border border-border p-5 shadow-sm mb-4">
