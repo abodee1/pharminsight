@@ -151,7 +151,6 @@ export function PharmacySearch({
       setResults([]);
       setGoogleResults([]);
     } else {
-    } else {
       inputRef.current?.focus();
     }
   };
