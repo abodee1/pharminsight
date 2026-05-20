@@ -2,10 +2,12 @@ import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   LayoutDashboard, Trophy, BarChart2, GitCompare, Sparkles, Upload, Settings,
-  LogOut, Menu, User as UserIcon,
+  LogOut, Menu, User as UserIcon, Search as SearchIcon,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
+import { PharmacySearch } from "./PharmacySearch";
 
 export const NAV_LINKS = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
