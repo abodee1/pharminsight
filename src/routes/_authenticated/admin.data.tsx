@@ -33,7 +33,20 @@ type SourceMeta = {
 const SOURCES: SourceMeta[] = [
   { key: "NHSBSA", label: "England (NHSBSA)", regionLabel: "ICB", expectedMonths: 90 },
   { key: "PHS_SCOTLAND", label: "Scotland (PHS)", regionLabel: "Health Board", expectedMonths: 90 },
+  { key: "HSCNI_BSO", label: "Northern Ireland (BSO)", regionLabel: "LCG", expectedMonths: 90 },
 ];
+
+const INGEST_PATH: Record<string, string> = {
+  PHS_SCOTLAND: "/api/public/hooks/ingest-scotland",
+  NHSBSA: "/api/public/hooks/ingest-england",
+  HSCNI_BSO: "/api/public/hooks/ingest-ni",
+};
+
+const SOURCE_LABEL: Record<string, string> = {
+  PHS_SCOTLAND: "Scotland",
+  NHSBSA: "England",
+  HSCNI_BSO: "Northern Ireland",
+};
 
 function AdminDataPage() {
   const [logs, setLogs] = useState<LogRow[]>([]);
@@ -78,14 +91,12 @@ function AdminDataPage() {
     setTriggering(key);
     const toastId = `ingest-${key}`;
     try {
-      const basePath =
-        source === "PHS_SCOTLAND"
-          ? "/api/public/hooks/ingest-scotland"
-          : null;
+      const basePath = INGEST_PATH[source];
       if (!basePath) {
         toast.info("Ingest endpoint not wired for this source yet.");
         return;
       }
+      const label = SOURCE_LABEL[source] ?? source;
 
       const callOnce = async (qs: string) => {
         const res = await fetch(`${basePath}${qs}`, { method: "POST" });
@@ -98,13 +109,11 @@ function AdminDataPage() {
         return json;
       };
 
-      // Initial call — does reset+discover if reingest, otherwise discover+1 item.
       let json = await callOnce(opts?.reingest ? "?reingest=1" : "");
       const total = (json.queued ?? 0) + (json.pending ?? 0);
       let done = json.processed ?? 0;
-      toast.loading(`Ingesting Scotland… ${done}/${total || "?"} (${json.pending ?? 0} pending)`, { id: toastId });
+      toast.loading(`Ingesting ${label}… ${done}/${total || "?"} (${json.pending ?? 0} pending)`, { id: toastId });
 
-      // Drain the queue: keep calling until pending === 0. Stop after a safety cap.
       let safety = 500;
       let consecutiveNoProgress = 0;
       while ((json.pending ?? 0) > 0 && safety-- > 0) {
@@ -119,7 +128,7 @@ function AdminDataPage() {
         } else {
           consecutiveNoProgress = 0;
         }
-        toast.loading(`Ingesting Scotland… ${done}/${total || done} (${json.pending ?? 0} pending)`, { id: toastId });
+        toast.loading(`Ingesting ${label}… ${done}/${total || done} (${json.pending ?? 0} pending)`, { id: toastId });
       }
 
       toast.success(`Done — processed ${done} file(s), ${json.pending ?? 0} pending`, { id: toastId });
@@ -168,20 +177,18 @@ function AdminDataPage() {
                     )}
                     <span className="ml-1.5">Ingest now</span>
                   </Button>
-                  {s.key === "PHS_SCOTLAND" && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={!!triggering}
-                      onClick={() => trigger(s.key, { reingest: true })}
-                      title="Wipe Scotland ingest logs and re-process every CSV"
-                    >
-                      {triggering === "PHS_SCOTLAND:reingest" ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : null}
-                      <span className="ml-1.5">Re-ingest Scotland</span>
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={!!triggering}
+                    onClick={() => trigger(s.key, { reingest: true })}
+                    title={`Wipe ${SOURCE_LABEL[s.key] ?? s.key} ingest logs and re-process every CSV`}
+                  >
+                    {triggering === `${s.key}:reingest` ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : null}
+                    <span className="ml-1.5">Re-ingest</span>
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
