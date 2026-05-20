@@ -115,14 +115,14 @@ function SettingsPage() {
     return scored;
   }, [pharms, search, countryFilter]);
 
-  const setPharmacy = async (id: string) => {
+  const setPharmacy = async (ph: { id: string; name?: string | null }) => {
     if (!user) return;
     await supabase.from("user_pharmacy").delete().eq("user_id", user.id);
-    const { error } = await supabase.from("user_pharmacy").insert({ user_id: user.id, pharmacy_id: id, is_primary: true });
+    const { error } = await supabase.from("user_pharmacy").insert({ user_id: user.id, pharmacy_id: ph.id, is_primary: true });
     if (error) return toast.error(error.message);
-    const ph = pharms.find((x) => x.id === id);
-    setMine(ph);
-    toast.success(`Primary pharmacy set to ${ph?.name}`);
+    const full = pharms.find((x) => x.id === ph.id) ?? ph;
+    setMine(full);
+    toast.success(`Primary pharmacy set to ${full?.name ?? "this pharmacy"}`);
   };
 
   const saveProfile = async () => {
