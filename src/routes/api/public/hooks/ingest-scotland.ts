@@ -414,7 +414,6 @@ export const Route = createFileRoute("/api/public/hooks/ingest-scotland")({
           const reingest = url.searchParams.get("reingest") === "1";
           let reset = 0;
           if (reingest) {
-            // Wipe success rows from the log and clear queue so discover() re-queues everything.
             await supabaseAdmin.from("ingestion_log").delete().eq("source", SOURCE).eq("status", "success");
             const { count } = await supabaseAdmin
               .from("ingestion_queue")
@@ -423,8 +422,9 @@ export const Route = createFileRoute("/api/public/hooks/ingest-scotland")({
             reset = count ?? 0;
           }
           const queued = await discover();
-          const batchSize = reingest ? 10 : 3;
-          const results = await runBatch(batchSize);
+          // Process at most 1 item per request to stay under the proxy timeout.
+          // The button can be clicked repeatedly (or polled) to drain the queue.
+          const results = reingest ? [] : await runBatch(1);
           const { count: pending } = await supabaseAdmin
             .from("ingestion_queue")
             .select("id", { count: "exact", head: true })
