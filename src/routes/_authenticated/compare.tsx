@@ -273,98 +273,104 @@ function Compare() {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <span className="text-xs text-muted-foreground self-center mr-1">Trend metric:</span>
-          {METRICS.map((mt) => (
-            <button
-              key={mt.key}
-              onClick={() => setMetric(mt.key)}
-              className={[
-                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                metric === mt.key
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground",
-              ].join(" ")}
-            >
-              {mt.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {selectedPharms.length >= 1 && (
         <>
-          {/* Headline cards */}
+          {/* Headline cards — all metrics per pharmacy */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {headline.map(({ ph, value, diff, pct }) => {
-              const up = diff > 0;
-              const flat = diff === 0;
-              return (
-                <div key={ph.id} className="rounded-xl bg-card border border-border p-5 shadow-sm relative overflow-hidden">
+            {headline.map(({ ph, metrics }) => (
+              <div
+                key={ph.id}
+                className="rounded-xl bg-card border border-border p-5 shadow-sm relative overflow-hidden"
+                style={{ borderTop: `3px solid ${colorFor(ph.id)}` }}
+              >
+                <div className="flex items-start gap-2 mb-3">
                   <span
-                    className="absolute left-0 top-0 h-full w-1"
+                    className="mt-1 h-2.5 w-2.5 rounded-full shrink-0"
                     style={{ background: colorFor(ph.id) }}
                   />
-                  <p className="text-xs font-medium text-muted-foreground truncate">{ph.name}</p>
-                  <p className="text-xs text-muted-foreground/70 truncate">{ph.region}</p>
-                  <p className="mt-3 text-2xl font-semibold tabular-nums">{value.toLocaleString()}</p>
-                  <div className="mt-1 flex items-center gap-1 text-xs">
-                    {flat ? (
-                      <Minus className="h-3.5 w-3.5 text-muted-foreground" />
-                    ) : up ? (
-                      <ArrowUpRight className="h-3.5 w-3.5 text-emerald-600" />
-                    ) : (
-                      <ArrowDownRight className="h-3.5 w-3.5 text-rose-600" />
-                    )}
-                    <span className={flat ? "text-muted-foreground" : up ? "text-emerald-700" : "text-rose-700"}>
-                      {flat ? "no change" : `${up ? "+" : ""}${pct}% vs prior month`}
-                    </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold truncate">{ph.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{ph.region}</p>
                   </div>
                 </div>
-              );
-            })}
+                <div className="grid grid-cols-2 gap-2">
+                  {metrics.map(({ mt, value, diff, pct }) => {
+                    const up = diff > 0;
+                    const flat = diff === 0;
+                    return (
+                      <div key={mt.key} className="rounded-md bg-secondary/40 px-2 py-1.5">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">{mt.short}</p>
+                        <p className="text-base font-semibold tabular-nums leading-tight">{value.toLocaleString()}</p>
+                        <div className="mt-0.5 flex items-center gap-0.5 text-[10px]">
+                          {flat ? (
+                            <Minus className="h-3 w-3 text-muted-foreground" />
+                          ) : up ? (
+                            <ArrowUpRight className="h-3 w-3 text-emerald-600" />
+                          ) : (
+                            <ArrowDownRight className="h-3 w-3 text-rose-600" />
+                          )}
+                          <span className={flat ? "text-muted-foreground" : up ? "text-emerald-700" : "text-rose-700"}>
+                            {flat ? "—" : `${up ? "+" : ""}${pct}%`}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
 
           {selectedPharms.length >= 2 && (
             <>
-              {/* Trend chart */}
+              {/* Trend small multiples — one chart per metric */}
               <div className="rounded-xl bg-card border border-border p-6 shadow-sm mb-6">
-                <div className="flex items-baseline justify-between mb-1">
-                  <h2 className="text-sm font-semibold">
-                    {METRICS.find((m) => m.key === metric)?.label} — 12-month trend
-                  </h2>
-                  <span className="text-xs text-muted-foreground">Hover to inspect</span>
+                <div className="flex items-baseline justify-between mb-4">
+                  <h2 className="text-sm font-semibold">24-month trend by service</h2>
+                  <div className="flex flex-wrap items-center gap-3 text-xs">
+                    {selectedPharms.map((ph) => (
+                      <span key={ph.id} className="inline-flex items-center gap-1.5">
+                        <span className="h-2 w-3 rounded-sm" style={{ background: colorFor(ph.id) }} />
+                        <span className="text-muted-foreground truncate max-w-[120px]">{ph.name}</span>
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trend} margin={{ top: 10, right: 12, bottom: 0, left: -10 }}>
-                      <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-                      <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                      <YAxis tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                      <Tooltip
-                        contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
-                        formatter={(v: any, _n: any, ctx: any) => {
-                          const ph = pharms.find((p) => p.id === ctx.dataKey);
-                          return [Number(v).toLocaleString(), ph?.name ?? ctx.dataKey];
-                        }}
-                      />
-                      <Legend
-                        wrapperStyle={{ fontSize: 12 }}
-                        formatter={(value) => pharms.find((p) => p.id === value)?.name ?? value}
-                      />
-                      {selectedPharms.map((ph) => (
-                        <Line
-                          key={ph.id}
-                          type="monotone"
-                          dataKey={ph.id}
-                          stroke={colorFor(ph.id)}
-                          strokeWidth={2.5}
-                          dot={{ r: 2 }}
-                          activeDot={{ r: 5 }}
-                        />
-                      ))}
-                    </LineChart>
-                  </ResponsiveContainer>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {trendByMetric.map(({ metric: mt, data }) => (
+                    <div key={mt.key}>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">{mt.label}</p>
+                      <div className="h-48">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={data} margin={{ top: 5, right: 8, bottom: 0, left: -15 }}>
+                            <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+                            <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" interval="preserveStartEnd" />
+                            <YAxis tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
+                            <Tooltip
+                              contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                              formatter={(v: any, _n: any, ctx: any) => {
+                                const ph = pharms.find((p) => p.id === ctx.dataKey);
+                                return [Number(v).toLocaleString(), ph?.name ?? ctx.dataKey];
+                              }}
+                            />
+                            {selectedPharms.map((ph) => (
+                              <Line
+                                key={ph.id}
+                                type="monotone"
+                                dataKey={ph.id}
+                                stroke={colorFor(ph.id)}
+                                strokeWidth={2}
+                                dot={false}
+                                activeDot={{ r: 4 }}
+                              />
+                            ))}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
