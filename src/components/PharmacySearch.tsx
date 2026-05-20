@@ -42,11 +42,15 @@ export function PharmacySearch({
 }: Props) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Pharmacy[]>([]);
+  const [googleResults, setGoogleResults] = useState<PlaceResult[]>([]);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleLinking, setGoogleLinking] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const searchPlaces = useServerFn(searchPlacesText);
   const excludeSet = new Set(excludeIds ?? []);
 
   // close on outside click / escape
