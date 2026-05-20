@@ -149,7 +149,7 @@ function AdminDataPage() {
         backLabel="My Account"
       />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {SOURCES.map((s) => {
           const st = stats[s.key];
           const monthsCovered = st?.months.size ?? 0;

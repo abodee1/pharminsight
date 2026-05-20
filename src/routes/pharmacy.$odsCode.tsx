@@ -422,8 +422,7 @@ function PharmacyProfile() {
                     {!isScotland && <th className="text-right px-3 py-2 font-medium">NMS</th>}
                     <th className="text-right px-3 py-2 font-medium">PF</th>
                     <th className="text-right px-3 py-2 font-medium">PF £</th>
-                    {!isScotland && <th className="text-right px-3 py-2 font-medium">Flu</th>}
-                    {isScotland && <th className="text-right px-3 py-2 font-medium">Flu</th>}
+                    <th className="text-right px-3 py-2 font-medium">Flu</th>
                     {isScotland && <th className="text-right px-3 py-2 font-medium">EHC</th>}
                     {isScotland && <th className="text-right px-3 py-2 font-medium">Meth.</th>}
                     {isScotland && <th className="text-right px-3 py-2 font-medium">Smoke.</th>}
