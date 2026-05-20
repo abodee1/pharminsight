@@ -74,17 +74,45 @@ function SettingsPage() {
     })();
   }, [user]);
 
+  const countries = useMemo(() => {
+    const set = new Set<string>();
+    pharms.forEach((p) => p.country && set.add(p.country));
+    return Array.from(set).sort();
+  }, [pharms]);
+
   const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    if (!q) return pharms.slice(0, 8);
-    return pharms
-      .filter((p) =>
-        p.name.toLowerCase().includes(q) ||
-        (p.ods_code || "").toLowerCase().includes(q) ||
-        (p.postcode || "").toLowerCase().includes(q) ||
-        (p.region || "").toLowerCase().includes(q))
-      .slice(0, 25);
-  }, [pharms, search]);
+    const base = countryFilter === "all" ? pharms : pharms.filter((p) => p.country === countryFilter);
+    const q = search.toLowerCase().trim().replace(/\s+/g, " ");
+    if (!q) return base.slice(0, 50);
+    const qNoSpace = q.replace(/\s+/g, "");
+    const scored = base
+      .map((p) => {
+        const name = (p.name || "").toLowerCase();
+        const ods = (p.ods_code || "").toLowerCase();
+        const postcode = (p.postcode || "").toLowerCase();
+        const postcodeNoSpace = postcode.replace(/\s+/g, "");
+        const outward = postcode.split(" ")[0] || "";
+        const region = (p.region || "").toLowerCase();
+        const address = (p.address || "").toLowerCase();
+
+        let score = 0;
+        if (ods === q) score = 1000;
+        else if (postcodeNoSpace === qNoSpace) score = 900;
+        else if (outward === q) score = 800;
+        else if (postcodeNoSpace.startsWith(qNoSpace)) score = 700;
+        else if (ods.startsWith(q)) score = 600;
+        else if (name.startsWith(q)) score = 500;
+        else if (name.includes(q)) score = 300;
+        else if (region.includes(q)) score = 200;
+        else if (address.includes(q)) score = 100;
+        return { p, score };
+      })
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name))
+      .slice(0, 50)
+      .map((x) => x.p);
+    return scored;
+  }, [pharms, search, countryFilter]);
 
   const setPharmacy = async (id: string) => {
     if (!user) return;
