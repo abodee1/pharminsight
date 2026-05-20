@@ -78,7 +78,9 @@ export function PharmacySearch({
     const term = q.trim();
     if (term.length < 2) {
       setResults([]);
+      setGoogleResults([]);
       setLoading(false);
+      setGoogleLoading(false);
       return;
     }
     setLoading(true);
@@ -89,6 +91,53 @@ export function PharmacySearch({
     }, 300);
     return () => clearTimeout(t);
   }, [q]);
+
+  const runGoogleSearch = async () => {
+    const term = q.trim();
+    if (term.length < 2) return;
+    setGoogleLoading(true);
+    setGoogleResults([]);
+    try {
+      const r = await searchPlaces({ data: { query: term } });
+      setGoogleResults(r.results);
+      if (r.results.length === 0) toast.info("No matches on Google.");
+    } catch (e: any) {
+      toast.error(e?.message || "Google search failed.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleSelect = async (p: PlaceResult) => {
+    if (!p.postcode) {
+      toast.error("No postcode in Google result — can't link to a pharmacy record.");
+      return;
+    }
+    setGoogleLinking(p.id);
+    try {
+      const compact = p.postcode.replace(/\s+/g, "");
+      const { data } = await supabase
+        .from("pharmacies")
+        .select("id,ods_code,name,address,postcode,country,region")
+        .or(`postcode.ilike.${p.postcode},postcode.ilike.${compact}`)
+        .limit(20);
+      const rows = (data || []) as Pharmacy[];
+      // Prefer best name match
+      const lname = p.name.toLowerCase();
+      const best =
+        rows.find((r) => r.name.toLowerCase() === lname) ||
+        rows.find((r) => lname.includes(r.name.toLowerCase().split(" ")[0])) ||
+        rows[0];
+      if (!best) {
+        toast.error(`"${p.name}" isn't in our dataset yet.`);
+        return;
+      }
+      handleSelect(best);
+    } finally {
+      setGoogleLinking(null);
+    }
+  };
+
 
   const handleSelect = (p: Pharmacy) => {
     if (onSelect) {
