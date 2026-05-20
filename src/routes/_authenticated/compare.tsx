@@ -5,12 +5,9 @@ import { fetchAll } from "@/lib/fetchAll";
 import { PageHeader } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
-import { Check, ChevronsUpDown, X, Plus, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
+import { X, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
+import { PharmacySearch } from "@/components/PharmacySearch";
+import { CountryBadge } from "@/components/CountryBadge";
 import { Badge } from "@/components/ui/badge";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
@@ -51,7 +48,7 @@ function Compare() {
   const [rows, setRows] = useState<Row[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [metric, setMetric] = useState<(typeof METRICS)[number]["key"]>("items_dispensed");
-  const [open, setOpen] = useState(false);
+  
 
   useEffect(() => {
     (async () => {
@@ -168,13 +165,6 @@ function Compare() {
     return out;
   }, [latest, selectedPharms, rows]);
 
-  function toggle(id: string) {
-    setSelected((cur) => {
-      if (cur.includes(id)) return cur.filter((x) => x !== id);
-      if (cur.length >= MAX_SELECT) return cur;
-      return [...cur, id];
-    });
-  }
 
   function remove(id: string) {
     setSelected((cur) => cur.filter((x) => x !== id));
@@ -191,70 +181,76 @@ function Compare() {
 
       {/* Selector */}
       <div className="rounded-xl bg-card border border-border p-5 shadow-sm mb-6">
-        <div className="flex flex-wrap items-center gap-2">
-          {selectedPharms.map((ph) => (
-            <span
-              key={ph.id}
-              className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary pl-3 pr-1 py-1 text-sm"
-            >
-              <span
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ background: colorFor(ph.id) }}
+        <div className="flex flex-col gap-4 md:flex-row md:items-start">
+          <div className="md:w-[420px] shrink-0">
+            {selected.length < MAX_SELECT ? (
+              <PharmacySearch
+                placeholder="Search by name, postcode (e.g. KY11), or ODS code…"
+                excludeIds={selected}
+                clearOnSelect
+                onSelect={(p) => {
+                  if (selected.includes(p.id)) return;
+                  if (selected.length >= MAX_SELECT) return;
+                  // Ensure pharmacy exists in local pharms list (it should — fetchAll loads all)
+                  setPharms((cur) =>
+                    cur.some((x) => x.id === p.id)
+                      ? cur
+                      : [
+                          ...cur,
+                          {
+                            id: p.id,
+                            name: p.name,
+                            region: p.region ?? null,
+                            country: p.country ?? null,
+                            postcode: p.postcode ?? null,
+                          },
+                        ],
+                  );
+                  setSelected((cur) => [...cur, p.id]);
+                }}
               />
-              <span className="font-medium">{ph.name}</span>
-              <span className="text-xs text-muted-foreground">{ph.region}</span>
-              <button
-                onClick={() => remove(ph.id)}
-                className="ml-1 rounded-full p-1 hover:bg-background"
-                aria-label="Remove"
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                Maximum {MAX_SELECT} pharmacies selected — remove one to add another.
+              </p>
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">
+              Up to {MAX_SELECT} pharmacies • {selected.length}/{MAX_SELECT} selected
+            </p>
+          </div>
+
+          <div className="flex-1 flex flex-wrap items-start gap-2 min-h-[36px]">
+            {selectedPharms.length === 0 && (
+              <span className="text-sm text-muted-foreground self-center">
+                Search above and add at least 2 pharmacies to compare.
+              </span>
+            )}
+            {selectedPharms.map((ph) => (
+              <span
+                key={ph.id}
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary pl-3 pr-1 py-1 text-sm max-w-full"
               >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-          {selected.length < MAX_SELECT && (
-            <Popover open={open} onOpenChange={setOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Add pharmacy
-                  <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="p-0 w-[380px]" align="start">
-                <Command>
-                  <CommandInput placeholder="Search by name, region, postcode…" />
-                  <CommandList className="max-h-72">
-                    <CommandEmpty>No pharmacies found.</CommandEmpty>
-                    <CommandGroup>
-                      {pharms.slice(0, 500).map((p) => {
-                        const checked = selected.includes(p.id);
-                        return (
-                          <CommandItem
-                            key={p.id}
-                            value={`${p.name} ${p.region ?? ""} ${p.postcode ?? ""}`}
-                            onSelect={() => { toggle(p.id); }}
-                          >
-                            <Check className={["mr-2 h-4 w-4", checked ? "opacity-100" : "opacity-0"].join(" ")} />
-                            <div className="flex flex-col">
-                              <span className="text-sm">{p.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {[p.region, p.postcode].filter(Boolean).join(" · ")}
-                              </span>
-                            </div>
-                          </CommandItem>
-                        );
-                      })}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          )}
-          {selected.length === 0 && (
-            <span className="text-sm text-muted-foreground">Add at least 2 pharmacies to compare.</span>
-          )}
+                <span
+                  className="h-2.5 w-2.5 rounded-full shrink-0"
+                  style={{ background: colorFor(ph.id) }}
+                />
+                <span className="font-medium truncate max-w-[180px]">{ph.name}</span>
+                <CountryBadge country={ph.country} />
+                {ph.region && (
+                  <span className="text-xs text-muted-foreground truncate max-w-[120px]">{ph.region}</span>
+                )}
+                <button
+                  onClick={() => remove(ph.id)}
+                  className="ml-1 rounded-full p-1 hover:bg-background"
+                  aria-label="Remove"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
         </div>
+
         <div className="mt-4 flex flex-wrap gap-2">
           <span className="text-xs text-muted-foreground self-center mr-1">Trend metric:</span>
           {METRICS.map((mt) => (
