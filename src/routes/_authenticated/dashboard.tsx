@@ -34,7 +34,7 @@ type Row = {
   pharmacy_id: string; month: number; year: number;
   items_dispensed: number; nms_count: number; pharmacy_first_count: number;
   pharmacy_first_payment: number; mcr_payment: number; smoking_cessation_payment: number;
-  final_payment: number; gross_cost: number;
+  final_payment: number; gross_cost: number; is_actual_payment: boolean;
 };
 
 function Dashboard() {
@@ -79,7 +79,7 @@ function Dashboard() {
         supabase
           .from("dispensing_data")
           .select(
-            "pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,pharmacy_first_payment,mcr_payment,smoking_cessation_payment,final_payment,gross_cost",
+            "pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,pharmacy_first_payment,mcr_payment,smoking_cessation_payment,final_payment,gross_cost,is_actual_payment",
           )
           .gte("year", nowYear - 2)
           .range(from, to),
@@ -98,7 +98,16 @@ function Dashboard() {
         if (!byPeriod.has(k)) byPeriod.set(k, []);
         byPeriod.get(k)!.push(r);
       });
-      const periods = [...byPeriod.keys()].sort((a, b) => a - b).slice(-24);
+      // Only keep periods with confirmed (non-provisional) data so sparklines aren't dragged to 0
+      const allPeriods = [...byPeriod.keys()].sort((a, b) => a - b);
+      const periods = allPeriods
+        .filter((k) => {
+          const rows = byPeriod.get(k)!;
+          return ph
+            ? rows.some((r) => r.pharmacy_id === ph.id && r.is_actual_payment)
+            : rows.some((r) => r.is_actual_payment);
+        })
+        .slice(-24);
 
       // Build mine vs national series (last 12 of those)
       const last12 = periods.slice(-12);
@@ -123,12 +132,16 @@ function Dashboard() {
         }),
       );
 
-      // Pick latest period where this pharmacy actually reported (non-zero items)
+      // Pick latest period where this pharmacy has actual (non-provisional) data
       let latestKey = periods[periods.length - 1];
       if (ph) {
         for (let i = periods.length - 1; i >= 0; i--) {
           const r = byPeriod.get(periods[i])!.find((x) => x.pharmacy_id === ph!.id);
-          if (r && (r.items_dispensed || 0) > 0) { latestKey = periods[i]; break; }
+          if (r && r.is_actual_payment) { latestKey = periods[i]; break; }
+        }
+      } else {
+        for (let i = periods.length - 1; i >= 0; i--) {
+          if (byPeriod.get(periods[i])!.some((r) => r.is_actual_payment)) { latestKey = periods[i]; break; }
         }
       }
       const latestRows = byPeriod.get(latestKey) || [];
