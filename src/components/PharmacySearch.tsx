@@ -4,25 +4,47 @@ import { Search, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CountryBadge } from "./CountryBadge";
 
-type Pharmacy = {
+export type Pharmacy = {
   id: string;
   ods_code: string;
   name: string;
   address: string | null;
   postcode: string | null;
   country: string | null;
+  region?: string | null;
 };
 
 const ODS_RE = /^[A-Za-z][A-Za-z0-9]{2,9}$/;
 const POSTCODE_RE = /^[A-Za-z]{1,2}[0-9][A-Za-z0-9]?(\s*[0-9][A-Za-z]{2})?$/;
 
-export function PharmacySearch({ compact = false }: { compact?: boolean }) {
+type Props = {
+  compact?: boolean;
+  placeholder?: string;
+  /** Override what happens when a result is picked. Default: navigate to /pharmacy/[ods]. */
+  onSelect?: (p: Pharmacy) => void;
+  /** Pharmacy ids already chosen — shown with a "Selected" badge and de-prioritised. */
+  excludeIds?: string[];
+  /** When false, keep the query after selection (handy for add-multiple flows). Default true. */
+  clearOnSelect?: boolean;
+  autoFocus?: boolean;
+};
+
+export function PharmacySearch({
+  compact = false,
+  placeholder,
+  onSelect,
+  excludeIds,
+  clearOnSelect = true,
+  autoFocus = false,
+}: Props) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Pharmacy[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const excludeSet = new Set(excludeIds ?? []);
 
   // close on outside click / escape
   useEffect(() => {
@@ -39,6 +61,10 @@ export function PharmacySearch({ compact = false }: { compact?: boolean }) {
       document.removeEventListener("keydown", onKey);
     };
   }, []);
+
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
 
   // debounced search
   useEffect(() => {
@@ -57,11 +83,19 @@ export function PharmacySearch({ compact = false }: { compact?: boolean }) {
     return () => clearTimeout(t);
   }, [q]);
 
-  const onSelect = (p: Pharmacy) => {
-    setOpen(false);
-    setQ("");
-    setResults([]);
-    navigate({ to: "/pharmacy/$odsCode", params: { odsCode: p.ods_code } });
+  const handleSelect = (p: Pharmacy) => {
+    if (onSelect) {
+      onSelect(p);
+    } else {
+      navigate({ to: "/pharmacy/$odsCode", params: { odsCode: p.ods_code } });
+    }
+    if (clearOnSelect) {
+      setOpen(false);
+      setQ("");
+      setResults([]);
+    } else {
+      inputRef.current?.focus();
+    }
   };
 
   return (
@@ -69,6 +103,7 @@ export function PharmacySearch({ compact = false }: { compact?: boolean }) {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <input
+          ref={inputRef}
           type="text"
           value={q}
           onChange={(e) => {
@@ -76,7 +111,9 @@ export function PharmacySearch({ compact = false }: { compact?: boolean }) {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder={compact ? "Search pharmacies…" : "Search by pharmacy name, postcode, or ODS code..."}
+          placeholder={
+            placeholder ?? (compact ? "Search pharmacies…" : "Search by pharmacy name, postcode, or ODS code...")
+          }
           className="w-full h-9 rounded-md border border-input bg-background pl-9 pr-9 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
         {loading && (
@@ -91,25 +128,39 @@ export function PharmacySearch({ compact = false }: { compact?: boolean }) {
               No pharmacies found. Try a different name or postcode.
             </p>
           )}
-          {results.slice(0, 8).map((p) => (
-            <button
-              key={p.id}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => onSelect(p)}
-              className="w-full text-left flex items-center gap-3 px-3 py-2.5 hover:bg-accent hover:text-accent-foreground border-b border-border/50 last:border-b-0"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold text-sm truncate">{p.name}</p>
-                  <CountryBadge country={p.country} />
+          {results.slice(0, 10).map((p) => {
+            const already = excludeSet.has(p.id);
+            return (
+              <button
+                key={p.id}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => !already && handleSelect(p)}
+                disabled={already}
+                className={[
+                  "w-full text-left flex items-center gap-3 px-3 py-2.5 border-b border-border/50 last:border-b-0",
+                  already
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-accent hover:text-accent-foreground",
+                ].join(" ")}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-sm truncate">{p.name}</p>
+                    <CountryBadge country={p.country} />
+                    {already && (
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1.5 py-0.5">
+                        Selected
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {[p.address, p.postcode, p.region].filter(Boolean).join(" · ")}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground truncate mt-0.5">
-                  {[p.address, p.postcode].filter(Boolean).join(", ")}
-                </p>
-              </div>
-              <span className="text-xs font-mono text-muted-foreground shrink-0">{p.ods_code}</span>
-            </button>
-          ))}
+                <span className="text-xs font-mono text-muted-foreground shrink-0">{p.ods_code}</span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
