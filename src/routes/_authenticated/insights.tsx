@@ -16,7 +16,7 @@ const TYPES = [
 ] as const;
 
 function Insights() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const generate = useServerFn(generateInsight);
   const [loading, setLoading] = useState<string | null>(null);
   const [history, setHistory] = useState<any[]>([]);
