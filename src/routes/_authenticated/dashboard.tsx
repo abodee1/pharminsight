@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetchAll";
+import { getLatestSubstantialPeriod } from "@/lib/latestPeriod";
 import { PageHeader, StatCard } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import {
