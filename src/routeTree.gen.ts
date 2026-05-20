@@ -18,6 +18,7 @@ import { Route as AuthenticatedUploadRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedLeaderboardsRouteImport } from './routes/_authenticated/leaderboards'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
+import { Route as AuthenticatedIncomeRouteImport } from './routes/_authenticated/income'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCompareRouteImport } from './routes/_authenticated/compare'
 import { Route as AuthenticatedBenchmarkingRouteImport } from './routes/_authenticated/benchmarking'
@@ -71,6 +72,11 @@ const AuthenticatedInsightsRoute = AuthenticatedInsightsRouteImport.update({
   path: '/insights',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedIncomeRoute = AuthenticatedIncomeRouteImport.update({
+  id: '/income',
+  path: '/income',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -118,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/benchmarking': typeof AuthenticatedBenchmarkingRoute
   '/compare': typeof AuthenticatedCompareRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/income': typeof AuthenticatedIncomeRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByTo {
   '/benchmarking': typeof AuthenticatedBenchmarkingRoute
   '/compare': typeof AuthenticatedCompareRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/income': typeof AuthenticatedIncomeRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -154,6 +162,7 @@ export interface FileRoutesById {
   '/_authenticated/benchmarking': typeof AuthenticatedBenchmarkingRoute
   '/_authenticated/compare': typeof AuthenticatedCompareRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/income': typeof AuthenticatedIncomeRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -173,6 +182,7 @@ export interface FileRouteTypes {
     | '/benchmarking'
     | '/compare'
     | '/dashboard'
+    | '/income'
     | '/insights'
     | '/leaderboards'
     | '/settings'
@@ -190,6 +200,7 @@ export interface FileRouteTypes {
     | '/benchmarking'
     | '/compare'
     | '/dashboard'
+    | '/income'
     | '/insights'
     | '/leaderboards'
     | '/settings'
@@ -208,6 +219,7 @@ export interface FileRouteTypes {
     | '/_authenticated/benchmarking'
     | '/_authenticated/compare'
     | '/_authenticated/dashboard'
+    | '/_authenticated/income'
     | '/_authenticated/insights'
     | '/_authenticated/leaderboards'
     | '/_authenticated/settings'
@@ -294,6 +306,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInsightsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/income': {
+      id: '/_authenticated/income'
+      path: '/income'
+      fullPath: '/income'
+      preLoaderRoute: typeof AuthenticatedIncomeRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -350,6 +369,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedBenchmarkingRoute: typeof AuthenticatedBenchmarkingRoute
   AuthenticatedCompareRoute: typeof AuthenticatedCompareRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedIncomeRoute: typeof AuthenticatedIncomeRoute
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedLeaderboardsRoute: typeof AuthenticatedLeaderboardsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -362,6 +382,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBenchmarkingRoute: AuthenticatedBenchmarkingRoute,
   AuthenticatedCompareRoute: AuthenticatedCompareRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedIncomeRoute: AuthenticatedIncomeRoute,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedLeaderboardsRoute: AuthenticatedLeaderboardsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
@@ -386,3 +407,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
