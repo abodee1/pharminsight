@@ -154,8 +154,6 @@ function Benchmarking() {
             </div>
           </div>
 
-          <div className="mt-6 rounded-lg bg-card border border-border p-6 shadow-sm">
-            <h2 className="text-sm font-semibold mb-3">Gap analysis</h2>
           <div className="mt-6">
             <div className="flex items-baseline justify-between mb-3">
               <h2 className="text-sm font-semibold tracking-tight">Where you sit nationally</h2>
