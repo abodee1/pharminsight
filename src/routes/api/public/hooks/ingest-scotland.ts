@@ -399,19 +399,31 @@ async function processQueueItem(item: {
   }
 }
 
+// Priority order: contractor-activity (payment data) first, then prescribed-dispensed,
+// then the heavy prescriptions-in-the-community files.
+const DATASET_PRIORITY = [
+  "community-pharmacy-contractor-activity",
+  "prescribed-dispensed",
+  "prescriptions-in-the-community",
+];
+
 async function runBatch(batchSize = 3) {
-  const { data: queue, error } = await supabaseAdmin
-    .from("ingestion_queue")
-    .select("id, dataset, resource_url, year, month")
-    .eq("source", SOURCE)
-    .eq("status", "pending")
-    .order("year", { ascending: false })
-    .order("month", { ascending: false })
-    .limit(batchSize);
-  if (error) throw error;
-  if (!queue?.length) return [];
-  return Promise.all(queue.map(processQueueItem));
+  for (const ds of DATASET_PRIORITY) {
+    const { data: queue, error } = await supabaseAdmin
+      .from("ingestion_queue")
+      .select("id, dataset, resource_url, year, month")
+      .eq("source", SOURCE)
+      .eq("status", "pending")
+      .eq("dataset", ds)
+      .order("year", { ascending: false })
+      .order("month", { ascending: false })
+      .limit(batchSize);
+    if (error) throw error;
+    if (queue?.length) return Promise.all(queue.map(processQueueItem));
+  }
+  return [];
 }
+
 
 export const Route = createFileRoute("/api/public/hooks/ingest-scotland")({
   server: {
