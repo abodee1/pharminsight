@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X, ShieldCheck } from "lucide-react";
 import { PharmacySearch } from "@/components/PharmacySearch";
+import { PercentileRail, AnnotatedSparkline, ShareDonut } from "@/components/Infographics";
 
 export const Route = createFileRoute("/pharmacy/$odsCode")({ component: PharmacyProfile });
 
