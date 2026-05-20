@@ -66,26 +66,30 @@ function Dashboard() {
       }
       setPharmacy(ph);
 
-      // ---- National overview (always shown): latest period totals per country ----
-      const { data: allPharm } = await supabase.from("pharmacies").select("id,country");
+      // ---- Pull all pharmacies (paginated to bypass 1000 cap) ----
+      const allPharm = await fetchAll<{ id: string; country: string | null }>((from, to) =>
+        supabase.from("pharmacies").select("id,country").range(from, to),
+      );
       const countryById = new Map<string, string>();
-      (allPharm || []).forEach((p: any) => countryById.set(p.id, p.country || "Unknown"));
+      allPharm.forEach((p) => countryById.set(p.id, p.country || "Unknown"));
 
-      // Pull last 24 months of compact data for the user's country (or all if none)
-      const targetCountry = ph?.country || "Scotland";
-      const peerIds = (allPharm || []).filter((p: any) => p.country === targetCountry).map((p: any) => p.id);
-
-      const recent = await fetchAll<Row>((from, to) =>
+      // Pull last 2 years of dispensing_data by date filter (avoid huge .in() URL)
+      const nowYear = new Date().getFullYear();
+      const allRecent = await fetchAll<Row & { year: number; month: number }>((from, to) =>
         supabase
           .from("dispensing_data")
           .select(
             "pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,pharmacy_first_payment,mcr_payment,smoking_cessation_payment,final_payment,gross_cost",
           )
-          .in("pharmacy_id", peerIds.length ? peerIds : ["00000000-0000-0000-0000-000000000000"])
-          .order("year", { ascending: false })
-          .order("month", { ascending: false })
+          .gte("year", nowYear - 2)
           .range(from, to),
       );
+
+      // Filter to user's country (or all if no pharmacy)
+      const targetCountry = ph?.country || null;
+      const recent = targetCountry
+        ? allRecent.filter((r) => countryById.get(r.pharmacy_id) === targetCountry)
+        : allRecent;
 
       // Group by period
       const byPeriod = new Map<number, Row[]>();
@@ -158,25 +162,19 @@ function Dashboard() {
         { label: "Dispensing & other", value: other },
       ]);
 
-      // Country split donut — total items at latest period across all countries
-      const { data: latestAll } = await supabase
-        .from("dispensing_data")
-        .select("pharmacy_id,items_dispensed,year,month")
-        .eq("year", ly).eq("month", lm);
+      // Country split donut — use allRecent at latest period across all countries
       const split = new Map<string, number>();
-      (latestAll || []).forEach((r: any) => {
-        const c = countryById.get(r.pharmacy_id) || "Unknown";
-        split.set(c, (split.get(c) || 0) + (r.items_dispensed || 0));
-      });
+      allRecent
+        .filter((r) => r.year === ly && r.month === lm)
+        .forEach((r) => {
+          const c = countryById.get(r.pharmacy_id) || "Unknown";
+          split.set(c, (split.get(c) || 0) + (r.items_dispensed || 0));
+        });
       setCountrySplit([...split.entries()].map(([label, value]) => ({ label, value })));
 
-      // National trend (all countries) — total items per period last 12
+      // National trend (all countries) — total items per period last 12 from allRecent
       const natByPeriod = new Map<number, number>();
-      // re-use peer recent doesn't have all countries; use a lightweight national query
-      const { data: nat } = await supabase
-        .from("dispensing_data")
-        .select("year,month,items_dispensed");
-      (nat || []).forEach((r: any) => {
+      allRecent.forEach((r) => {
         const k = periodKey(r.year, r.month);
         natByPeriod.set(k, (natByPeriod.get(k) || 0) + (r.items_dispensed || 0));
       });
