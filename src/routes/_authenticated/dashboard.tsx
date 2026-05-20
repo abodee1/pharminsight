@@ -88,7 +88,7 @@ function Dashboard() {
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto">
-      <PageHeader title={`${greeting}, ${firstName}`} subtitle="Here's how your pharmacy is performing." />
+      <PageHeader title={`${greeting}, ${firstName}`} subtitle="Here's how your pharmacy is performing." showBack={false} />
 
       {!pharmacy && (
         <div className="mb-6 rounded-lg border border-gold/40 bg-gold/10 p-4 text-sm">
