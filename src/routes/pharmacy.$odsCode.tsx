@@ -133,8 +133,16 @@ function PharmacyProfile() {
     toast.success(`${pharmacy.name} set as your pharmacy`);
   };
 
-  const latest = rows[rows.length - 1];
-  const prior = rows[rows.length - 2];
+  const isScotlandPharm = (pharmacy?.country || "").toLowerCase() === "scotland";
+  const latestIdx = useMemo(() => {
+    if (rows.length === 0) return -1;
+    if (isScotlandPharm) {
+      for (let i = rows.length - 1; i >= 0; i--) if (rows[i].is_actual_payment) return i;
+    }
+    return rows.length - 1;
+  }, [rows, isScotlandPharm]);
+  const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
+  const prior = latestIdx > 0 ? rows[latestIdx - 1] : undefined;
   const yoy = useMemo(() => {
     if (!latest) return null;
     return rows.find((r) => r.year === latest.year - 1 && r.month === latest.month) ?? null;
