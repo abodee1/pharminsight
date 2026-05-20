@@ -69,7 +69,7 @@ async function discover() {
     (r) => r.format?.toUpperCase() === "CSV" && /dispensed items by gp and pharmacy/i.test(r.name),
   );
 
-  const queue: Array<Record<string, unknown>> = [];
+  const queue: Array<{ source: string; dataset: string; resource_url: string; year: number | null; month: number | null; status: string; error: string | null }> = [];
   for (const r of resources) {
     if (skip.has(r.url)) continue;
     const { year, month } = parseYearMonth(r.name, r.url);

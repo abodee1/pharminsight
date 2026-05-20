@@ -87,7 +87,7 @@ async function discover() {
   const payload = (await res.json()) as { result: { resources: CkanResource[] } };
   const resources = (payload.result?.resources ?? []).filter((r) => r.format?.toUpperCase() === "CSV");
 
-  const queue: Array<Record<string, unknown>> = [];
+  const queue: Array<{ source: string; dataset: string; resource_url: string; year: number | null; month: number | null; status: string; error: string | null }> = [];
   for (const r of resources) {
     if (skip.has(r.url)) continue;
     const { year, month } = parseYearMonth(r.name, r.url);
