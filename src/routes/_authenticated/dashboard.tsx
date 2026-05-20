@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetchAll";
 import { PageHeader, StatCard } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
+import { PercentileRail, AnnotatedSparkline } from "@/components/Infographics";
 import {
   ResponsiveContainer,
   LineChart,
