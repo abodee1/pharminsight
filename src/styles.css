@@ -78,11 +78,12 @@
 
   --border: oklch(0.92 0.012 256);
   --input: oklch(0.92 0.012 256);
-  --ring: oklch(0.76 0.12 85);
+  --ring: oklch(0.55 0.025 260);
 
-  /* Gold accent (#C8A84B-ish) */
-  --gold: oklch(0.76 0.12 85);
-  --gold-foreground: oklch(0.18 0.03 260);
+  /* "gold" token kept for legacy classes — redefined as a dark slate accent
+     that reads on both light cards and the dark sidebar. */
+  --gold: oklch(0.30 0.035 260);
+  --gold-foreground: oklch(0.985 0 0);
 
   /* Sidebar (dark slate #0F172A) */
   --sidebar: oklch(0.19 0.03 260);
@@ -91,12 +92,12 @@
   --sidebar-accent: oklch(0.26 0.035 260);
   --sidebar-border: oklch(0.28 0.03 260);
 
-  /* Charts — slate / gold / sky blue palette */
-  --chart-1: oklch(0.32 0.04 260);   /* slate dark */
-  --chart-2: oklch(0.76 0.12 85);    /* gold */
-  --chart-3: oklch(0.65 0.13 230);   /* sky blue */
-  --chart-4: oklch(0.55 0.04 260);   /* slate mid */
-  --chart-5: oklch(0.80 0.08 230);   /* light sky */
+  /* Charts — monochromatic slate scale */
+  --chart-1: oklch(0.22 0.035 260);  /* near-black slate */
+  --chart-2: oklch(0.42 0.035 260);  /* dark slate */
+  --chart-3: oklch(0.60 0.025 260);  /* mid slate */
+  --chart-4: oklch(0.75 0.015 260);  /* light slate */
+  --chart-5: oklch(0.88 0.008 260);  /* very light slate */
 }
 
 @layer base {
