@@ -65,6 +65,9 @@ function PharmacyProfile() {
   const [hasFp34c, setHasFp34c] = useState(false);
   const [pfPeerAvg, setPfPeerAvg] = useState<Record<string, number> | null>(null);
   const [pfPeerCount, setPfPeerCount] = useState(0);
+  const [peerDistribution, setPeerDistribution] = useState<{
+    items_dispensed: number[]; nms_count: number[]; pharmacy_first_count: number[]; eps_items: number[];
+  } | null>(null);
 
   useEffect(() => {
     (async () => {
