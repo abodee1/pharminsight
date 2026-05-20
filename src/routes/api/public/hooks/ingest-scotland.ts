@@ -208,22 +208,29 @@ async function processQueueItem(item: {
       });
     };
 
-    const odsKey = findHeader(["DispensLocationCode", "DispenserLocationCode", "ContractorCode"]);
-    const nameKey = findHeader(["DispensLocationName", "DispenserLocationName", "ContractorName"]);
-    const regionKey = findHeader(["HBName", "HealthBoardName"]);
+    const odsKey = findHeader([
+      "DispensLocationCode",
+      "DispenserLocationCode",
+      "DispLocationCode",
+      "DispenserLocation",
+      "ContractorCode",
+      "Contractor",
+    ]);
+    const nameKey = findHeader(["DispensLocationName", "DispenserLocationName", "DispLocationName", "ContractorName"]);
+    const regionKey = findHeader(["HBName", "HealthBoardName", "HBT", "HB"]);
     const itemsKey = findHeader(["NumberOfPaidItems", "PaidQuantity", "Items"]);
     const monthKey = findHeader(["PaidDateMonth"]);
     const yearKey = findHeader(["Year"]);
 
     // Payment / service field mapping with multiple known variants per field.
     const PAYMENT_FIELDS = {
-      pharmacy_first_payment: ["PharmacyFirstPayment", "Pharmacy_First_Payment", "PF_Payment", "PharmFirstPayment"],
+      pharmacy_first_payment: ["PharmacyFirstPayment", "Pharmacy_First_Payment", "PF_Payment", "PFPayment", "PharmFirstPayment"],
       mcr_payment: ["MCRPayment", "MCR_Payment", "MedicinesCareReview", "MCR_Total"],
       ehc_items: ["EHCItems", "EHC_Items", "EHC", "EmergencyContraception"],
-      methadone_items: ["MethadoneItems", "Methadone_Items", "Methadone", "MethadoneSupervised"],
+      methadone_items: ["MethadoneItems", "Methadone_Items", "Methadone", "MethadoneSupervised", "MethadoneDispensingFeeNumber", "SupervisedDispensingFeeNumber"],
       smoking_cessation: ["SmokingCessation", "Smoking_Cessation", "SmokingCessationItems", "SC_Items"],
       gross_cost: ["GrossIngredientCost", "Gross_Cost", "GIC", "GrossIngCost", "GICTotal"],
-      final_payment: ["FinalPayment", "Final_Payment", "TotalPayment", "NetPayment", "Total_Net_Payment"],
+      final_payment: ["FinalPayment", "FinalPayments", "Final_Payment", "TotalPayment", "NetPayment", "Total_Net_Payment"],
     } as const;
     type PField = keyof typeof PAYMENT_FIELDS;
 
