@@ -355,13 +355,18 @@ async function processQueueItem(item: {
         is_provisional: isProvisional(a.year, a.month),
       }));
 
+    // Contractor-activity is the authoritative source for per-pharmacy payment data,
+    // so it does a full upsert. Other datasets only insert rows that don't already
+    // exist (ignoreDuplicates) so they never overwrite verified payment data.
+    const isAuthoritative = item.dataset === "community-pharmacy-contractor-activity";
     let inserted = 0;
     for (let i = 0; i < dispRows.length; i += 500) {
+      const slice = dispRows.slice(i, i + 500);
       const { error } = await supabaseAdmin
         .from("dispensing_data")
-        .upsert(dispRows.slice(i, i + 500), { onConflict: "pharmacy_id,year,month" });
+        .upsert(slice, { onConflict: "pharmacy_id,year,month", ignoreDuplicates: !isAuthoritative });
       if (error) throw error;
-      inserted += Math.min(500, dispRows.length - i);
+      inserted += slice.length;
     }
 
     await supabaseAdmin.from("ingestion_log").insert({
