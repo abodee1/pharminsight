@@ -398,10 +398,23 @@ async function runBatch(batchSize = 3) {
 export const Route = createFileRoute("/api/public/hooks/ingest-scotland")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
         try {
+          const url = new URL(request.url);
+          const reingest = url.searchParams.get("reingest") === "1";
+          let reset = 0;
+          if (reingest) {
+            // Wipe success rows from the log and clear queue so discover() re-queues everything.
+            await supabaseAdmin.from("ingestion_log").delete().eq("source", SOURCE).eq("status", "success");
+            const { count } = await supabaseAdmin
+              .from("ingestion_queue")
+              .delete({ count: "exact" })
+              .eq("source", SOURCE);
+            reset = count ?? 0;
+          }
           const queued = await discover();
-          const results = await runBatch(3);
+          const batchSize = reingest ? 10 : 3;
+          const results = await runBatch(batchSize);
           const { count: pending } = await supabaseAdmin
             .from("ingestion_queue")
             .select("id", { count: "exact", head: true })
@@ -409,6 +422,8 @@ export const Route = createFileRoute("/api/public/hooks/ingest-scotland")({
             .eq("status", "pending");
           return Response.json({
             ok: true,
+            reingest,
+            reset,
             queued,
             processed: results.length,
             results,
