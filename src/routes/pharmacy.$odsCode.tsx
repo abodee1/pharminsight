@@ -392,7 +392,6 @@ function PharmacyProfile() {
             {!isScotland && <MiniChart title="EPS items" data={chartData} dataKey="eps_items" />}
             {!isScotland && <MiniChart title="NMS" data={chartData} dataKey="nms" />}
             <MiniChart title="Pharmacy First" data={chartData} dataKey="pf" />
-            {!isScotland && <MiniChart title="Flu vaccinations" data={chartData} dataKey="flu" />}
             <MiniChart title="Gross cost (£)" data={chartData} dataKey="cost" />
           </div>
 
