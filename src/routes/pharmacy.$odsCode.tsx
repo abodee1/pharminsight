@@ -44,6 +44,20 @@ function PharmacyProfile() {
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [hasUserPharmacy, setHasUserPharmacy] = useState<boolean | null>(null);
   const [ranks, setRanks] = useState<Partial<Record<RankKey, { rank: number; total: number }>>>({});
+  const [hasFp34c, setHasFp34c] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      if (!user || !pharmacy) { setHasFp34c(false); return; }
+      const { count } = await supabase
+        .from("private_uploads")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("pharmacy_id", pharmacy.id)
+        .eq("upload_type", "fp34c");
+      setHasFp34c((count ?? 0) > 0);
+    })();
+  }, [user, pharmacy]);
 
   useEffect(() => {
     (async () => {
