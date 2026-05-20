@@ -26,6 +26,8 @@ import { Route as AuthenticatedAdminPaymentsImportRouteImport } from './routes/_
 import { Route as AuthenticatedAdminDataRouteImport } from './routes/_authenticated/admin.data'
 import { Route as ApiPublicIngestPharmacyPaymentsRouteImport } from './routes/api/public/ingest.pharmacy-payments'
 import { Route as ApiPublicHooksIngestScotlandRouteImport } from './routes/api/public/hooks/ingest-scotland'
+import { Route as ApiPublicHooksIngestNiRouteImport } from './routes/api/public/hooks/ingest-ni'
+import { Route as ApiPublicHooksIngestEnglandRouteImport } from './routes/api/public/hooks/ingest-england'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -116,6 +118,17 @@ const ApiPublicHooksIngestScotlandRoute =
     path: '/api/public/hooks/ingest-scotland',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksIngestNiRoute = ApiPublicHooksIngestNiRouteImport.update({
+  id: '/api/public/hooks/ingest-ni',
+  path: '/api/public/hooks/ingest-ni',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicHooksIngestEnglandRoute =
+  ApiPublicHooksIngestEnglandRouteImport.update({
+    id: '/api/public/hooks/ingest-england',
+    path: '/api/public/hooks/ingest-england',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -132,6 +145,8 @@ export interface FileRoutesByFullPath {
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/admin/data': typeof AuthenticatedAdminDataRoute
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
+  '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
+  '/api/public/hooks/ingest-ni': typeof ApiPublicHooksIngestNiRoute
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
   '/api/public/ingest/pharmacy-payments': typeof ApiPublicIngestPharmacyPaymentsRoute
 }
@@ -150,6 +165,8 @@ export interface FileRoutesByTo {
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/admin/data': typeof AuthenticatedAdminDataRoute
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
+  '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
+  '/api/public/hooks/ingest-ni': typeof ApiPublicHooksIngestNiRoute
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
   '/api/public/ingest/pharmacy-payments': typeof ApiPublicIngestPharmacyPaymentsRoute
 }
@@ -170,6 +187,8 @@ export interface FileRoutesById {
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/_authenticated/admin/data': typeof AuthenticatedAdminDataRoute
   '/_authenticated/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
+  '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
+  '/api/public/hooks/ingest-ni': typeof ApiPublicHooksIngestNiRoute
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
   '/api/public/ingest/pharmacy-payments': typeof ApiPublicIngestPharmacyPaymentsRoute
 }
@@ -190,6 +209,8 @@ export interface FileRouteTypes {
     | '/pharmacy/$odsCode'
     | '/admin/data'
     | '/admin/payments-import'
+    | '/api/public/hooks/ingest-england'
+    | '/api/public/hooks/ingest-ni'
     | '/api/public/hooks/ingest-scotland'
     | '/api/public/ingest/pharmacy-payments'
   fileRoutesByTo: FileRoutesByTo
@@ -208,6 +229,8 @@ export interface FileRouteTypes {
     | '/pharmacy/$odsCode'
     | '/admin/data'
     | '/admin/payments-import'
+    | '/api/public/hooks/ingest-england'
+    | '/api/public/hooks/ingest-ni'
     | '/api/public/hooks/ingest-scotland'
     | '/api/public/ingest/pharmacy-payments'
   id:
@@ -227,6 +250,8 @@ export interface FileRouteTypes {
     | '/pharmacy/$odsCode'
     | '/_authenticated/admin/data'
     | '/_authenticated/admin/payments-import'
+    | '/api/public/hooks/ingest-england'
+    | '/api/public/hooks/ingest-ni'
     | '/api/public/hooks/ingest-scotland'
     | '/api/public/ingest/pharmacy-payments'
   fileRoutesById: FileRoutesById
@@ -237,6 +262,8 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
   PharmacyOdsCodeRoute: typeof PharmacyOdsCodeRoute
+  ApiPublicHooksIngestEnglandRoute: typeof ApiPublicHooksIngestEnglandRoute
+  ApiPublicHooksIngestNiRoute: typeof ApiPublicHooksIngestNiRoute
   ApiPublicHooksIngestScotlandRoute: typeof ApiPublicHooksIngestScotlandRoute
   ApiPublicIngestPharmacyPaymentsRoute: typeof ApiPublicIngestPharmacyPaymentsRoute
 }
@@ -362,6 +389,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksIngestScotlandRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/ingest-ni': {
+      id: '/api/public/hooks/ingest-ni'
+      path: '/api/public/hooks/ingest-ni'
+      fullPath: '/api/public/hooks/ingest-ni'
+      preLoaderRoute: typeof ApiPublicHooksIngestNiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/ingest-england': {
+      id: '/api/public/hooks/ingest-england'
+      path: '/api/public/hooks/ingest-england'
+      fullPath: '/api/public/hooks/ingest-england'
+      preLoaderRoute: typeof ApiPublicHooksIngestEnglandRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -401,19 +442,11 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   PharmacyOdsCodeRoute: PharmacyOdsCodeRoute,
+  ApiPublicHooksIngestEnglandRoute: ApiPublicHooksIngestEnglandRoute,
+  ApiPublicHooksIngestNiRoute: ApiPublicHooksIngestNiRoute,
   ApiPublicHooksIngestScotlandRoute: ApiPublicHooksIngestScotlandRoute,
   ApiPublicIngestPharmacyPaymentsRoute: ApiPublicIngestPharmacyPaymentsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

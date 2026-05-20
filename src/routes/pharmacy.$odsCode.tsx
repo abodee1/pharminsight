@@ -423,12 +423,12 @@ function PharmacyProfile() {
                     <th className="text-right px-3 py-2 font-medium">PF</th>
                     <th className="text-right px-3 py-2 font-medium">PF £</th>
                     <th className="text-right px-3 py-2 font-medium">Flu</th>
-                    <th className="text-right px-3 py-2 font-medium">EHC</th>
-                    <th className="text-right px-3 py-2 font-medium">Meth.</th>
-                    <th className="text-right px-3 py-2 font-medium">Smoke.</th>
-                    <th className="text-right px-3 py-2 font-medium">MCR £</th>
-                    <th className="text-right px-3 py-2 font-medium">Gross £</th>
-                    <th className="text-right px-3 py-2 font-medium">Final £</th>
+                    {isScotland && <th className="text-right px-3 py-2 font-medium">EHC</th>}
+                    {isScotland && <th className="text-right px-3 py-2 font-medium">Meth.</th>}
+                    {isScotland && <th className="text-right px-3 py-2 font-medium">Smoke.</th>}
+                    {isScotland && <th className="text-right px-3 py-2 font-medium">MCR £</th>}
+                    {isScotland && <th className="text-right px-3 py-2 font-medium">Gross £</th>}
+                    {isScotland && <th className="text-right px-3 py-2 font-medium">Final £</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -444,12 +444,12 @@ function PharmacyProfile() {
                         <td className="px-3 py-2 text-right tabular-nums">{r.pharmacy_first_count.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.pharmacy_first_payment)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{r.flu_vaccinations.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{r.ehc_items.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{r.methadone_items.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{r.smoking_cessation.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.mcr_payment)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.gross_cost)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.final_payment)}</td>
+                        {isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.ehc_items.toLocaleString()}</td>}
+                        {isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.methadone_items.toLocaleString()}</td>}
+                        {isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.smoking_cessation.toLocaleString()}</td>}
+                        {isScotland && <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.mcr_payment)}</td>}
+                        {isScotland && <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.gross_cost)}</td>}
+                        {isScotland && <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.final_payment)}</td>}
                       </tr>
                     );
                   })}
