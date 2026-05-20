@@ -192,20 +192,26 @@ async function processQueueItem(item: {
     // Memory stays ~O(unique pharmacies × months in file), not O(file size).
     type PField =
       | "pharmacy_first_payment" | "pharmacy_first_count" | "mcr_payment" | "ehc_items"
-      | "methadone_items" | "smoking_cessation" | "gross_cost" | "final_payment";
+      | "methadone_items" | "smoking_cessation" | "gross_cost" | "final_payment"
+      | "mcr_registrations" | "mcr_items" | "supervised_methadone_doses" | "smoking_cessation_payment";
     const PAYMENT_FIELDS: Record<PField, string[]> = {
       pharmacy_first_payment: ["PFPayment", "PharmacyFirstPayment", "Pharmacy_First_Payment", "PF_Payment", "PharmFirstPayment"],
       pharmacy_first_count: ["PFConsultations", "PFConsultation", "PharmacyFirstConsultations", "PFItems", "PharmacyFirstItems"],
       mcr_payment: ["MedicinesCareandReviewPayment", "MedicinesCareReviewPayment", "MCRPayment", "MCR_Payment", "MCR_Total", "CMSCapitationPayment"],
+      mcr_registrations: ["MCRRegistrations", "MCR_Registrations", "MCRRegistered", "MedicinesCareReviewRegistrations"],
+      mcr_items: ["MCRItems", "MCR_Items", "MedicinesCareReviewItems"],
       ehc_items: ["EHCItems", "EHC_Items", "EHC", "EmergencyContraception"],
-      methadone_items: ["MethadoneItems", "Methadone_Items", "Methadone", "MethadoneSupervised", "MethadoneDispensingFeeNumber", "SupervisedDispensingFeeNumber"],
+      methadone_items: ["MethadoneItems", "Methadone_Items", "Methadone", "MethadoneSupervised", "MethadoneDispensingFeeNumber"],
+      supervised_methadone_doses: ["SupervisedDispensingFeeNumber", "SupervisedConsumptions", "SupervisedMethadoneDoses"],
       smoking_cessation: ["SmokingCessationItems", "SmokingCessation", "Smoking_Cessation", "SC_Items"],
+      smoking_cessation_payment: ["SmokingCessationPayment", "SC_Payment", "SmokingCessation_Payment"],
       gross_cost: ["GrossIngredientCost", "Gross_Cost", "GIC", "GrossIngCost", "GICTotal"],
       final_payment: ["FinalPayments", "FinalPayment", "Final_Payment", "TotalPayment", "NetPayment", "Total_Net_Payment"],
     };
     const blankPayments = (): Record<PField, number> => ({
       pharmacy_first_payment: 0, pharmacy_first_count: 0, mcr_payment: 0, ehc_items: 0,
       methadone_items: 0, smoking_cessation: 0, gross_cost: 0, final_payment: 0,
+      mcr_registrations: 0, mcr_items: 0, supervised_methadone_doses: 0, smoking_cessation_payment: 0,
     });
 
     type Agg = {
