@@ -192,7 +192,7 @@ function Compare() {
       const prv = prev ? rows.find((r) => r.pharmacy_id === ph.id && r.year === py && r.month === pm) : null;
       const metrics = METRICS.map((mt) => {
         const v = mt.compute(cur);
-        const p = mt.compute(prv);
+        const p = mt.compute(prv ?? undefined);
         const diff = v - p;
         const pct = p ? Math.round((diff / p) * 100) : 0;
         return { mt, value: v, diff, pct };
