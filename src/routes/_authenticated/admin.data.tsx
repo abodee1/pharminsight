@@ -102,8 +102,9 @@ function AdminDataPage() {
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <PageHeader
         title="Data Coverage"
-        description="Ingestion status across all data sources."
-        breadcrumbs={[{ label: "My Account", to: "/settings" }, { label: "Data Coverage" }]}
+        subtitle="Ingestion status across all data sources."
+        backTo="/settings"
+        backLabel="My Account"
       />
 
       <div className="grid gap-4 md:grid-cols-2">

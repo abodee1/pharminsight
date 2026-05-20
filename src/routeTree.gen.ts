@@ -20,6 +20,8 @@ import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCompareRouteImport } from './routes/_authenticated/compare'
 import { Route as AuthenticatedBenchmarkingRouteImport } from './routes/_authenticated/benchmarking'
+import { Route as AuthenticatedAdminDataRouteImport } from './routes/_authenticated/admin.data'
+import { Route as ApiPublicHooksIngestScotlandRouteImport } from './routes/api/public/hooks/ingest-scotland'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -77,6 +79,17 @@ const AuthenticatedBenchmarkingRoute =
     path: '/benchmarking',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminDataRoute = AuthenticatedAdminDataRouteImport.update({
+  id: '/admin/data',
+  path: '/admin/data',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const ApiPublicHooksIngestScotlandRoute =
+  ApiPublicHooksIngestScotlandRouteImport.update({
+    id: '/api/public/hooks/ingest-scotland',
+    path: '/api/public/hooks/ingest-scotland',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -89,6 +102,8 @@ export interface FileRoutesByFullPath {
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/upload': typeof AuthenticatedUploadRoute
+  '/admin/data': typeof AuthenticatedAdminDataRoute
+  '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -101,6 +116,8 @@ export interface FileRoutesByTo {
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/upload': typeof AuthenticatedUploadRoute
+  '/admin/data': typeof AuthenticatedAdminDataRoute
+  '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -115,6 +132,8 @@ export interface FileRoutesById {
   '/_authenticated/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/upload': typeof AuthenticatedUploadRoute
+  '/_authenticated/admin/data': typeof AuthenticatedAdminDataRoute
+  '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -129,6 +148,8 @@ export interface FileRouteTypes {
     | '/leaderboards'
     | '/settings'
     | '/upload'
+    | '/admin/data'
+    | '/api/public/hooks/ingest-scotland'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -141,6 +162,8 @@ export interface FileRouteTypes {
     | '/leaderboards'
     | '/settings'
     | '/upload'
+    | '/admin/data'
+    | '/api/public/hooks/ingest-scotland'
   id:
     | '__root__'
     | '/'
@@ -154,6 +177,8 @@ export interface FileRouteTypes {
     | '/_authenticated/leaderboards'
     | '/_authenticated/settings'
     | '/_authenticated/upload'
+    | '/_authenticated/admin/data'
+    | '/api/public/hooks/ingest-scotland'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -161,6 +186,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
+  ApiPublicHooksIngestScotlandRoute: typeof ApiPublicHooksIngestScotlandRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -242,6 +268,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBenchmarkingRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/data': {
+      id: '/_authenticated/admin/data'
+      path: '/admin/data'
+      fullPath: '/admin/data'
+      preLoaderRoute: typeof AuthenticatedAdminDataRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/api/public/hooks/ingest-scotland': {
+      id: '/api/public/hooks/ingest-scotland'
+      path: '/api/public/hooks/ingest-scotland'
+      fullPath: '/api/public/hooks/ingest-scotland'
+      preLoaderRoute: typeof ApiPublicHooksIngestScotlandRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -253,6 +293,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedLeaderboardsRoute: typeof AuthenticatedLeaderboardsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedUploadRoute: typeof AuthenticatedUploadRoute
+  AuthenticatedAdminDataRoute: typeof AuthenticatedAdminDataRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -263,6 +304,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedLeaderboardsRoute: AuthenticatedLeaderboardsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedUploadRoute: AuthenticatedUploadRoute,
+  AuthenticatedAdminDataRoute: AuthenticatedAdminDataRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -274,6 +316,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
+  ApiPublicHooksIngestScotlandRoute: ApiPublicHooksIngestScotlandRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
