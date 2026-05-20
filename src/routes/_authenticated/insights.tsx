@@ -13,11 +13,10 @@ export const Route = createFileRoute("/_authenticated/insights")({ component: In
 const TYPES = [
   { key: "swot", title: "SWOT Analysis", desc: "Strengths, weaknesses, opportunities and threats from your dispensing trends and service uptake." },
   { key: "benchmark", title: "Performance Commentary", desc: "Plain-English summary of the last three months versus benchmarks." },
-  { key: "acquisition", title: "Acquisition Assessment", desc: "Due diligence framing comparing pharmacies (consultant view)." },
 ] as const;
 
 function Insights() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const generate = useServerFn(generateInsight);
   const [loading, setLoading] = useState<string | null>(null);
   const [history, setHistory] = useState<any[]>([]);
@@ -64,7 +63,7 @@ function Insights() {
       />
 
       <div className="grid md:grid-cols-3 gap-4">
-        {TYPES.filter((t) => t.key !== "acquisition" || profile?.role === "consultant_analyst").map((t) => (
+        {TYPES.map((t) => (
           <div key={t.key} className="rounded-lg bg-card border border-border p-6 shadow-sm flex flex-col">
             <div className="h-10 w-10 rounded-md bg-gold/15 text-gold flex items-center justify-center">
               <Sparkles className="h-5 w-5" />
@@ -80,6 +79,17 @@ function Insights() {
             </button>
           </div>
         ))}
+        <div className="rounded-lg border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-card p-6 shadow-sm flex flex-col">
+          <div className="h-10 w-10 rounded-md bg-primary/15 text-primary flex items-center justify-center">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <h3 className="mt-4 font-semibold">Acquisition Intelligence Report</h3>
+          <p className="text-sm text-muted-foreground mt-1 flex-1">
+            Full M&amp;A-grade due diligence brief: location, GP catchment, competitor map, NHS performance vs peers,
+            untapped service revenue, indicative valuation and a buy/hold/pass recommendation. Exportable as PDF.
+          </p>
+          <p className="mt-3 text-xs text-muted-foreground">Open any pharmacy profile and click <span className="font-semibold text-foreground">Acquisition report</span>.</p>
+        </div>
       </div>
 
       <h2 className="mt-10 text-lg font-semibold">Recent insights</h2>

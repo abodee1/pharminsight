@@ -9,7 +9,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, Cell,
 } from "recharts";
-import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X, ShieldCheck } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X, ShieldCheck, Sparkles } from "lucide-react";
 import { PharmacySearch } from "@/components/PharmacySearch";
 import { PercentileRail, AnnotatedSparkline, ShareDonut } from "@/components/Infographics";
 import { LocalLandscape } from "@/components/LocalLandscape";
@@ -394,11 +394,20 @@ function PharmacyProfile() {
             {latest && <><span>·</span><span>Latest: {MONTHS[latest.month - 1]} {latest.year}</span></>}
           </div>
         </div>
-        {user && !isMine && !showClaimBanner && (
-          <button onClick={claimAsMine} className="text-xs text-primary hover:underline">
-            Set as my pharmacy
-          </button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {user && (
+            <Link to="/acquisition/$odsCode" params={{ odsCode: pharmacy.ods_code }}>
+              <Button size="sm" className="gap-1.5">
+                <Sparkles className="h-4 w-4" /> Acquisition report
+              </Button>
+            </Link>
+          )}
+          {user && !isMine && !showClaimBanner && (
+            <button onClick={claimAsMine} className="text-xs text-primary hover:underline">
+              Set as my pharmacy
+            </button>
+          )}
+        </div>
       </div>
 
       {metrics.length === 0 ? (
