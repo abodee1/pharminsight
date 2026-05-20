@@ -56,49 +56,67 @@ export type Database = {
         Row: {
           created_at: string
           data_source: string | null
+          ehc_items: number
           eps_items: number
           eps_nominations: number
+          final_payment: number
           flu_vaccinations: number
           gross_cost: number
           id: string
           is_provisional: boolean
           items_dispensed: number
+          mcr_payment: number
+          methadone_items: number
           month: number
           nms_count: number
           pharmacy_first_count: number
+          pharmacy_first_payment: number
           pharmacy_id: string
+          smoking_cessation: number
           year: number
         }
         Insert: {
           created_at?: string
           data_source?: string | null
+          ehc_items?: number
           eps_items?: number
           eps_nominations?: number
+          final_payment?: number
           flu_vaccinations?: number
           gross_cost?: number
           id?: string
           is_provisional?: boolean
           items_dispensed?: number
+          mcr_payment?: number
+          methadone_items?: number
           month: number
           nms_count?: number
           pharmacy_first_count?: number
+          pharmacy_first_payment?: number
           pharmacy_id: string
+          smoking_cessation?: number
           year: number
         }
         Update: {
           created_at?: string
           data_source?: string | null
+          ehc_items?: number
           eps_items?: number
           eps_nominations?: number
+          final_payment?: number
           flu_vaccinations?: number
           gross_cost?: number
           id?: string
           is_provisional?: boolean
           items_dispensed?: number
+          mcr_payment?: number
+          methadone_items?: number
           month?: number
           nms_count?: number
           pharmacy_first_count?: number
+          pharmacy_first_payment?: number
           pharmacy_id?: string
+          smoking_cessation?: number
           year?: number
         }
         Relationships: [
