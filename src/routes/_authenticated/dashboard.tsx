@@ -84,6 +84,8 @@ function Dashboard() {
         rank,
         total: latestRows.length,
       });
+      setPeerItems(latestRows.map((r) => r.items_dispensed || 0));
+      setPeerPf(latestRows.map((r) => r.pharmacy_first_count || 0));
     })();
   }, [user]);
 
