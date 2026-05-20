@@ -334,7 +334,7 @@ function Compare() {
                     return (
                       <div key={mt.key} className="rounded-md bg-secondary/40 px-2 py-1.5">
                         <p className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">{mt.short}</p>
-                        <p className="text-base font-semibold tabular-nums leading-tight">{value.toLocaleString()}</p>
+                        <p className="text-base font-semibold tabular-nums leading-tight">{value > 0 ? mt.format(value) : "—"}</p>
                         <div className="mt-0.5 flex items-center gap-0.5 text-[10px]">
                           {flat ? (
                             <Minus className="h-3 w-3 text-muted-foreground" />
@@ -530,7 +530,7 @@ function Compare() {
                                   ].join(" ")}
                                 >
                                   <div className="inline-flex items-center gap-2 justify-end">
-                                    {v.toLocaleString()}
+                                    {v > 0 ? mt.format(v) : "—"}
                                     {isWin && <Badge variant="secondary" className="text-[10px] py-0">Best</Badge>}
                                   </div>
                                 </td>
