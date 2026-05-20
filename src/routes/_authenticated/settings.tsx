@@ -42,6 +42,7 @@ function SettingsPage() {
 
   // Pharmacy search
   const [search, setSearch] = useState("");
+  const [countryFilter, setCountryFilter] = useState<"all" | "England" | "Scotland" | "Wales" | "Northern Ireland">("all");
 
   const initials = (profile?.full_name || user?.email || "?")
     .split(/\s+|@/).map((s) => s[0]).slice(0, 2).join("").toUpperCase();
