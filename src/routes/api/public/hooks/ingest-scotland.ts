@@ -421,7 +421,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-scotland")({
           const reingest = url.searchParams.get("reingest") === "1";
           let reset = 0;
           if (reingest) {
-            await supabaseAdmin.from("ingestion_log").delete().eq("source", SOURCE).eq("status", "success");
+            await supabaseAdmin.from("ingestion_log").delete().eq("source", SOURCE);
             const { count } = await supabaseAdmin
               .from("ingestion_queue")
               .delete({ count: "exact" })
