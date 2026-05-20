@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetchAll";
 import { PageHeader } from "@/components/PageHeader";
@@ -512,34 +512,43 @@ function Compare() {
                       </tr>
                     </thead>
                     <tbody>
-                      {METRICS.map((mt) => {
-                        const [y, m] = (latest || "0-0").split("-").map(Number);
-                        const winnerId = winners[mt.key];
-                        return (
-                          <tr key={mt.key} className="border-t border-border">
-                            <td className="px-6 py-3 font-medium">{mt.label}</td>
-                            {selectedPharms.map((ph) => {
-                              const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-                              const v = mt.compute(row);
-                              const isWin = ph.id === winnerId && selectedPharms.length > 1;
-                              return (
-                                <td
-                                  key={ph.id}
-                                  className={[
-                                    "px-6 py-3 text-right tabular-nums",
-                                    isWin ? "font-semibold text-foreground" : "text-muted-foreground",
-                                  ].join(" ")}
-                                >
-                                  <div className="inline-flex items-center gap-2 justify-end">
-                                    {v > 0 ? mt.format(v) : "—"}
-                                    {isWin && <Badge variant="secondary" className="text-[10px] py-0">Best</Badge>}
-                                  </div>
-                                </td>
-                              );
-                            })}
+                      {(["volume", "rate"] as const).map((group) => (
+                        <Fragment key={group}>
+                          <tr className="bg-secondary/40 border-t border-border">
+                            <td colSpan={selectedPharms.length + 1} className="px-6 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                              {group === "volume" ? "Monthly volumes" : "Service intensity (size-adjusted)"}
+                            </td>
                           </tr>
-                        );
-                      })}
+                          {METRICS.filter((mt) => mt.group === group).map((mt) => {
+                            const [y, m] = (latest || "0-0").split("-").map(Number);
+                            const winnerId = winners[mt.key];
+                            return (
+                              <tr key={mt.key} className="border-t border-border">
+                                <td className="px-6 py-3 font-medium">{mt.label}</td>
+                                {selectedPharms.map((ph) => {
+                                  const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
+                                  const v = mt.compute(row);
+                                  const isWin = ph.id === winnerId && selectedPharms.length > 1 && v > 0;
+                                  return (
+                                    <td
+                                      key={ph.id}
+                                      className={[
+                                        "px-6 py-3 text-right tabular-nums",
+                                        isWin ? "font-semibold text-foreground" : "text-muted-foreground",
+                                      ].join(" ")}
+                                    >
+                                      <div className="inline-flex items-center gap-2 justify-end">
+                                        {v > 0 ? mt.format(v) : "—"}
+                                        {isWin && <Badge variant="secondary" className="text-[10px] py-0">Best</Badge>}
+                                      </div>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                        </Fragment>
+                      ))}
                     </tbody>
                   </table>
                 </div>
