@@ -276,6 +276,10 @@ async function processQueueItem(item: {
           if (idx >= 0) paymentIdxByField[f] = idx;
           else if (item.dataset === "community-pharmacy-contractor-activity") missingPayments.push(f);
         }
+        for (const s of Object.keys(PF_SERVICE_FIELDS) as PFService[]) {
+          const idx = findIdx(PF_SERVICE_FIELDS[s]);
+          if (idx >= 0) pfServiceIdxByField[s] = idx;
+        }
         rowCount++;
         return;
       }
