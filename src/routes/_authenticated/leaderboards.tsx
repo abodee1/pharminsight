@@ -14,7 +14,7 @@ const SERVICES = [
   { key: "items_dispensed", label: "Items" },
   { key: "pharmacy_first_count", label: "Pharmacy First" },
   { key: "nms_count", label: "NMS" },
-  { key: "flu_vaccinations", label: "Flu Vaccinations" },
+  
   { key: "eps_items", label: "EPS Items" },
 ] as const;
 
