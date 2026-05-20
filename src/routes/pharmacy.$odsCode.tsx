@@ -148,7 +148,11 @@ function PharmacyProfile() {
     return rows.find((r) => r.year === latest.year - 1 && r.month === latest.month) ?? null;
   }, [rows, latest]);
 
-  const chartData = useMemo(() => rows.slice(-24).map((r) => ({
+  const trimmedRows = useMemo(
+    () => (latestIdx >= 0 ? rows.slice(0, latestIdx + 1) : rows),
+    [rows, latestIdx],
+  );
+  const chartData = useMemo(() => trimmedRows.slice(-24).map((r) => ({
     label: `${MONTHS[r.month - 1]} ${String(r.year).slice(2)}`,
     items: r.items_dispensed,
     eps_items: r.eps_items,
@@ -156,7 +160,7 @@ function PharmacyProfile() {
     pf: r.pharmacy_first_count,
     flu: r.flu_vaccinations,
     cost: Number(r.gross_cost) || 0,
-  })), [rows]);
+  })), [trimmedRows]);
 
   if (loading) {
     return <div className="p-10 text-sm text-muted-foreground">Loading pharmacy…</div>;
