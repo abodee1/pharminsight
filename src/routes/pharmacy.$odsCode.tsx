@@ -437,6 +437,89 @@ function PharmacyProfile() {
             <MiniChart title="Gross cost (£)" data={chartData} dataKey="cost" />
           </div>
 
+          {peerDistribution && latest && (
+            <section className="mt-8">
+              <div className="flex items-baseline justify-between mb-3">
+                <h2 className="text-sm font-semibold tracking-tight">How this pharmacy ranks in {pharmacy.country}</h2>
+                <p className="text-xs text-muted-foreground italic">
+                  {MONTHS[latest.month - 1]} {latest.year} · {peerDistribution.items_dispensed.length.toLocaleString()} peers
+                </p>
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <PercentileRail
+                  label="Items dispensed"
+                  value={latest.items_dispensed}
+                  values={peerDistribution.items_dispensed}
+                  peerLabel={`${pharmacy.country} avg`}
+                  nationalLabel="Highest"
+                />
+                <PercentileRail
+                  label="Pharmacy First consultations"
+                  value={latest.pharmacy_first_count}
+                  values={peerDistribution.pharmacy_first_count}
+                  peerLabel={`${pharmacy.country} avg`}
+                  nationalLabel="Highest"
+                />
+                {!isScotland && (
+                  <PercentileRail
+                    label="New Medicine Service"
+                    value={latest.nms_count}
+                    values={peerDistribution.nms_count}
+                    peerLabel={`${pharmacy.country} avg`}
+                    nationalLabel="Highest"
+                  />
+                )}
+                {!isScotland && (
+                  <PercentileRail
+                    label="EPS items"
+                    value={latest.eps_items}
+                    values={peerDistribution.eps_items}
+                    peerLabel={`${pharmacy.country} avg`}
+                    nationalLabel="Highest"
+                  />
+                )}
+              </div>
+            </section>
+          )}
+
+          {chartData.length >= 6 && (
+            <section className="mt-6 grid md:grid-cols-2 gap-4">
+              <AnnotatedSparkline
+                label="Items dispensed — 24-month arc"
+                points={chartData.map((d) => ({ period: d.label, value: d.items }))}
+              />
+              <AnnotatedSparkline
+                label="Pharmacy First — 24-month arc"
+                points={chartData.map((d) => ({ period: d.label, value: d.pf }))}
+              />
+            </section>
+          )}
+
+          {isScotland && latest && (
+            <section className="mt-6">
+              <ShareDonut
+                label={`Payment composition · ${MONTHS[latest.month - 1]} ${latest.year}`}
+                caption="Where this month's NHS revenue came from. Pharmacy First, MCR and smoking-cessation are shown as paid fees; dispensing is the residual gross cost minus these service streams."
+                formatValue={(n) => "£" + n.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                segments={[
+                  { label: "Pharmacy First", value: Number(latest.pharmacy_first_payment) || 0 },
+                  { label: "MCR", value: Number(latest.mcr_payment) || 0 },
+                  { label: "Smoking cessation", value: Number(latest.smoking_cessation_payment) || 0 },
+                  {
+                    label: "Dispensing & other",
+                    value: Math.max(
+                      0,
+                      (Number(latest.gross_cost) || 0)
+                        - (Number(latest.pharmacy_first_payment) || 0)
+                        - (Number(latest.mcr_payment) || 0)
+                        - (Number(latest.smoking_cessation_payment) || 0),
+                    ),
+                  },
+                ]}
+              />
+            </section>
+          )}
+
           {/* Pharmacy First service mix hidden for now
           {isScotland && latest && latest.pharmacy_first_services && (
             <PFServiceMix
