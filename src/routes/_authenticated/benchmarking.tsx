@@ -37,14 +37,8 @@ function Benchmarking() {
         const { data: ph } = await supabase.from("pharmacies").select("*").eq("id", up.pharmacy_id).maybeSingle();
         setPharmacy(ph);
       }
-      const { data: last } = await supabase
-        .from("dispensing_data")
-        .select("year,month")
-        .order("year", { ascending: false })
-        .order("month", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (last) setLatest({ year: last.year, month: last.month });
+      const last = await getLatestSubstantialPeriod();
+      if (last) setLatest(last);
     })();
   }, [user]);
 
