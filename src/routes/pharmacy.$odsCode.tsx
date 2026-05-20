@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
+  BarChart, Bar, Cell,
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X, ShieldCheck } from "lucide-react";
 import { PharmacySearch } from "@/components/PharmacySearch";
@@ -14,6 +15,17 @@ import { PharmacySearch } from "@/components/PharmacySearch";
 export const Route = createFileRoute("/pharmacy/$odsCode")({ component: PharmacyProfile });
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+const PF_SERVICES: { key: string; label: string }[] = [
+  { key: "acute", label: "Acute conditions" },
+  { key: "uti", label: "UTI" },
+  { key: "impetigo", label: "Impetigo" },
+  { key: "skin_infection", label: "Skin infection" },
+  { key: "sexual_health", label: "Sexual health" },
+  { key: "hayfever", label: "Hayfever" },
+  { key: "bridging_contraception", label: "Bridging contraception" },
+  { key: "emergency_contraception", label: "Emergency contraception" },
+];
 
 type Pharmacy = {
   id: string; ods_code: string; name: string;
@@ -33,6 +45,7 @@ type Row = {
   smoking_cessation_payment: number | string | null;
   final_payment: number | string | null;
   is_actual_payment: boolean;
+  pharmacy_first_services: Record<string, number> | null;
 };
 
 type RankKey = "items_dispensed" | "nms_count" | "pharmacy_first_count" | "flu_vaccinations" | "eps_items";
@@ -49,6 +62,8 @@ function PharmacyProfile() {
   const [hasUserPharmacy, setHasUserPharmacy] = useState<boolean | null>(null);
   const [ranks, setRanks] = useState<Partial<Record<RankKey, { rank: number; total: number }>>>({});
   const [hasFp34c, setHasFp34c] = useState(false);
+  const [pfPeerAvg, setPfPeerAvg] = useState<Record<string, number> | null>(null);
+  const [pfPeerCount, setPfPeerCount] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -75,7 +90,7 @@ function PharmacyProfile() {
       if (p) {
         const { data: d } = await supabase
           .from("dispensing_data")
-          .select("month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations,gross_cost,pharmacy_first_payment,mcr_payment,mcr_registrations,mcr_items,ehc_items,methadone_items,supervised_methadone_doses,smoking_cessation,smoking_cessation_payment,final_payment,is_actual_payment")
+          .select("month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations,gross_cost,pharmacy_first_payment,mcr_payment,mcr_registrations,mcr_items,ehc_items,methadone_items,supervised_methadone_doses,smoking_cessation,smoking_cessation_payment,final_payment,is_actual_payment,pharmacy_first_services")
           .eq("pharmacy_id", (p as Pharmacy).id)
           .order("year", { ascending: true })
           .order("month", { ascending: true });
@@ -124,6 +139,45 @@ function PharmacyProfile() {
         out[k] = { rank, total };
       }));
       setRanks(out);
+    })();
+  }, [rows, pharmacy]);
+
+  // Peer PF service mix — average per pharmacy for the same region+month.
+  useEffect(() => {
+    (async () => {
+      if (!pharmacy || rows.length === 0) return;
+      if ((pharmacy.country || "").toLowerCase() !== "scotland") { setPfPeerAvg(null); return; }
+      let latest = rows[rows.length - 1];
+      for (let i = rows.length - 1; i >= 0; i--) {
+        if (rows[i].is_actual_payment) { latest = rows[i]; break; }
+      }
+      const peers = await supabase
+        .from("pharmacies")
+        .select("id")
+        .eq("country", "Scotland")
+        .eq("region", pharmacy.region ?? "");
+      const peerIds = (peers.data ?? []).map((p) => p.id);
+      if (peerIds.length === 0) { setPfPeerAvg(null); return; }
+      // Chunk in 500s to keep URL length sane.
+      const sums: Record<string, number> = {};
+      let counted = 0;
+      for (let i = 0; i < peerIds.length; i += 500) {
+        const { data } = await supabase
+          .from("dispensing_data")
+          .select("pharmacy_first_services")
+          .eq("year", latest.year).eq("month", latest.month)
+          .in("pharmacy_id", peerIds.slice(i, i + 500));
+        for (const r of data ?? []) {
+          const svc = (r as { pharmacy_first_services: Record<string, number> | null }).pharmacy_first_services || {};
+          counted++;
+          for (const k of Object.keys(svc)) sums[k] = (sums[k] ?? 0) + (Number(svc[k]) || 0);
+        }
+      }
+      if (counted === 0) { setPfPeerAvg(null); return; }
+      const avg: Record<string, number> = {};
+      for (const k of Object.keys(sums)) avg[k] = sums[k] / counted;
+      setPfPeerAvg(avg);
+      setPfPeerCount(counted);
     })();
   }, [rows, pharmacy]);
 
@@ -342,6 +396,16 @@ function PharmacyProfile() {
             <MiniChart title="Gross cost (£)" data={chartData} dataKey="cost" />
           </div>
 
+          {isScotland && latest && latest.pharmacy_first_services && (
+            <PFServiceMix
+              services={latest.pharmacy_first_services}
+              peerAvg={pfPeerAvg}
+              peerCount={pfPeerCount}
+              region={pharmacy.region}
+              period={`${MONTHS[latest.month - 1]} ${latest.year}`}
+            />
+          )}
+
           <div className="mt-6 rounded-lg bg-card border border-border shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-border flex items-center justify-between">
               <h2 className="text-sm font-semibold">Monthly history — last 24 months</h2>
@@ -462,6 +526,82 @@ function MiniChart({ title, data, dataKey }: { title: string; data: any[]; dataK
           </LineChart>
         </ResponsiveContainer>
       </div>
+    </div>
+  );
+}
+
+function PFServiceMix({
+  services, peerAvg, peerCount, region, period,
+}: {
+  services: Record<string, number>;
+  peerAvg: Record<string, number> | null;
+  peerCount: number;
+  region: string | null;
+  period: string;
+}) {
+  const data = PF_SERVICES.map((s) => ({
+    label: s.label,
+    you: Number(services[s.key]) || 0,
+    peer: peerAvg ? Math.round((peerAvg[s.key] || 0) * 10) / 10 : 0,
+  }));
+  const total = data.reduce((acc, d) => acc + d.you, 0);
+  if (total === 0 && !peerAvg) {
+    return (
+      <div className="mt-6 rounded-lg bg-card border border-border p-4 shadow-sm">
+        <h2 className="text-sm font-semibold">Pharmacy First service mix</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          No Pharmacy First consultations recorded for {period}.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-6 rounded-lg bg-card border border-border p-4 shadow-sm">
+      <div className="flex items-baseline justify-between gap-3 flex-wrap">
+        <h2 className="text-sm font-semibold">Pharmacy First service mix · {period}</h2>
+        <p className="text-xs text-muted-foreground">
+          {total.toLocaleString()} consultations
+          {peerAvg && region && (
+            <> · vs avg of {peerCount.toLocaleString()} peers in {region}</>
+          )}
+        </p>
+      </div>
+      <div className="h-72 mt-3">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} layout="vertical" margin={{ top: 5, right: 16, bottom: 0, left: 30 }}>
+            <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" horizontal={false} />
+            <XAxis type="number" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
+            <YAxis dataKey="label" type="category" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" width={140} />
+            <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12 }} />
+            <Bar dataKey="you" name="This pharmacy" fill="var(--chart-2)" radius={[0, 4, 4, 0]}>
+              {data.map((d, i) => (
+                <Cell key={i} fill={peerAvg && d.you > d.peer ? "var(--chart-1)" : "var(--chart-2)"} />
+              ))}
+            </Bar>
+            {peerAvg && <Bar dataKey="peer" name="Regional avg" fill="var(--muted-foreground)" fillOpacity={0.35} radius={[0, 4, 4, 0]} />}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      {peerAvg && (
+        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+          {data.filter((d) => d.you > 0 || d.peer > 0).map((d) => {
+            const delta = d.peer > 0 ? Math.round(((d.you - d.peer) / d.peer) * 100) : null;
+            return (
+              <div key={d.label} className="rounded border border-border bg-secondary/40 px-2 py-1.5">
+                <div className="text-muted-foreground">{d.label}</div>
+                <div className="font-semibold tabular-nums">
+                  {d.you} <span className="text-muted-foreground font-normal">vs {d.peer}</span>
+                </div>
+                {delta !== null && (
+                  <div className={delta >= 0 ? "text-emerald-600" : "text-red-600"}>
+                    {delta >= 0 ? "+" : ""}{delta}%
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

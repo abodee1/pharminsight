@@ -208,15 +208,36 @@ async function processQueueItem(item: {
       gross_cost: ["GrossIngredientCost", "Gross_Cost", "GIC", "GrossIngCost", "GICTotal"],
       final_payment: ["FinalPayments", "FinalPayment", "Final_Payment", "TotalPayment", "NetPayment", "Total_Net_Payment"],
     };
+    // PF service breakdown — friendly key → PHS *Consultations columns.
+    // PFConsultations is the top-level acute service; PF{IPT,UTI,SIN,SHN,HAY}/BRC/EBC are sub-services.
+    type PFService =
+      | "acute" | "uti" | "impetigo" | "skin_infection" | "sexual_health"
+      | "hayfever" | "bridging_contraception" | "emergency_contraception";
+    const PF_SERVICE_FIELDS: Record<PFService, string[]> = {
+      acute: ["PFConsultations"],
+      uti: ["PFUTIConsultations"],
+      impetigo: ["PFIPTConsultations"],
+      skin_infection: ["PFSINConsultations"],
+      sexual_health: ["PFSHNConsultations"],
+      hayfever: ["PFHAYConsultations"],
+      bridging_contraception: ["BRCConsultations"],
+      emergency_contraception: ["EBCConsultations"],
+    };
     const blankPayments = (): Record<PField, number> => ({
       pharmacy_first_payment: 0, pharmacy_first_count: 0, mcr_payment: 0, ehc_items: 0,
       methadone_items: 0, smoking_cessation: 0, gross_cost: 0, final_payment: 0,
       mcr_registrations: 0, mcr_items: 0, supervised_methadone_doses: 0, smoking_cessation_payment: 0,
     });
+    const blankPFServices = (): Record<PFService, number> => ({
+      acute: 0, uti: 0, impetigo: 0, skin_infection: 0,
+      sexual_health: 0, hayfever: 0, bridging_contraception: 0, emergency_contraception: 0,
+    });
 
     type Agg = {
       ods_code: string; name: string; region: string | null;
-      year: number; month: number; items: number; payments: Record<PField, number>;
+      year: number; month: number; items: number;
+      payments: Record<PField, number>;
+      pf_services: Record<PFService, number>;
     };
     const agg = new Map<string, Agg>();
 
@@ -224,6 +245,7 @@ async function processQueueItem(item: {
     let headerIdx: Record<string, number> = {};
     let odsIdx = -1, nameIdx = -1, regionIdx = -1, itemsIdx = -1, monthIdx = -1, yearIdx = -1;
     const paymentIdxByField: Partial<Record<PField, number>> = {};
+    const pfServiceIdxByField: Partial<Record<PFService, number>> = {};
     const missingPayments: PField[] = [];
 
     const findIdx = (variants: string[]): number => {
@@ -253,6 +275,10 @@ async function processQueueItem(item: {
           const idx = findIdx(PAYMENT_FIELDS[f]);
           if (idx >= 0) paymentIdxByField[f] = idx;
           else if (item.dataset === "community-pharmacy-contractor-activity") missingPayments.push(f);
+        }
+        for (const s of Object.keys(PF_SERVICE_FIELDS) as PFService[]) {
+          const idx = findIdx(PF_SERVICE_FIELDS[s]);
+          if (idx >= 0) pfServiceIdxByField[s] = idx;
         }
         rowCount++;
         return;
@@ -285,14 +311,19 @@ async function processQueueItem(item: {
           ods_code: ods,
           name: nameIdx >= 0 ? ((cells[nameIdx] ?? "").trim() || ods) : ods,
           region: regionIdx >= 0 ? ((cells[regionIdx] ?? "").trim() || null) : null,
-          year, month, items: 0, payments: blankPayments(),
+          year, month, items: 0, payments: blankPayments(), pf_services: blankPFServices(),
         };
         agg.set(key, cur);
       }
-      if (itemsIdx >= 0) cur.items += num(cells[itemsIdx]);
+      const row = cur;
+      if (itemsIdx >= 0) row.items += num(cells[itemsIdx]);
       for (const f of Object.keys(PAYMENT_FIELDS) as PField[]) {
         const idx = paymentIdxByField[f];
-        if (idx !== undefined) cur.payments[f] += num(cells[idx]);
+        if (idx !== undefined) row.payments[f] += num(cells[idx]);
+      }
+      for (const s of Object.keys(PF_SERVICE_FIELDS) as PFService[]) {
+        const idx = pfServiceIdxByField[s];
+        if (idx !== undefined) row.pf_services[s] += num(cells[idx]);
       }
     });
 
@@ -363,6 +394,9 @@ async function processQueueItem(item: {
         smoking_cessation_payment: a.payments.smoking_cessation_payment,
         final_payment: a.payments.final_payment,
         is_actual_payment: a.payments.final_payment > 0,
+        pharmacy_first_services: Object.fromEntries(
+          Object.entries(a.pf_services).map(([k, v]) => [k, Math.round(v)]),
+        ),
         data_source: SOURCE,
         is_provisional: isProvisional(a.year, a.month),
       }));
