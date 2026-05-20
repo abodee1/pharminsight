@@ -34,7 +34,7 @@ type Row = {
   pharmacy_id: string; month: number; year: number;
   items_dispensed: number; nms_count: number; pharmacy_first_count: number;
   pharmacy_first_payment: number; mcr_payment: number; smoking_cessation_payment: number;
-  final_payment: number; gross_cost: number;
+  final_payment: number; gross_cost: number; is_actual_payment: boolean;
 };
 
 function Dashboard() {
