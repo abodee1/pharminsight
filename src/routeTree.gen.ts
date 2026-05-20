@@ -22,6 +22,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedCompareRouteImport } from './routes/_authenticated/compare'
 import { Route as AuthenticatedBenchmarkingRouteImport } from './routes/_authenticated/benchmarking'
 import { Route as AuthenticatedAdminDataRouteImport } from './routes/_authenticated/admin.data'
+import { Route as ApiPublicIngestPharmacyPaymentsRouteImport } from './routes/api/public/ingest.pharmacy-payments'
 import { Route as ApiPublicHooksIngestScotlandRouteImport } from './routes/api/public/hooks/ingest-scotland'
 
 const RegisterRoute = RegisterRouteImport.update({
@@ -90,6 +91,12 @@ const AuthenticatedAdminDataRoute = AuthenticatedAdminDataRouteImport.update({
   path: '/admin/data',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const ApiPublicIngestPharmacyPaymentsRoute =
+  ApiPublicIngestPharmacyPaymentsRouteImport.update({
+    id: '/api/public/ingest/pharmacy-payments',
+    path: '/api/public/ingest/pharmacy-payments',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksIngestScotlandRoute =
   ApiPublicHooksIngestScotlandRouteImport.update({
     id: '/api/public/hooks/ingest-scotland',
@@ -111,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/admin/data': typeof AuthenticatedAdminDataRoute
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
+  '/api/public/ingest/pharmacy-payments': typeof ApiPublicIngestPharmacyPaymentsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -126,6 +134,7 @@ export interface FileRoutesByTo {
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/admin/data': typeof AuthenticatedAdminDataRoute
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
+  '/api/public/ingest/pharmacy-payments': typeof ApiPublicIngestPharmacyPaymentsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -143,6 +152,7 @@ export interface FileRoutesById {
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/_authenticated/admin/data': typeof AuthenticatedAdminDataRoute
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
+  '/api/public/ingest/pharmacy-payments': typeof ApiPublicIngestPharmacyPaymentsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -160,6 +170,7 @@ export interface FileRouteTypes {
     | '/pharmacy/$odsCode'
     | '/admin/data'
     | '/api/public/hooks/ingest-scotland'
+    | '/api/public/ingest/pharmacy-payments'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -175,6 +186,7 @@ export interface FileRouteTypes {
     | '/pharmacy/$odsCode'
     | '/admin/data'
     | '/api/public/hooks/ingest-scotland'
+    | '/api/public/ingest/pharmacy-payments'
   id:
     | '__root__'
     | '/'
@@ -191,6 +203,7 @@ export interface FileRouteTypes {
     | '/pharmacy/$odsCode'
     | '/_authenticated/admin/data'
     | '/api/public/hooks/ingest-scotland'
+    | '/api/public/ingest/pharmacy-payments'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -200,6 +213,7 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   PharmacyOdsCodeRoute: typeof PharmacyOdsCodeRoute
   ApiPublicHooksIngestScotlandRoute: typeof ApiPublicHooksIngestScotlandRoute
+  ApiPublicIngestPharmacyPaymentsRoute: typeof ApiPublicIngestPharmacyPaymentsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -295,6 +309,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminDataRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/api/public/ingest/pharmacy-payments': {
+      id: '/api/public/ingest/pharmacy-payments'
+      path: '/api/public/ingest/pharmacy-payments'
+      fullPath: '/api/public/ingest/pharmacy-payments'
+      preLoaderRoute: typeof ApiPublicIngestPharmacyPaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/ingest-scotland': {
       id: '/api/public/hooks/ingest-scotland'
       path: '/api/public/hooks/ingest-scotland'
@@ -338,6 +359,7 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   PharmacyOdsCodeRoute: PharmacyOdsCodeRoute,
   ApiPublicHooksIngestScotlandRoute: ApiPublicHooksIngestScotlandRoute,
+  ApiPublicIngestPharmacyPaymentsRoute: ApiPublicIngestPharmacyPaymentsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
