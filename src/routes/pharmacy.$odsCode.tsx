@@ -24,6 +24,10 @@ type Row = {
   items_dispensed: number; nms_count: number; pharmacy_first_count: number;
   flu_vaccinations: number; eps_items: number; eps_nominations: number;
   gross_cost: number | string | null;
+  pharmacy_first_payment: number | string | null;
+  mcr_payment: number | string | null;
+  ehc_items: number; methadone_items: number; smoking_cessation: number;
+  final_payment: number | string | null;
 };
 
 type RankKey = "items_dispensed" | "nms_count" | "pharmacy_first_count" | "flu_vaccinations" | "eps_items";
