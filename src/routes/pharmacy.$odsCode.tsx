@@ -27,7 +27,10 @@ type Row = {
   gross_cost: number | string | null;
   pharmacy_first_payment: number | string | null;
   mcr_payment: number | string | null;
-  ehc_items: number; methadone_items: number; smoking_cessation: number;
+  mcr_registrations: number; mcr_items: number;
+  ehc_items: number; methadone_items: number; supervised_methadone_doses: number;
+  smoking_cessation: number;
+  smoking_cessation_payment: number | string | null;
   final_payment: number | string | null;
   is_actual_payment: boolean;
 };
