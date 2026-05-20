@@ -218,6 +218,52 @@ export function PharmacySearch({
               </button>
             );
           })}
+
+          {/* Google Places fallback */}
+          <div className="border-t border-border bg-secondary/30">
+            {googleResults.length === 0 ? (
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={runGoogleSearch}
+                disabled={googleLoading}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                {googleLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Globe className="h-3.5 w-3.5" />
+                )}
+                {googleLoading ? "Searching Google…" : `Can't find it? Search Google for "${q.trim()}"`}
+              </button>
+            ) : (
+              <>
+                <p className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                  <Globe className="h-3 w-3" /> From Google
+                </p>
+                {googleResults.map((g) => (
+                  <button
+                    key={g.id}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleGoogleSelect(g)}
+                    disabled={googleLinking === g.id}
+                    className="w-full text-left flex items-center gap-3 px-3 py-2.5 border-t border-border/30 hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm truncate">{g.name}</p>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">{g.address}</p>
+                    </div>
+                    {googleLinking === g.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                    ) : (
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground shrink-0">
+                        {g.postcode || "—"}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
