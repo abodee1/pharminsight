@@ -346,6 +346,7 @@ async function processQueueItem(item: {
         items_dispensed: a.items,
         gross_cost: a.payments.gross_cost,
         pharmacy_first_payment: a.payments.pharmacy_first_payment,
+        pharmacy_first_count: Math.round(a.payments.pharmacy_first_count),
         mcr_payment: a.payments.mcr_payment,
         ehc_items: Math.round(a.payments.ehc_items),
         methadone_items: Math.round(a.payments.methadone_items),
