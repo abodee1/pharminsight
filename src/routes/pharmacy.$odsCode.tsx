@@ -529,3 +529,79 @@ function MiniChart({ title, data, dataKey }: { title: string; data: any[]; dataK
     </div>
   );
 }
+
+function PFServiceMix({
+  services, peerAvg, peerCount, region, period,
+}: {
+  services: Record<string, number>;
+  peerAvg: Record<string, number> | null;
+  peerCount: number;
+  region: string | null;
+  period: string;
+}) {
+  const data = PF_SERVICES.map((s) => ({
+    label: s.label,
+    you: Number(services[s.key]) || 0,
+    peer: peerAvg ? Math.round((peerAvg[s.key] || 0) * 10) / 10 : 0,
+  }));
+  const total = data.reduce((acc, d) => acc + d.you, 0);
+  if (total === 0 && !peerAvg) {
+    return (
+      <div className="mt-6 rounded-lg bg-card border border-border p-4 shadow-sm">
+        <h2 className="text-sm font-semibold">Pharmacy First service mix</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          No Pharmacy First consultations recorded for {period}.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-6 rounded-lg bg-card border border-border p-4 shadow-sm">
+      <div className="flex items-baseline justify-between gap-3 flex-wrap">
+        <h2 className="text-sm font-semibold">Pharmacy First service mix · {period}</h2>
+        <p className="text-xs text-muted-foreground">
+          {total.toLocaleString()} consultations
+          {peerAvg && region && (
+            <> · vs avg of {peerCount.toLocaleString()} peers in {region}</>
+          )}
+        </p>
+      </div>
+      <div className="h-72 mt-3">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} layout="vertical" margin={{ top: 5, right: 16, bottom: 0, left: 30 }}>
+            <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" horizontal={false} />
+            <XAxis type="number" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
+            <YAxis dataKey="label" type="category" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" width={140} />
+            <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12 }} />
+            <Bar dataKey="you" name="This pharmacy" fill="var(--chart-2)" radius={[0, 4, 4, 0]}>
+              {data.map((d, i) => (
+                <Cell key={i} fill={peerAvg && d.you > d.peer ? "var(--chart-1)" : "var(--chart-2)"} />
+              ))}
+            </Bar>
+            {peerAvg && <Bar dataKey="peer" name="Regional avg" fill="var(--muted-foreground)" fillOpacity={0.35} radius={[0, 4, 4, 0]} />}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      {peerAvg && (
+        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+          {data.filter((d) => d.you > 0 || d.peer > 0).map((d) => {
+            const delta = d.peer > 0 ? Math.round(((d.you - d.peer) / d.peer) * 100) : null;
+            return (
+              <div key={d.label} className="rounded border border-border bg-secondary/40 px-2 py-1.5">
+                <div className="text-muted-foreground">{d.label}</div>
+                <div className="font-semibold tabular-nums">
+                  {d.you} <span className="text-muted-foreground font-normal">vs {d.peer}</span>
+                </div>
+                {delta !== null && (
+                  <div className={delta >= 0 ? "text-emerald-600" : "text-red-600"}>
+                    {delta >= 0 ? "+" : ""}{delta}%
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
