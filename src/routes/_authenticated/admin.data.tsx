@@ -73,22 +73,26 @@ function AdminDataPage() {
     return byKey;
   }, [logs]);
 
-  const trigger = async (source: string) => {
-    setTriggering(source);
+  const trigger = async (source: string, opts?: { reingest?: boolean }) => {
+    const key = source + (opts?.reingest ? ":reingest" : "");
+    setTriggering(key);
     try {
-      const path =
+      const basePath =
         source === "PHS_SCOTLAND"
           ? "/api/public/hooks/ingest-scotland"
           : null;
-      if (!path) {
+      if (!basePath) {
         toast.info("Ingest endpoint not wired for this source yet.");
         return;
       }
+      const path = opts?.reingest ? `${basePath}?reingest=1` : basePath;
       const res = await fetch(path, { method: "POST" });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || `HTTP ${res.status}`);
       toast.success(
-        `Queued ${json.queued ?? 0}, processed ${json.processed ?? 0}, pending ${json.pending ?? 0}`,
+        opts?.reingest
+          ? `Re-ingest started — reset ${json.reset ?? 0}, queued ${json.queued ?? 0}, processed ${json.processed ?? 0}`
+          : `Queued ${json.queued ?? 0}, processed ${json.processed ?? 0}, pending ${json.pending ?? 0}`,
       );
       await load();
     } catch (e) {
@@ -121,23 +125,40 @@ function AdminDataPage() {
                     Region label: <span className="font-medium">{s.regionLabel}</span>
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={triggering === s.key}
-                  onClick={() => trigger(s.key)}
-                >
-                  {triggering === s.key ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-3.5 w-3.5" />
+                <div className="flex flex-col gap-1.5 items-end">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!!triggering}
+                    onClick={() => trigger(s.key)}
+                  >
+                    {triggering === s.key ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    )}
+                    <span className="ml-1.5">Ingest now</span>
+                  </Button>
+                  {s.key === "PHS_SCOTLAND" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={!!triggering}
+                      onClick={() => trigger(s.key, { reingest: true })}
+                      title="Wipe Scotland ingest logs and re-process every CSV"
+                    >
+                      {triggering === "PHS_SCOTLAND:reingest" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : null}
+                      <span className="ml-1.5">Re-ingest Scotland</span>
+                    </Button>
                   )}
-                  <span className="ml-1.5">Ingest now</span>
-                </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+
                     <span>{monthsCovered} of ~{s.expectedMonths} months</span>
                     <span>{pct}%</span>
                   </div>
