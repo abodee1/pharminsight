@@ -328,7 +328,7 @@ function SettingsPage() {
                   if (!pharms.some((x) => x.id === p.id)) {
                     setPharms((prev) => [...prev, p as any]);
                   }
-                  await setPharmacy(p.id);
+                  await setPharmacy(p);
                 }}
               />
             </div>
