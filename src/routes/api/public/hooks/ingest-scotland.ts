@@ -208,10 +208,29 @@ async function processQueueItem(item: {
       gross_cost: ["GrossIngredientCost", "Gross_Cost", "GIC", "GrossIngCost", "GICTotal"],
       final_payment: ["FinalPayments", "FinalPayment", "Final_Payment", "TotalPayment", "NetPayment", "Total_Net_Payment"],
     };
+    // PF service breakdown — friendly key → PHS *Consultations columns.
+    // PFConsultations is the top-level acute service; PF{IPT,UTI,SIN,SHN,HAY}/BRC/EBC are sub-services.
+    type PFService =
+      | "acute" | "uti" | "impetigo" | "skin_infection" | "sexual_health"
+      | "hayfever" | "bridging_contraception" | "emergency_contraception";
+    const PF_SERVICE_FIELDS: Record<PFService, string[]> = {
+      acute: ["PFConsultations"],
+      uti: ["PFUTIConsultations"],
+      impetigo: ["PFIPTConsultations"],
+      skin_infection: ["PFSINConsultations"],
+      sexual_health: ["PFSHNConsultations"],
+      hayfever: ["PFHAYConsultations"],
+      bridging_contraception: ["BRCConsultations"],
+      emergency_contraception: ["EBCConsultations"],
+    };
     const blankPayments = (): Record<PField, number> => ({
       pharmacy_first_payment: 0, pharmacy_first_count: 0, mcr_payment: 0, ehc_items: 0,
       methadone_items: 0, smoking_cessation: 0, gross_cost: 0, final_payment: 0,
       mcr_registrations: 0, mcr_items: 0, supervised_methadone_doses: 0, smoking_cessation_payment: 0,
+    });
+    const blankPFServices = (): Record<PFService, number> => ({
+      acute: 0, uti: 0, impetigo: 0, skin_infection: 0,
+      sexual_health: 0, hayfever: 0, bridging_contraception: 0, emergency_contraception: 0,
     });
 
     type Agg = {
