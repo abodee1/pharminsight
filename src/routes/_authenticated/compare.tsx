@@ -10,7 +10,7 @@ import { PharmacySearch } from "@/components/PharmacySearch";
 import { CountryBadge } from "@/components/CountryBadge";
 import { Badge } from "@/components/ui/badge";
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   LineChart, Line, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from "recharts";
 
@@ -47,7 +47,7 @@ function Compare() {
   const [pharms, setPharms] = useState<Pharm[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
-  const [metric, setMetric] = useState<(typeof METRICS)[number]["key"]>("items_dispensed");
+  const [loading, setLoading] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Preload the user's primary pharmacy as the first selection.
