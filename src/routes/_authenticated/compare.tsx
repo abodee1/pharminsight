@@ -393,6 +393,42 @@ function Compare() {
                 </div>
               </div>
 
+              {selectedPharms.length > 1 && latest && (
+                <div className="rounded-xl bg-card border border-border shadow-sm p-6 mb-6">
+                  <div className="flex items-baseline justify-between mb-4">
+                    <h2 className="text-sm font-semibold tracking-tight">Metric leadership · this month</h2>
+                    <p className="text-xs text-muted-foreground italic">Who leads, and by how wide a margin.</p>
+                  </div>
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {METRICS.map((mt) => {
+                      const [y, m] = latest.split("-").map(Number);
+                      const vals = selectedPharms.map((ph) => {
+                        const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
+                        return { ph, v: row ? (row[mt.key] as number) : 0 };
+                      }).sort((a, b) => b.v - a.v);
+                      const leader = vals[0];
+                      const runner = vals[1];
+                      const margin = runner && runner.v ? Math.round(((leader.v - runner.v) / runner.v) * 100) : null;
+                      return (
+                        <div key={mt.key} className="border-l-2 pl-3" style={{ borderColor: colorFor(leader.ph.id) }}>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{mt.label}</p>
+                          <p className="text-sm font-semibold truncate" title={leader.ph.name}>{leader.ph.name}</p>
+                          <p className="text-lg font-bold tabular-nums">{leader.v.toLocaleString()}</p>
+                          {runner && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {margin !== null
+                                ? `${margin > 0 ? `+${margin}% ahead of` : "tied with"} ${runner.ph.name.split(" ")[0]}`
+                                : `vs ${runner.ph.name.split(" ")[0]}`}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+
               {/* Comparison table */}
               <div className="rounded-xl bg-card border border-border shadow-sm overflow-hidden mb-6">
                 <div className="px-6 py-4 border-b border-border flex items-center justify-between">
