@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { z } from "zod";
 import { User as UserIcon, Lock, Building2, FileText, Search, Check, Trash2 } from "lucide-react";
+import { PharmacySearch as PharmacySearchInline } from "@/components/PharmacySearch";
 
 export const Route = createFileRoute("/_authenticated/settings")({ component: SettingsPage });
 
