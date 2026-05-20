@@ -96,7 +96,13 @@ function PharmacyProfile() {
   useEffect(() => {
     (async () => {
       if (rows.length === 0) return;
-      const latest = rows[rows.length - 1];
+      const isScot = (pharmacy?.country || "").toLowerCase() === "scotland";
+      let latest = rows[rows.length - 1];
+      if (isScot) {
+        for (let i = rows.length - 1; i >= 0; i--) {
+          if (rows[i].is_actual_payment) { latest = rows[i]; break; }
+        }
+      }
       const keys: RankKey[] = ["items_dispensed", "nms_count", "pharmacy_first_count", "flu_vaccinations", "eps_items"];
       const out: Partial<Record<RankKey, { rank: number; total: number }>> = {};
       await Promise.all(keys.map(async (k) => {
