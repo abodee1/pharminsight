@@ -338,6 +338,39 @@ export type Database = {
         }
         Relationships: []
       }
+      schema_alerts: {
+        Row: {
+          available_headers: string[]
+          created_at: string
+          dataset: string | null
+          id: string
+          missing_field: string
+          resource_url: string | null
+          source: string
+          tried_variants: string[]
+        }
+        Insert: {
+          available_headers?: string[]
+          created_at?: string
+          dataset?: string | null
+          id?: string
+          missing_field: string
+          resource_url?: string | null
+          source: string
+          tried_variants?: string[]
+        }
+        Update: {
+          available_headers?: string[]
+          created_at?: string
+          dataset?: string | null
+          id?: string
+          missing_field?: string
+          resource_url?: string | null
+          source?: string
+          tried_variants?: string[]
+        }
+        Relationships: []
+      }
       user_pharmacy: {
         Row: {
           created_at: string
