@@ -154,7 +154,8 @@ function PharmacyProfile() {
   const isMine = myPharmacyId === pharmacy.id;
   const showClaimBanner = user && hasUserPharmacy === false && !bannerDismissed;
 
-  const metrics: { label: string; key: RankKey | "gross_cost"; value: number; prior: number; yoy: number; format?: (n: number) => string }[] = latest
+  const gbp = (n: number) => "£" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  const metrics: { label: string; key: RankKey | "money"; value: number; prior: number; yoy: number; format?: (n: number) => string }[] = latest
     ? [
         { label: "Items dispensed", key: "items_dispensed", value: latest.items_dispensed, prior: prior?.items_dispensed ?? 0, yoy: yoy?.items_dispensed ?? 0 },
         { label: "EPS items", key: "eps_items", value: latest.eps_items, prior: prior?.eps_items ?? 0, yoy: yoy?.eps_items ?? 0 },
@@ -162,7 +163,13 @@ function PharmacyProfile() {
         { label: "NMS", key: "nms_count", value: latest.nms_count, prior: prior?.nms_count ?? 0, yoy: yoy?.nms_count ?? 0 },
         { label: "Pharmacy First", key: "pharmacy_first_count", value: latest.pharmacy_first_count, prior: prior?.pharmacy_first_count ?? 0, yoy: yoy?.pharmacy_first_count ?? 0 },
         { label: "Flu vaccinations", key: "flu_vaccinations", value: latest.flu_vaccinations, prior: prior?.flu_vaccinations ?? 0, yoy: yoy?.flu_vaccinations ?? 0 },
-        { label: "Gross cost", key: "gross_cost", value: Number(latest.gross_cost) || 0, prior: Number(prior?.gross_cost) || 0, yoy: Number(yoy?.gross_cost) || 0, format: (n) => "£" + n.toLocaleString(undefined, { maximumFractionDigits: 0 }) },
+        { label: "EHC items", key: "items_dispensed", value: latest.ehc_items, prior: prior?.ehc_items ?? 0, yoy: yoy?.ehc_items ?? 0 },
+        { label: "Methadone items", key: "items_dispensed", value: latest.methadone_items, prior: prior?.methadone_items ?? 0, yoy: yoy?.methadone_items ?? 0 },
+        { label: "Smoking cessation", key: "items_dispensed", value: latest.smoking_cessation, prior: prior?.smoking_cessation ?? 0, yoy: yoy?.smoking_cessation ?? 0 },
+        { label: "Pharmacy First £", key: "money", value: Number(latest.pharmacy_first_payment) || 0, prior: Number(prior?.pharmacy_first_payment) || 0, yoy: Number(yoy?.pharmacy_first_payment) || 0, format: gbp },
+        { label: "MCR payment", key: "money", value: Number(latest.mcr_payment) || 0, prior: Number(prior?.mcr_payment) || 0, yoy: Number(yoy?.mcr_payment) || 0, format: gbp },
+        { label: "Gross cost", key: "money", value: Number(latest.gross_cost) || 0, prior: Number(prior?.gross_cost) || 0, yoy: Number(yoy?.gross_cost) || 0, format: gbp },
+        { label: "Final payment", key: "money", value: Number(latest.final_payment) || 0, prior: Number(prior?.final_payment) || 0, yoy: Number(yoy?.final_payment) || 0, format: gbp },
       ]
     : [];
 
