@@ -196,7 +196,6 @@ function PharmacyProfile() {
         ? [
             { label: "Items dispensed", key: "items_dispensed", value: latest.items_dispensed, prior: prior?.items_dispensed ?? 0, yoy: yoy?.items_dispensed ?? 0 },
             { label: "Pharmacy First", key: "pharmacy_first_count", value: latest.pharmacy_first_count, prior: prior?.pharmacy_first_count ?? 0, yoy: yoy?.pharmacy_first_count ?? 0 },
-            { label: "Flu vaccinations", key: "flu_vaccinations", value: latest.flu_vaccinations, prior: prior?.flu_vaccinations ?? 0, yoy: yoy?.flu_vaccinations ?? 0 },
           ]
         : [
             { label: "Items dispensed", key: "items_dispensed", value: latest.items_dispensed, prior: prior?.items_dispensed ?? 0, yoy: yoy?.items_dispensed ?? 0 },
