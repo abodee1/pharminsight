@@ -125,23 +125,40 @@ function AdminDataPage() {
                     Region label: <span className="font-medium">{s.regionLabel}</span>
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={triggering === s.key}
-                  onClick={() => trigger(s.key)}
-                >
-                  {triggering === s.key ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-3.5 w-3.5" />
+                <div className="flex flex-col gap-1.5 items-end">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!!triggering}
+                    onClick={() => trigger(s.key)}
+                  >
+                    {triggering === s.key ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    )}
+                    <span className="ml-1.5">Ingest now</span>
+                  </Button>
+                  {s.key === "PHS_SCOTLAND" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={!!triggering}
+                      onClick={() => trigger(s.key, { reingest: true })}
+                      title="Wipe Scotland ingest logs and re-process every CSV"
+                    >
+                      {triggering === "PHS_SCOTLAND:reingest" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : null}
+                      <span className="ml-1.5">Re-ingest Scotland</span>
+                    </Button>
                   )}
-                  <span className="ml-1.5">Ingest now</span>
-                </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+
                     <span>{monthsCovered} of ~{s.expectedMonths} months</span>
                     <span>{pct}%</span>
                   </div>
