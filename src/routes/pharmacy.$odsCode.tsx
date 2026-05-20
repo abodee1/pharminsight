@@ -172,18 +172,24 @@ function PharmacyProfile() {
 
   const gbp = (n: number) => "£" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
   const isScotland = (pharmacy.country || "").toLowerCase() === "scotland";
-  const showVerified = isScotland && !!latest?.is_actual_payment;
+  const showVerified = isScotland;
   const baseMetrics: { label: string; key: RankKey | "money"; value: number; prior: number; yoy: number; format?: (n: number) => string }[] = latest
-    ? [
-        { label: "Items dispensed", key: "items_dispensed", value: latest.items_dispensed, prior: prior?.items_dispensed ?? 0, yoy: yoy?.items_dispensed ?? 0 },
-        { label: "EPS items", key: "eps_items", value: latest.eps_items, prior: prior?.eps_items ?? 0, yoy: yoy?.eps_items ?? 0 },
-        { label: "EPS nominations", key: "items_dispensed", value: latest.eps_nominations, prior: prior?.eps_nominations ?? 0, yoy: yoy?.eps_nominations ?? 0 },
-        { label: "NMS", key: "nms_count", value: latest.nms_count, prior: prior?.nms_count ?? 0, yoy: yoy?.nms_count ?? 0 },
-        { label: "Pharmacy First", key: "pharmacy_first_count", value: latest.pharmacy_first_count, prior: prior?.pharmacy_first_count ?? 0, yoy: yoy?.pharmacy_first_count ?? 0 },
-        { label: "Flu vaccinations", key: "flu_vaccinations", value: latest.flu_vaccinations, prior: prior?.flu_vaccinations ?? 0, yoy: yoy?.flu_vaccinations ?? 0 },
-      ]
+    ? (isScotland
+        ? [
+            { label: "Items dispensed", key: "items_dispensed", value: latest.items_dispensed, prior: prior?.items_dispensed ?? 0, yoy: yoy?.items_dispensed ?? 0 },
+            { label: "Pharmacy First", key: "pharmacy_first_count", value: latest.pharmacy_first_count, prior: prior?.pharmacy_first_count ?? 0, yoy: yoy?.pharmacy_first_count ?? 0 },
+            { label: "Flu vaccinations", key: "flu_vaccinations", value: latest.flu_vaccinations, prior: prior?.flu_vaccinations ?? 0, yoy: yoy?.flu_vaccinations ?? 0 },
+          ]
+        : [
+            { label: "Items dispensed", key: "items_dispensed", value: latest.items_dispensed, prior: prior?.items_dispensed ?? 0, yoy: yoy?.items_dispensed ?? 0 },
+            { label: "EPS items", key: "eps_items", value: latest.eps_items, prior: prior?.eps_items ?? 0, yoy: yoy?.eps_items ?? 0 },
+            { label: "EPS nominations", key: "items_dispensed", value: latest.eps_nominations, prior: prior?.eps_nominations ?? 0, yoy: yoy?.eps_nominations ?? 0 },
+            { label: "NMS", key: "nms_count", value: latest.nms_count, prior: prior?.nms_count ?? 0, yoy: yoy?.nms_count ?? 0 },
+            { label: "Pharmacy First", key: "pharmacy_first_count", value: latest.pharmacy_first_count, prior: prior?.pharmacy_first_count ?? 0, yoy: yoy?.pharmacy_first_count ?? 0 },
+            { label: "Flu vaccinations", key: "flu_vaccinations", value: latest.flu_vaccinations, prior: prior?.flu_vaccinations ?? 0, yoy: yoy?.flu_vaccinations ?? 0 },
+          ])
     : [];
-  const scottishMetrics = showVerified && latest
+  const scottishMetrics = isScotland && latest
     ? [
         { label: "EHC items", key: "items_dispensed" as RankKey, value: latest.ehc_items, prior: prior?.ehc_items ?? 0, yoy: yoy?.ehc_items ?? 0 },
         { label: "Methadone items", key: "items_dispensed" as RankKey, value: latest.methadone_items, prior: prior?.methadone_items ?? 0, yoy: yoy?.methadone_items ?? 0 },
@@ -305,8 +311,8 @@ function PharmacyProfile() {
 
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
             <MiniChart title="Items dispensed" data={chartData} dataKey="items" />
-            <MiniChart title="EPS items" data={chartData} dataKey="eps_items" />
-            <MiniChart title="NMS" data={chartData} dataKey="nms" />
+            {!isScotland && <MiniChart title="EPS items" data={chartData} dataKey="eps_items" />}
+            {!isScotland && <MiniChart title="NMS" data={chartData} dataKey="nms" />}
             <MiniChart title="Pharmacy First" data={chartData} dataKey="pf" />
             <MiniChart title="Flu vaccinations" data={chartData} dataKey="flu" />
             <MiniChart title="Gross cost (£)" data={chartData} dataKey="cost" />
@@ -323,9 +329,9 @@ function PharmacyProfile() {
                   <tr>
                     <th className="text-left px-3 py-2 font-medium">Month</th>
                     <th className="text-right px-3 py-2 font-medium">Items</th>
-                    <th className="text-right px-3 py-2 font-medium">EPS items</th>
-                    <th className="text-right px-3 py-2 font-medium">EPS nom.</th>
-                    <th className="text-right px-3 py-2 font-medium">NMS</th>
+                    {!isScotland && <th className="text-right px-3 py-2 font-medium">EPS items</th>}
+                    {!isScotland && <th className="text-right px-3 py-2 font-medium">EPS nom.</th>}
+                    {!isScotland && <th className="text-right px-3 py-2 font-medium">NMS</th>}
                     <th className="text-right px-3 py-2 font-medium">PF</th>
                     <th className="text-right px-3 py-2 font-medium">PF £</th>
                     <th className="text-right px-3 py-2 font-medium">Flu</th>
@@ -344,9 +350,9 @@ function PharmacyProfile() {
                       <tr key={`${r.year}-${r.month}`} className="border-t border-border">
                         <td className="px-3 py-2 whitespace-nowrap">{MONTHS[r.month - 1]} {r.year}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{r.items_dispensed.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{r.eps_items.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{r.eps_nominations.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{r.nms_count.toLocaleString()}</td>
+                        {!isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.eps_items.toLocaleString()}</td>}
+                        {!isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.eps_nominations.toLocaleString()}</td>}
+                        {!isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.nms_count.toLocaleString()}</td>}
                         <td className="px-3 py-2 text-right tabular-nums">{r.pharmacy_first_count.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.pharmacy_first_payment)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{r.flu_vaccinations.toLocaleString()}</td>
