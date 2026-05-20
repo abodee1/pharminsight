@@ -5,12 +5,9 @@ import { fetchAll } from "@/lib/fetchAll";
 import { PageHeader } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
-import { Check, ChevronsUpDown, X, Plus, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
+import { X, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
+import { PharmacySearch } from "@/components/PharmacySearch";
+import { CountryBadge } from "@/components/CountryBadge";
 import { Badge } from "@/components/ui/badge";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
