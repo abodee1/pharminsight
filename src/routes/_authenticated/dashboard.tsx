@@ -123,12 +123,16 @@ function Dashboard() {
         }),
       );
 
-      // Pick latest period where this pharmacy actually reported (non-zero items)
+      // Pick latest period where this pharmacy has actual (non-provisional) data
       let latestKey = periods[periods.length - 1];
       if (ph) {
         for (let i = periods.length - 1; i >= 0; i--) {
           const r = byPeriod.get(periods[i])!.find((x) => x.pharmacy_id === ph!.id);
-          if (r && (r.items_dispensed || 0) > 0) { latestKey = periods[i]; break; }
+          if (r && r.is_actual_payment) { latestKey = periods[i]; break; }
+        }
+      } else {
+        for (let i = periods.length - 1; i >= 0; i--) {
+          if (byPeriod.get(periods[i])!.some((r) => r.is_actual_payment)) { latestKey = periods[i]; break; }
         }
       }
       const latestRows = byPeriod.get(latestKey) || [];
