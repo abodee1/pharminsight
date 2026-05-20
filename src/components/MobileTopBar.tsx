@@ -94,13 +94,29 @@ export function MobileTopBar() {
         PharmIQ
       </Link>
 
-      <Link
-        to="/settings"
-        aria-label="My account"
-        className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary text-primary-foreground text-xs font-semibold"
-      >
-        {initials || <UserIcon className="h-4 w-4" />}
-      </Link>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setSearchOpen(true)}
+          aria-label="Search pharmacies"
+          className="inline-flex items-center justify-center h-9 w-9 rounded-md border border-border hover:bg-secondary"
+        >
+          <SearchIcon className="h-4 w-4" />
+        </button>
+        <Link
+          to="/settings"
+          aria-label="My account"
+          className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary text-primary-foreground text-xs font-semibold"
+        >
+          {initials || <UserIcon className="h-4 w-4" />}
+        </Link>
+      </div>
+
+      <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+        <DialogContent className="top-[15%] translate-y-0 max-w-lg p-4">
+          <DialogTitle className="text-sm font-semibold mb-2">Search pharmacies</DialogTitle>
+          <PharmacySearch />
+        </DialogContent>
+      </Dialog>
     </header>
   );
 }
