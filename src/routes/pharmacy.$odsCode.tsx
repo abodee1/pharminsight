@@ -260,7 +260,7 @@ function PharmacyProfile() {
             { label: "EPS nominations", key: "items_dispensed", value: latest.eps_nominations, prior: prior?.eps_nominations ?? 0, yoy: yoy?.eps_nominations ?? 0 },
             { label: "NMS", key: "nms_count", value: latest.nms_count, prior: prior?.nms_count ?? 0, yoy: yoy?.nms_count ?? 0 },
             { label: "Pharmacy First", key: "pharmacy_first_count", value: latest.pharmacy_first_count, prior: prior?.pharmacy_first_count ?? 0, yoy: yoy?.pharmacy_first_count ?? 0 },
-            { label: "Flu vaccinations", key: "flu_vaccinations", value: latest.flu_vaccinations, prior: prior?.flu_vaccinations ?? 0, yoy: yoy?.flu_vaccinations ?? 0 },
+            
           ])
     : [];
   const scottishMetrics = isScotland && latest
