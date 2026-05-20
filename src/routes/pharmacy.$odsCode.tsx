@@ -336,6 +336,7 @@ function PharmacyProfile() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
