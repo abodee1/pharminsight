@@ -150,7 +150,7 @@ function Compare() {
     });
   }, [latest, selectedPharms, rows]);
 
-  // Headline stats per pharmacy (latest + change)
+  // Headline per pharmacy — all metrics + change vs prior
   const headline = useMemo(() => {
     if (!latest) return [];
     const [ly, lm] = latest.split("-").map(Number);
@@ -158,13 +158,16 @@ function Compare() {
     return selectedPharms.map((ph) => {
       const cur = rows.find((r) => r.pharmacy_id === ph.id && r.year === ly && r.month === lm);
       const prv = prev ? rows.find((r) => r.pharmacy_id === ph.id && r.year === py && r.month === pm) : null;
-      const v = cur ? (cur[metric] as number) : 0;
-      const p = prv ? (prv[metric] as number) : 0;
-      const diff = v - p;
-      const pct = p ? Math.round((diff / p) * 100) : 0;
-      return { ph, value: v, diff, pct };
+      const metrics = METRICS.map((mt) => {
+        const v = cur ? (cur[mt.key] as number) : 0;
+        const p = prv ? (prv[mt.key] as number) : 0;
+        const diff = v - p;
+        const pct = p ? Math.round((diff / p) * 100) : 0;
+        return { mt, value: v, diff, pct };
+      });
+      return { ph, metrics };
     });
-  }, [latest, prev, selectedPharms, rows, metric]);
+  }, [latest, prev, selectedPharms, rows]);
 
   // Winner per metric
   const winners = useMemo(() => {
