@@ -291,49 +291,11 @@ function Dashboard() {
           <AnnotatedSparkline
             label={pharmacy ? "Pharmacy First — your 12-month arc" : "Pharmacy First — national arc"}
             points={pfSeries}
-          />
-        )}
-        {nationalTrend.length >= 6 && (
-          <AnnotatedSparkline
-            label="UK items dispensed — total across reporting pharmacies"
-            points={nationalTrend}
+            caption={pharmacy ? "Your monthly Pharmacy First consultations over the last year, with peak and trough highlighted." : "Average Pharmacy First consultations per reporting pharmacy across the country."}
           />
         )}
       </div>
 
-      {peerItems.length > 8 && (
-        <div className="mt-6">
-          <DistributionStrip
-            label={`How ${pharmacy?.country || "the country"} dispenses — ${stats.period}`}
-            values={peerItems}
-            highlightValue={pharmacy ? stats.items : undefined}
-            highlightLabel={pharmacy?.name}
-            caption="Each bar is a band of pharmacies grouped by monthly items dispensed."
-          />
-        </div>
-      )}
-
-      <div className="mt-6 grid md:grid-cols-2 gap-4">
-        {revenueMix.some((s) => s.value > 0) && (
-          <ShareDonut
-            label={pharmacy ? `Revenue mix · ${stats.period}` : `${pharmacy ? "" : "Country "}revenue mix · ${stats.period}`}
-            segments={revenueMix}
-            caption={
-              pharmacy
-                ? "Composition of the pharmacy's reported income at the latest period."
-                : "Composition of total reported income across the country at the latest period."
-            }
-            formatValue={gbp}
-          />
-        )}
-        {countrySplit.some((s) => s.value > 0) && (
-          <ShareDonut
-            label={`UK dispensing share · ${stats.period}`}
-            segments={countrySplit}
-            caption="Share of items dispensed across the four UK nations at the latest period reported."
-          />
-        )}
-      </div>
 
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link to="/compare" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md transition-all">
