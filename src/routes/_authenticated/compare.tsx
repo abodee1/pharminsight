@@ -27,10 +27,10 @@ const METRICS = [
 ] as const;
 
 const SERIES_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
+  "var(--cmp-1)",
+  "var(--cmp-2)",
+  "var(--cmp-3)",
+  "var(--cmp-4)",
 ];
 
 type Pharm = { id: string; name: string; region: string | null; country: string | null; postcode: string | null };
