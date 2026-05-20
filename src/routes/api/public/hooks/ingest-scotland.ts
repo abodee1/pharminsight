@@ -394,6 +394,9 @@ async function processQueueItem(item: {
         smoking_cessation_payment: a.payments.smoking_cessation_payment,
         final_payment: a.payments.final_payment,
         is_actual_payment: a.payments.final_payment > 0,
+        pharmacy_first_services: Object.fromEntries(
+          Object.entries(a.pf_services).map(([k, v]) => [k, Math.round(v)]),
+        ),
         data_source: SOURCE,
         is_provisional: isProvisional(a.year, a.month),
       }));
