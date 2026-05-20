@@ -296,9 +296,11 @@ export function AnnotatedSparkline({
           Low: <span className="font-semibold text-foreground">{fmt(min)}{unit}</span> · {points[troughIdx].period}
         </span>
       </div>
+      {caption && <p className="mt-3 text-xs italic text-muted-foreground border-t border-border pt-2">{caption}</p>}
     </div>
   );
 }
+
 
 /* ----------------------------------------------------------------
  * ShareDonut
