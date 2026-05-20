@@ -96,7 +96,13 @@ function PharmacyProfile() {
   useEffect(() => {
     (async () => {
       if (rows.length === 0) return;
-      const latest = rows[rows.length - 1];
+      const isScot = (pharmacy?.country || "").toLowerCase() === "scotland";
+      let latest = rows[rows.length - 1];
+      if (isScot) {
+        for (let i = rows.length - 1; i >= 0; i--) {
+          if (rows[i].is_actual_payment) { latest = rows[i]; break; }
+        }
+      }
       const keys: RankKey[] = ["items_dispensed", "nms_count", "pharmacy_first_count", "flu_vaccinations", "eps_items"];
       const out: Partial<Record<RankKey, { rank: number; total: number }>> = {};
       await Promise.all(keys.map(async (k) => {
@@ -116,7 +122,7 @@ function PharmacyProfile() {
       }));
       setRanks(out);
     })();
-  }, [rows]);
+  }, [rows, pharmacy]);
 
   const claimAsMine = async () => {
     if (!user || !pharmacy) {
@@ -133,14 +139,26 @@ function PharmacyProfile() {
     toast.success(`${pharmacy.name} set as your pharmacy`);
   };
 
-  const latest = rows[rows.length - 1];
-  const prior = rows[rows.length - 2];
+  const isScotlandPharm = (pharmacy?.country || "").toLowerCase() === "scotland";
+  const latestIdx = useMemo(() => {
+    if (rows.length === 0) return -1;
+    if (isScotlandPharm) {
+      for (let i = rows.length - 1; i >= 0; i--) if (rows[i].is_actual_payment) return i;
+    }
+    return rows.length - 1;
+  }, [rows, isScotlandPharm]);
+  const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
+  const prior = latestIdx > 0 ? rows[latestIdx - 1] : undefined;
   const yoy = useMemo(() => {
     if (!latest) return null;
     return rows.find((r) => r.year === latest.year - 1 && r.month === latest.month) ?? null;
   }, [rows, latest]);
 
-  const chartData = useMemo(() => rows.slice(-24).map((r) => ({
+  const trimmedRows = useMemo(
+    () => (latestIdx >= 0 ? rows.slice(0, latestIdx + 1) : rows),
+    [rows, latestIdx],
+  );
+  const chartData = useMemo(() => trimmedRows.slice(-24).map((r) => ({
     label: `${MONTHS[r.month - 1]} ${String(r.year).slice(2)}`,
     items: r.items_dispensed,
     eps_items: r.eps_items,
@@ -148,7 +166,7 @@ function PharmacyProfile() {
     pf: r.pharmacy_first_count,
     flu: r.flu_vaccinations,
     cost: Number(r.gross_cost) || 0,
-  })), [rows]);
+  })), [trimmedRows]);
 
   if (loading) {
     return <div className="p-10 text-sm text-muted-foreground">Loading pharmacy…</div>;
@@ -202,7 +220,7 @@ function PharmacyProfile() {
     : [];
   const metrics = [...baseMetrics, ...scottishMetrics];
 
-  const tableRows = [...rows].slice(-24).reverse();
+  const tableRows = [...trimmedRows].slice(-24).reverse();
 
   const backTo = user ? "/dashboard" : "/";
   const backLabel = user ? "Back to dashboard" : "Back home";
