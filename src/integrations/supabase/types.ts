@@ -14,7 +14,230 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_insights: {
+        Row: {
+          generated_at: string
+          id: string
+          insight_text: string
+          insight_type: string
+          pharmacy_id: string | null
+          prompt_context: Json
+          user_id: string
+        }
+        Insert: {
+          generated_at?: string
+          id?: string
+          insight_text: string
+          insight_type: string
+          pharmacy_id?: string | null
+          prompt_context?: Json
+          user_id: string
+        }
+        Update: {
+          generated_at?: string
+          id?: string
+          insight_text?: string
+          insight_type?: string
+          pharmacy_id?: string | null
+          prompt_context?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_insights_pharmacy_id_fkey"
+            columns: ["pharmacy_id"]
+            isOneToOne: false
+            referencedRelation: "pharmacies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispensing_data: {
+        Row: {
+          created_at: string
+          eps_items: number
+          eps_nominations: number
+          flu_vaccinations: number
+          id: string
+          items_dispensed: number
+          month: number
+          nms_count: number
+          pharmacy_first_count: number
+          pharmacy_id: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          eps_items?: number
+          eps_nominations?: number
+          flu_vaccinations?: number
+          id?: string
+          items_dispensed?: number
+          month: number
+          nms_count?: number
+          pharmacy_first_count?: number
+          pharmacy_id: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          eps_items?: number
+          eps_nominations?: number
+          flu_vaccinations?: number
+          id?: string
+          items_dispensed?: number
+          month?: number
+          nms_count?: number
+          pharmacy_first_count?: number
+          pharmacy_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispensing_data_pharmacy_id_fkey"
+            columns: ["pharmacy_id"]
+            isOneToOne: false
+            referencedRelation: "pharmacies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pharmacies: {
+        Row: {
+          address: string | null
+          country: string | null
+          created_at: string
+          id: string
+          name: string
+          ods_code: string
+          postcode: string | null
+          region: string | null
+          type: string | null
+        }
+        Insert: {
+          address?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          ods_code: string
+          postcode?: string | null
+          region?: string | null
+          type?: string | null
+        }
+        Update: {
+          address?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          ods_code?: string
+          postcode?: string | null
+          region?: string | null
+          type?: string | null
+        }
+        Relationships: []
+      }
+      private_uploads: {
+        Row: {
+          created_at: string
+          file_name: string
+          id: string
+          parsed_data: Json
+          period_end: string | null
+          period_start: string | null
+          pharmacy_id: string | null
+          upload_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          id?: string
+          parsed_data?: Json
+          period_end?: string | null
+          period_start?: string | null
+          pharmacy_id?: string | null
+          upload_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          id?: string
+          parsed_data?: Json
+          period_end?: string | null
+          period_start?: string | null
+          pharmacy_id?: string | null
+          upload_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "private_uploads_pharmacy_id_fkey"
+            columns: ["pharmacy_id"]
+            isOneToOne: false
+            referencedRelation: "pharmacies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string | null
+          id: string
+          role: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string | null
+          id: string
+          role?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          role?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_pharmacy: {
+        Row: {
+          created_at: string
+          id: string
+          is_primary: boolean
+          pharmacy_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          pharmacy_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          pharmacy_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_pharmacy_pharmacy_id_fkey"
+            columns: ["pharmacy_id"]
+            isOneToOne: false
+            referencedRelation: "pharmacies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
