@@ -55,10 +55,13 @@ export type Database = {
       dispensing_data: {
         Row: {
           created_at: string
+          data_source: string | null
           eps_items: number
           eps_nominations: number
           flu_vaccinations: number
+          gross_cost: number
           id: string
+          is_provisional: boolean
           items_dispensed: number
           month: number
           nms_count: number
@@ -68,10 +71,13 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          data_source?: string | null
           eps_items?: number
           eps_nominations?: number
           flu_vaccinations?: number
+          gross_cost?: number
           id?: string
+          is_provisional?: boolean
           items_dispensed?: number
           month: number
           nms_count?: number
@@ -81,10 +87,13 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          data_source?: string | null
           eps_items?: number
           eps_nominations?: number
           flu_vaccinations?: number
+          gross_cost?: number
           id?: string
+          is_provisional?: boolean
           items_dispensed?: number
           month?: number
           nms_count?: number
@@ -101,6 +110,108 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      health_boards: {
+        Row: {
+          code: string
+          country: string
+          created_at: string
+          name: string
+        }
+        Insert: {
+          code: string
+          country: string
+          created_at?: string
+          name: string
+        }
+        Update: {
+          code?: string
+          country?: string
+          created_at?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      ingestion_log: {
+        Row: {
+          created_at: string
+          dataset: string
+          error: string | null
+          id: string
+          month: number | null
+          resource_url: string
+          rows_ingested: number
+          source: string
+          status: string
+          year: number | null
+        }
+        Insert: {
+          created_at?: string
+          dataset: string
+          error?: string | null
+          id?: string
+          month?: number | null
+          resource_url: string
+          rows_ingested?: number
+          source: string
+          status: string
+          year?: number | null
+        }
+        Update: {
+          created_at?: string
+          dataset?: string
+          error?: string | null
+          id?: string
+          month?: number | null
+          resource_url?: string
+          rows_ingested?: number
+          source?: string
+          status?: string
+          year?: number | null
+        }
+        Relationships: []
+      }
+      ingestion_queue: {
+        Row: {
+          created_at: string
+          dataset: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          month: number | null
+          resource_url: string
+          source: string
+          started_at: string | null
+          status: string
+          year: number | null
+        }
+        Insert: {
+          created_at?: string
+          dataset: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          month?: number | null
+          resource_url: string
+          source: string
+          started_at?: string | null
+          status?: string
+          year?: number | null
+        }
+        Update: {
+          created_at?: string
+          dataset?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          month?: number | null
+          resource_url?: string
+          source?: string
+          started_at?: string | null
+          status?: string
+          year?: number | null
+        }
+        Relationships: []
       }
       pharmacies: {
         Row: {
