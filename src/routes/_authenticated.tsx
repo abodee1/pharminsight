@@ -29,13 +29,17 @@ function AuthLayout() {
     return <RolePrompt onSet={refreshProfile} />;
   }
 
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
   return (
     <div className="min-h-screen flex bg-background">
       <AppSidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <MobileTopBar />
         <main className="flex-1 overflow-x-hidden">
-          <Outlet />
+          <div key={pathname} className="animate-fade-in">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
