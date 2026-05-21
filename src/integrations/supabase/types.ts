@@ -423,7 +423,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      country_monthly_aggregates: {
+        Args: {
+          p_country: string
+          p_end_month: number
+          p_end_year: number
+          p_start_month: number
+          p_start_year: number
+        }
+        Returns: {
+          avg_items: number
+          avg_nms: number
+          avg_pf: number
+          month: number
+          pharmacy_count: number
+          total_items: number
+          year: number
+        }[]
+      }
+      country_split_for_period: {
+        Args: { p_month: number; p_year: number }
+        Returns: {
+          country: string
+          total_items: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
