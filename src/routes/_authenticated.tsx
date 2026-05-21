@@ -11,6 +11,7 @@ export const Route = createFileRoute("/_authenticated")({ component: AuthLayout 
 function AuthLayout() {
   const { user, profile, loading, refreshProfile } = useAuth();
   const nav = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
     if (!loading && !user) nav({ to: "/login" });
@@ -28,8 +29,6 @@ function AuthLayout() {
   if (!profile?.role) {
     return <RolePrompt onSet={refreshProfile} />;
   }
-
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (
     <div className="min-h-screen flex bg-background">
