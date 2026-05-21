@@ -90,7 +90,7 @@ function Dashboard() {
         : Promise.resolve({ data: [] as Row[], error: null });
 
       const aggP = supabase.rpc("country_monthly_aggregates", {
-        p_country: targetCountry,
+        p_country: targetCountry as string,
         p_start_year: startY,
         p_start_month: startM,
         p_end_year: endY,
