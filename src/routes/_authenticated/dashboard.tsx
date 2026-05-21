@@ -27,7 +27,6 @@ import { Trophy, BarChart2, Upload, GitCompare, Sparkles } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const periodKey = (y: number, m: number) => y * 12 + (m - 1);
 const labelFor = (y: number, m: number) => `${MONTHS[m - 1]} ${String(y).slice(2)}`;
 
 type Pharmacy = { id: string; name: string; region: string | null; country: string | null };
@@ -48,14 +47,13 @@ function Dashboard() {
   const [peerItems, setPeerItems] = useState<number[]>([]);
   const [peerPf, setPeerPf] = useState<number[]>([]);
   const [revenueMix, setRevenueMix] = useState<{ label: string; value: number }[]>([]);
-  const [countrySplit, setCountrySplit] = useState<{ label: string; value: number }[]>([]);
-  const [nationalTrend, setNationalTrend] = useState<{ period: string; value: number }[]>([]);
 
   useEffect(() => {
     (async () => {
       if (!user) return;
       setLoading(true);
 
+      // 1. Get user's pharmacy
       const { data: up } = await supabase
         .from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle();
 
@@ -67,116 +65,129 @@ function Dashboard() {
       }
       setPharmacy(ph);
 
-      // ---- Pull all pharmacies (paginated to bypass 1000 cap) ----
-      const allPharm = await fetchAll<{ id: string; country: string | null }>((from, to) =>
-        supabase.from("pharmacies").select("id,country").range(from, to),
-      );
-      const countryById = new Map<string, string>();
-      allPharm.forEach((p) => countryById.set(p.id, p.country || "Unknown"));
-
-      // Window: last ~13 months ending at the latest substantive period.
-      // Avoid pulling the entire 2-year backlog (hundreds of thousands of rows)
-      // — it both delays the dashboard and risks request timeouts.
+      // 2. Latest substantive period
       const latestPeriod = await getLatestSubstantialPeriod();
       const endY = latestPeriod?.year ?? new Date().getFullYear();
       const endM = latestPeriod?.month ?? new Date().getMonth() + 1;
-      const startKey = endY * 12 + (endM - 1) - 12; // 13 months inclusive
+      const startKey = endY * 12 + (endM - 1) - 12;
       const startY = Math.floor(startKey / 12);
       const startM = (startKey % 12) + 1;
 
-      const allRecent = await fetchAll<Row & { year: number; month: number }>((from, to) =>
+      // 3. Parallel: user pharmacy 13mo + country aggregates + latest period country snapshot
+      const targetCountry = ph?.country || null;
+
+      const myRowsP = ph
+        ? supabase
+            .from("dispensing_data")
+            .select(
+              "pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,pharmacy_first_payment,mcr_payment,smoking_cessation_payment,final_payment,gross_cost,is_actual_payment",
+            )
+            .eq("pharmacy_id", ph.id)
+            .or(`and(year.gt.${startY}),and(year.eq.${startY},month.gte.${startM})`)
+            .or(`and(year.lt.${endY}),and(year.eq.${endY},month.lte.${endM})`)
+            .order("year", { ascending: true })
+            .order("month", { ascending: true })
+        : Promise.resolve({ data: [] as Row[], error: null });
+
+      const aggP = supabase.rpc("country_monthly_aggregates", {
+        p_country: targetCountry as string,
+        p_start_year: startY,
+        p_start_month: startM,
+        p_end_year: endY,
+        p_end_month: endM,
+      });
+
+      // Latest period country snapshot for rank/distribution. Paginate but
+      // filter by country first so it's ~1-2k rows (Scotland), not 12k.
+      const latestSnapP = fetchAll<Row>((from, to) =>
         supabase
           .from("dispensing_data")
           .select(
             "pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,pharmacy_first_payment,mcr_payment,smoking_cessation_payment,final_payment,gross_cost,is_actual_payment",
           )
-          .or(
-            `and(year.gt.${startY}),and(year.eq.${startY},month.gte.${startM})`,
-          )
-          .or(
-            `and(year.lt.${endY}),and(year.eq.${endY},month.lte.${endM})`,
-          )
+          .eq("year", endY)
+          .eq("month", endM)
           .range(from, to),
       );
 
-      // Filter to user's country (or all if no pharmacy)
-      const targetCountry = ph?.country || null;
-      const recent = targetCountry
-        ? allRecent.filter((r) => countryById.get(r.pharmacy_id) === targetCountry)
-        : allRecent;
+      const [myRowsRes, aggRes, latestSnapAll] = await Promise.all([
+        myRowsP,
+        aggP,
+        latestSnapP,
+      ]);
 
-      // Group by period
-      const byPeriod = new Map<number, Row[]>();
-      recent.forEach((r) => {
-        const k = periodKey(r.year, r.month);
-        if (!byPeriod.has(k)) byPeriod.set(k, []);
-        byPeriod.get(k)!.push(r);
-      });
-      // Only keep periods with confirmed (non-provisional) data so sparklines aren't dragged to 0
-      const allPeriods = [...byPeriod.keys()].sort((a, b) => a - b);
-      const periods = allPeriods
-        .filter((k) => {
-          const rows = byPeriod.get(k)!;
-          return ph
-            ? rows.some((r) => r.pharmacy_id === ph.id && r.is_actual_payment)
-            : rows.some((r) => r.is_actual_payment);
-        })
-        .slice(-24);
+      const myRows = (myRowsRes.data || []) as Row[];
+      const agg = (aggRes.data || []) as Array<{
+        year: number; month: number; pharmacy_count: number;
+        avg_items: number; avg_pf: number; avg_nms: number; total_items: number;
+      }>;
 
-      // Build mine vs national series (last 12 of those)
-      const last12 = periods.slice(-12);
-      const points = last12.map((k) => {
-        const rows = byPeriod.get(k)!;
-        const y = Math.floor(k / 12); const m = (k % 12) + 1;
-        const mine = ph ? rows.find((r) => r.pharmacy_id === ph!.id)?.items_dispensed ?? 0 : 0;
-        const avg = Math.round(rows.reduce((a, r) => a + (r.items_dispensed || 0), 0) / Math.max(1, rows.length));
-        return { label: labelFor(y, m), mine, national: avg };
+      // For country rank we need country pharmacies. If no pharmacy chosen, fall back to all.
+      let latestSnap = latestSnapAll;
+      if (targetCountry) {
+        const { data: countryPharms } = await supabase
+          .from("pharmacies")
+          .select("id")
+          .eq("country", targetCountry);
+        const ids = new Set((countryPharms || []).map((p) => p.id));
+        latestSnap = latestSnapAll.filter((r) => ids.has(r.pharmacy_id));
+      }
+
+      // Mine vs country avg trend (last 12 months from agg)
+      const last12Agg = agg.slice(-12);
+      const myByKey = new Map<number, Row>();
+      myRows.forEach((r) => myByKey.set(r.year * 12 + (r.month - 1), r));
+      const points = last12Agg.map((a) => {
+        const k = a.year * 12 + (a.month - 1);
+        return {
+          label: labelFor(a.year, a.month),
+          mine: myByKey.get(k)?.items_dispensed ?? 0,
+          national: Math.round(Number(a.avg_items) || 0),
+        };
       });
       setSeries(points);
 
-      // PF sparkline for mine (or country avg)
+      // PF sparkline — user pharmacy if available, otherwise country avg
       setPfSeries(
-        last12.map((k) => {
-          const rows = byPeriod.get(k)!;
-          const y = Math.floor(k / 12); const m = (k % 12) + 1;
+        last12Agg.map((a) => {
+          const k = a.year * 12 + (a.month - 1);
           const v = ph
-            ? rows.find((r) => r.pharmacy_id === ph!.id)?.pharmacy_first_count ?? 0
-            : Math.round(rows.reduce((a, r) => a + (r.pharmacy_first_count || 0), 0) / Math.max(1, rows.length));
-          return { period: labelFor(y, m), value: v };
+            ? myByKey.get(k)?.pharmacy_first_count ?? 0
+            : Math.round(Number(a.avg_pf) || 0);
+          return { period: labelFor(a.year, a.month), value: v };
         }),
       );
 
-      // Pick latest period where this pharmacy has actual (non-provisional) data
-      let latestKey = periods[periods.length - 1];
-      if (ph) {
-        for (let i = periods.length - 1; i >= 0; i--) {
-          const r = byPeriod.get(periods[i])!.find((x) => x.pharmacy_id === ph!.id);
-          if (r && r.is_actual_payment) { latestKey = periods[i]; break; }
-        }
-      } else {
-        for (let i = periods.length - 1; i >= 0; i--) {
-          if (byPeriod.get(periods[i])!.some((r) => r.is_actual_payment)) { latestKey = periods[i]; break; }
-        }
+      // Latest period stats — prefer pharmacy's most recent confirmed row,
+      // else its most recent provisional row.
+      let mineRow: Row | undefined;
+      if (myRows.length) {
+        mineRow =
+          [...myRows].reverse().find((r) => r.is_actual_payment) ??
+          myRows[myRows.length - 1];
       }
-      const latestRows = byPeriod.get(latestKey) || [];
-      const ly = Math.floor(latestKey / 12); const lm = (latestKey % 12) + 1;
-      const mineRow = ph ? latestRows.find((r) => r.pharmacy_id === ph.id) : undefined;
-      const ranked = [...latestRows].sort((a, b) => (b.items_dispensed || 0) - (a.items_dispensed || 0));
+      const statY = mineRow?.year ?? endY;
+      const statM = mineRow?.month ?? endM;
+
+      const ranked = [...latestSnap].sort(
+        (a, b) => (b.items_dispensed || 0) - (a.items_dispensed || 0),
+      );
       const rank = ph ? ranked.findIndex((r) => r.pharmacy_id === ph.id) + 1 : 0;
       setStats({
         items: mineRow?.items_dispensed ?? 0,
         pf: mineRow?.pharmacy_first_count ?? 0,
         nms: mineRow?.nms_count ?? 0,
         rank,
-        total: latestRows.length,
-        period: labelFor(ly, lm),
+        total: latestSnap.length,
+        period: labelFor(statY, statM),
       });
-      setPeerItems(latestRows.map((r) => r.items_dispensed || 0));
-      setPeerPf(latestRows.map((r) => r.pharmacy_first_count || 0));
+      setPeerItems(latestSnap.map((r) => r.items_dispensed || 0));
+      setPeerPf(latestSnap.map((r) => r.pharmacy_first_count || 0));
 
-      // Revenue mix donut (mine if available, else country totals at latest)
-      const source = mineRow ? [mineRow] : latestRows;
-      const sum = (k: keyof Row) => source.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+      // Revenue mix (user pharmacy latest row, else country totals at latest)
+      const source: Row[] = mineRow ? [mineRow] : latestSnap;
+      const sum = (k: keyof Row) =>
+        source.reduce((a, r) => a + (Number(r[k]) || 0), 0);
       const pf = sum("pharmacy_first_payment");
       const mcr = sum("mcr_payment");
       const smk = sum("smoking_cessation_payment");
@@ -189,30 +200,6 @@ function Dashboard() {
         { label: "Dispensing & other", value: other },
       ]);
 
-      // Country split donut — use allRecent at latest period across all countries
-      const split = new Map<string, number>();
-      allRecent
-        .filter((r) => r.year === ly && r.month === lm)
-        .forEach((r) => {
-          const c = countryById.get(r.pharmacy_id) || "Unknown";
-          split.set(c, (split.get(c) || 0) + (r.items_dispensed || 0));
-        });
-      setCountrySplit([...split.entries()].map(([label, value]) => ({ label, value })));
-
-      // National trend (all countries) — total items per period last 12 from allRecent
-      const natByPeriod = new Map<number, number>();
-      allRecent.forEach((r) => {
-        const k = periodKey(r.year, r.month);
-        natByPeriod.set(k, (natByPeriod.get(k) || 0) + (r.items_dispensed || 0));
-      });
-      const natKeys = [...natByPeriod.keys()].sort((a, b) => a - b).slice(-12);
-      setNationalTrend(
-        natKeys.map((k) => {
-          const y = Math.floor(k / 12); const m = (k % 12) + 1;
-          return { period: labelFor(y, m), value: natByPeriod.get(k) || 0 };
-        }),
-      );
-
       setLoading(false);
     })();
   }, [user]);
@@ -222,10 +209,9 @@ function Dashboard() {
     return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
   })();
   const firstName = (profile?.full_name || "").split(" ")[0] || "there";
-  const gbp = (n: number) => `£${Math.round(n).toLocaleString()}`;
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto">
+    <div className="p-6 md:p-10 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
         title={`${greeting}, ${firstName}`}
         subtitle={
@@ -271,9 +257,9 @@ function Dashboard() {
               <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               {pharmacy && (
-                <Line type="monotone" dataKey="mine" name="My pharmacy" stroke="var(--chart-2)" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="mine" name="My pharmacy" stroke="var(--cmp-1)" strokeWidth={2} dot={false} />
               )}
-              <Line type="monotone" dataKey="national" name={`${pharmacy?.country || "National"} avg`} stroke="var(--chart-1)" strokeWidth={2} dot={false} strokeDasharray={pharmacy ? "4 4" : undefined} />
+              <Line type="monotone" dataKey="national" name={`${pharmacy?.country || "National"} avg`} stroke="var(--cmp-2)" strokeWidth={2} dot={false} strokeDasharray={pharmacy ? "4 4" : undefined} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -322,32 +308,29 @@ function Dashboard() {
         </div>
       )}
 
-
-
-
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Link to="/compare" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md transition-all">
+        <Link to="/compare" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
           <div className="h-9 w-9 rounded-lg bg-secondary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
             <GitCompare className="h-4.5 w-4.5" />
           </div>
           <p className="mt-3 font-semibold text-sm">Compare pharmacies</p>
           <p className="text-xs text-muted-foreground mt-1">Side-by-side, up to 4 at once</p>
         </Link>
-        <Link to="/leaderboards" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md transition-all">
+        <Link to="/leaderboards" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
           <div className="h-9 w-9 rounded-lg bg-secondary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
             <Trophy className="h-4.5 w-4.5" />
           </div>
           <p className="mt-3 font-semibold text-sm">Leaderboards</p>
           <p className="text-xs text-muted-foreground mt-1">Rank by service across the UK</p>
         </Link>
-        <Link to="/benchmarking" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md transition-all">
+        <Link to="/benchmarking" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
           <div className="h-9 w-9 rounded-lg bg-secondary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
             <BarChart2 className="h-4.5 w-4.5" />
           </div>
           <p className="mt-3 font-semibold text-sm">Benchmarking</p>
           <p className="text-xs text-muted-foreground mt-1">Vs local & national peers</p>
         </Link>
-        <Link to="/insights" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md transition-all">
+        <Link to="/insights" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
           <div className="h-9 w-9 rounded-lg bg-secondary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
             <Sparkles className="h-4.5 w-4.5" />
           </div>
@@ -372,6 +355,7 @@ function Dashboard() {
       {loading && <p className="mt-4 text-xs text-muted-foreground">Loading latest data…</p>}
 
       <DataAttribution />
+      {revenueMix.length === 0 && null}
     </div>
   );
 }
