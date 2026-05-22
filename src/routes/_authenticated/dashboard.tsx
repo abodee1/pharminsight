@@ -147,16 +147,25 @@ function Dashboard() {
       });
       setSeries(points);
 
-      // PF sparkline — user pharmacy if available, otherwise country avg
-      setPfSeries(
-        last12Agg.map((a) => {
-          const k = a.year * 12 + (a.month - 1);
-          const v = ph
-            ? myByKey.get(k)?.pharmacy_first_count ?? 0
-            : Math.round(Number(a.avg_pf) || 0);
-          return { period: labelFor(a.year, a.month), value: v };
-        }),
-      );
+      // PF sparkline — user pharmacy if available, otherwise country avg.
+      // Drop trailing months with no data (provisional period not yet reported)
+      // so the arc doesn't dive to zero and skew the trend.
+      const pfRaw = last12Agg.map((a) => {
+        const k = a.year * 12 + (a.month - 1);
+        const myRow = myByKey.get(k);
+        const hasMine = !!myRow;
+        const v = ph
+          ? myRow?.pharmacy_first_count ?? 0
+          : Math.round(Number(a.avg_pf) || 0);
+        return { period: labelFor(a.year, a.month), value: v, hasMine };
+      });
+      let endIdx = pfRaw.length;
+      if (ph) {
+        while (endIdx > 0 && (!pfRaw[endIdx - 1].hasMine || pfRaw[endIdx - 1].value === 0)) endIdx--;
+      } else {
+        while (endIdx > 0 && pfRaw[endIdx - 1].value === 0) endIdx--;
+      }
+      setPfSeries(pfRaw.slice(0, endIdx).map(({ period, value }) => ({ period, value })));
 
       // Latest period stats — prefer pharmacy's most recent confirmed row,
       // else its most recent provisional row.
