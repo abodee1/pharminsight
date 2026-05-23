@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetchAll";
-import { getLatestSubstantialPeriod } from "@/lib/latestPeriod";
 import { PageHeader } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,228 +9,420 @@ import { PercentileRail } from "@/components/Infographics";
 
 export const Route = createFileRoute("/_authenticated/benchmarking")({ component: Benchmarking });
 
-const METRICS = [
-  { key: "items_dispensed", label: "Items" },
-  { key: "nms_count", label: "NMS" },
-  { key: "pharmacy_first_count", label: "Pharmacy First" },
-  { key: "eps_nominations", label: "EPS Nom." },
-] as const;
+type MetricDef = {
+  key: string;
+  label: string;
+  unit?: string;
+  fmt?: (n: number) => string;
+  group: "volume" | "service" | "revenue" | "ratio";
+  // ratio: compute per row from other fields
+  derive?: (row: any) => number;
+  description?: string;
+};
+
+const money = (n: number) =>
+  `£${Math.round(n).toLocaleString()}`;
+const ratio = (n: number) => `${n.toFixed(1)}`;
+
+const METRICS: MetricDef[] = [
+  { key: "items_dispensed", label: "Items dispensed", group: "volume", description: "Total prescription items dispensed in the month." },
+  { key: "pharmacy_first_count", label: "Pharmacy First consultations", group: "service", description: "Walk-in clinical consultations completed." },
+  { key: "nms_count", label: "New Medicine Service", group: "service", description: "NMS interventions delivered to patients starting new meds." },
+  { key: "flu_vaccinations", label: "Flu vaccinations", group: "service", description: "NHS flu jabs administered in the month." },
+  { key: "methadone_items", label: "Methadone items", group: "service", description: "Supervised opioid substitution items." },
+  { key: "mcr_registrations", label: "MCR registrations", group: "service", description: "Patients registered for the Medicines: Care & Review service." },
+  { key: "gross_cost", label: "Gross drug cost", group: "revenue", fmt: money, description: "Reimbursable drug cost before clawback." },
+  { key: "final_payment", label: "Final payment", group: "revenue", fmt: money, description: "Net payment received for the month." },
+  {
+    key: "pf_per_100",
+    label: "Pharmacy First per 100 items",
+    group: "ratio",
+    fmt: ratio,
+    derive: (r) => (r.items_dispensed ? (r.pharmacy_first_count * 100) / r.items_dispensed : 0),
+    description: "Clinical service intensity vs dispensing volume.",
+  },
+  {
+    key: "nms_per_100",
+    label: "NMS per 100 items",
+    group: "ratio",
+    fmt: ratio,
+    derive: (r) => (r.items_dispensed ? (r.nms_count * 100) / r.items_dispensed : 0),
+    description: "How actively the team engages patients on new meds.",
+  },
+  {
+    key: "revenue_per_item",
+    label: "Revenue per item",
+    group: "ratio",
+    fmt: (n) => `£${n.toFixed(2)}`,
+    derive: (r) => (r.items_dispensed ? r.final_payment / r.items_dispensed : 0),
+    description: "Average revenue earned per dispensed item.",
+  },
+];
+
+const GROUP_LABEL: Record<MetricDef["group"], string> = {
+  volume: "Volume",
+  service: "Clinical services",
+  revenue: "Revenue",
+  ratio: "Efficiency ratios",
+};
+
+function metricValue(m: MetricDef, row: any): number {
+  if (m.derive) return m.derive(row);
+  return Number(row?.[m.key] ?? 0);
+}
 
 function Benchmarking() {
   const { user } = useAuth();
   const [pharmacy, setPharmacy] = useState<any>(null);
-  const [rows, setRows] = useState<any[]>([]);
-  const [pharms, setPharms] = useState<any[]>([]);
+  const [myHistory, setMyHistory] = useState<any[]>([]);
+  const [regionPharms, setRegionPharms] = useState<any[]>([]);
+  const [countryPharms, setCountryPharms] = useState<any[]>([]);
+  // Per-metric snapshots: snapshots[metricKey] = { year, month, regionRows, countryRows }
+  const [snapshots, setSnapshots] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
-  const [latest, setLatest] = useState<{ year: number; month: number } | null>(null);
 
-  // 1. Find user's pharmacy + latest period
+  // Load pharmacy & cohorts
   useEffect(() => {
     (async () => {
       if (!user) return;
-      const { data: up } = await supabase.from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle();
-      if (up) {
-        const { data: ph } = await supabase.from("pharmacies").select("*").eq("id", up.pharmacy_id).maybeSingle();
-        setPharmacy(ph);
+      const { data: up } = await supabase
+        .from("user_pharmacy")
+        .select("pharmacy_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!up) {
+        setLoading(false);
+        return;
       }
-      const last = await getLatestSubstantialPeriod();
-      if (last) setLatest(last);
+      const { data: ph } = await supabase
+        .from("pharmacies")
+        .select("*")
+        .eq("id", up.pharmacy_id)
+        .maybeSingle();
+      if (!ph) {
+        setLoading(false);
+        return;
+      }
+      setPharmacy(ph);
+
+      const country = await fetchAll<any>((from, to) =>
+        supabase
+          .from("pharmacies")
+          .select("id,name,region,country")
+          .eq("country", ph.country)
+          .range(from, to),
+      );
+      setCountryPharms(country);
+      setRegionPharms(country.filter((p) => p.region === ph.region));
+
+      // 12-month history for user pharmacy
+      const { data: hist } = await supabase
+        .from("dispensing_data")
+        .select("*")
+        .eq("pharmacy_id", ph.id)
+        .order("year", { ascending: false })
+        .order("month", { ascending: false })
+        .limit(24);
+      setMyHistory(hist ?? []);
     })();
   }, [user]);
 
-  // 2. Load only that single period's dispensing + pharmacies for country
+  // Once we have the user history + cohorts, pick a target month per metric (latest where user > 0)
+  // and fetch country-wide rows for that month. Months are deduped to minimise queries.
   useEffect(() => {
-    if (!pharmacy || !latest) return;
+    if (!pharmacy || !myHistory.length || !countryPharms.length) return;
     (async () => {
       setLoading(true);
-      const [p, d] = await Promise.all([
-        fetchAll<any>((from, to) =>
-          supabase.from("pharmacies").select("id,name,region,country").eq("country", pharmacy.country).range(from, to)
-        ),
-        fetchAll<any>((from, to) =>
-          supabase
-            .from("dispensing_data")
-            .select("pharmacy_id,items_dispensed,nms_count,pharmacy_first_count,eps_nominations")
-            .eq("year", latest.year)
-            .eq("month", latest.month)
-            .range(from, to)
-        ),
-      ]);
-      setPharms(p);
-      setRows(d);
+      const ordered = [...myHistory].sort(
+        (a, b) => b.year * 12 + b.month - (a.year * 12 + a.month),
+      );
+
+      // pick month per metric
+      const metricMonth: Record<string, { year: number; month: number; mine: any }> = {};
+      for (const m of METRICS) {
+        const hit = ordered.find((row) => metricValue(m, row) > 0);
+        if (hit) metricMonth[m.key] = { year: hit.year, month: hit.month, mine: hit };
+      }
+
+      // unique months
+      const monthKey = (y: number, mo: number) => `${y}-${mo}`;
+      const uniqueMonths = Array.from(
+        new Map(
+          Object.values(metricMonth).map((v) => [monthKey(v.year, v.month), v]),
+        ).values(),
+      );
+
+      // fetch country dispensing for each unique month in parallel
+      const countryIds = new Set(countryPharms.map((p) => p.id));
+      const monthData = new Map<string, any[]>();
+      await Promise.all(
+        uniqueMonths.map(async ({ year, month }) => {
+          const rows = await fetchAll<any>((from, to) =>
+            supabase
+              .from("dispensing_data")
+              .select(
+                "pharmacy_id,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,methadone_items,mcr_registrations,gross_cost,final_payment",
+              )
+              .eq("year", year)
+              .eq("month", month)
+              .range(from, to),
+          );
+          monthData.set(
+            monthKey(year, month),
+            rows.filter((r) => countryIds.has(r.pharmacy_id)),
+          );
+        }),
+      );
+
+      const snaps: Record<string, any> = {};
+      for (const m of METRICS) {
+        const sel = metricMonth[m.key];
+        if (!sel) continue;
+        const rows = monthData.get(monthKey(sel.year, sel.month)) || [];
+        snaps[m.key] = {
+          year: sel.year,
+          month: sel.month,
+          mine: sel.mine,
+          countryRows: rows,
+        };
+      }
+      setSnapshots(snaps);
       setLoading(false);
     })();
-  }, [pharmacy, latest]);
+  }, [pharmacy, myHistory, countryPharms]);
+
+  const monthLabel = (y: number, mo: number) =>
+    new Date(y, mo - 1, 1).toLocaleDateString(undefined, { month: "short", year: "numeric" });
 
   const analysis = useMemo(() => {
-    if (!pharmacy || !latest || !rows.length) return null;
-    const idsInCountry = new Set(pharms.map((p) => p.id));
-    const cur = rows.filter((r) => idsInCountry.has(r.pharmacy_id));
-    const mine = cur.find((r) => r.pharmacy_id === pharmacy.id);
-    if (!mine) return null;
-    const localIds = new Set(pharms.filter((p) => p.region === pharmacy.region).map((p) => p.id));
-    const local = cur.filter((r) => localIds.has(r.pharmacy_id));
-    const avg = (arr: any[], k: string) => Math.round(arr.reduce((a, r) => a + (r[k] || 0), 0) / Math.max(1, arr.length));
-    const top10pct = (k: string) => {
-      const sorted = [...cur].sort((a, b) => (b[k] || 0) - (a[k] || 0));
-      const n = Math.max(1, Math.ceil(sorted.length * 0.1));
-      return Math.round(sorted.slice(0, n).reduce((a, r) => a + (r[k] || 0), 0) / n);
-    };
+    if (!pharmacy || !Object.keys(snapshots).length) return null;
+    const regionIds = new Set(regionPharms.map((p) => p.id));
 
-    const data = METRICS.map((m) => ({
-      key: m.key,
-      label: m.label,
-      mine: mine[m.key] || 0,
-      local: avg(local, m.key),
-      national: avg(cur, m.key),
-      top10: top10pct(m.key),
-      nationalValues: cur.map((r) => (r[m.key] as number) || 0),
-      localValues: local.map((r) => (r[m.key] as number) || 0),
-    }));
+    const rows = METRICS.map((m) => {
+      const snap = snapshots[m.key];
+      if (!snap) return null;
+      const mineVal = metricValue(m, snap.mine);
+      const country = snap.countryRows;
+      const region = country.filter((r: any) => regionIds.has(r.pharmacy_id));
+      const countryVals = country.map((r: any) => metricValue(m, r)).filter((v: number) => isFinite(v));
+      const regionVals = region.map((r: any) => metricValue(m, r)).filter((v: number) => isFinite(v));
+      const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+      const sortedC = [...countryVals].sort((a, b) => b - a);
+      const top10n = Math.max(1, Math.ceil(sortedC.length * 0.1));
+      const top10 = avg(sortedC.slice(0, top10n));
 
-    return { data };
+      // rank in country (1 = best)
+      const sortedDesc = [...countryVals].sort((a, b) => b - a);
+      const rank = sortedDesc.findIndex((v) => v <= mineVal) + 1;
+      const percentile = countryVals.length
+        ? Math.round((1 - rank / countryVals.length) * 100)
+        : 0;
 
-  }, [pharmacy, latest, rows, pharms]);
+      return {
+        metric: m,
+        snap,
+        mineVal,
+        regionAvg: avg(regionVals),
+        countryAvg: avg(countryVals),
+        top10,
+        regionVals,
+        countryVals,
+        rank,
+        cohortSize: countryVals.length,
+        percentile,
+      };
+    }).filter(Boolean) as any[];
+
+    const grouped: Record<string, any[]> = {};
+    for (const r of rows) {
+      (grouped[r.metric.group] ||= []).push(r);
+    }
+    return { rows, grouped };
+  }, [pharmacy, snapshots, regionPharms]);
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto">
-      <PageHeader title="Benchmarking" subtitle="How your pharmacy compares against local and national peers." />
+      <PageHeader
+        title="Benchmarking"
+        subtitle="How your pharmacy compares against local and national peers across volume, services, revenue and efficiency."
+      />
 
-      {!pharmacy && (
+      {!pharmacy && !loading && (
         <div className="rounded-lg border border-border bg-card p-6 shadow-sm text-sm">
           You need to set your pharmacy first.{" "}
-          <Link to="/settings" className="text-primary font-semibold hover:underline">Go to Settings</Link>
+          <Link to="/settings" className="text-primary font-semibold hover:underline">
+            Go to Settings
+          </Link>
         </div>
       )}
 
       {pharmacy && loading && (
         <div className="rounded-lg border border-border bg-card p-6 shadow-sm text-sm text-muted-foreground">
-          Loading benchmarking data…
+          Crunching latest benchmarks…
         </div>
       )}
 
-      {pharmacy && !loading && !analysis && (
+      {pharmacy && !loading && analysis && analysis.rows.length === 0 && (
         <div className="rounded-lg border border-border bg-card p-6 shadow-sm text-sm text-muted-foreground">
-          No data available for your pharmacy in the latest period.
+          No reported activity for your pharmacy in the last 24 months.
         </div>
       )}
 
-      {pharmacy && analysis && (
+      {pharmacy && !loading && analysis && analysis.rows.length > 0 && (
         <>
           <div className="rounded-lg bg-card border border-border p-6 shadow-sm mb-6">
             <p className="text-xs text-muted-foreground">Comparing</p>
             <p className="text-lg font-semibold">{pharmacy.name}</p>
-            <p className="text-sm text-muted-foreground">{pharmacy.region} · {pharmacy.country}</p>
+            <p className="text-sm text-muted-foreground">
+              {pharmacy.region} · {pharmacy.country} · cohort of{" "}
+              {regionPharms.length.toLocaleString()} regional /{" "}
+              {countryPharms.length.toLocaleString()} national pharmacies
+            </p>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-6">
-            <div className="rounded-lg bg-card border border-border p-6 shadow-sm">
-              <h2 className="text-sm font-semibold mb-4">Side-by-side comparison</h2>
-              <table className="w-full text-sm">
-                <thead className="text-muted-foreground">
-                  <tr>
-                    <th className="text-left font-medium py-2">Metric</th>
-                    <th className="text-right font-medium py-2">Mine</th>
-                    <th className="text-right font-medium py-2">Local</th>
-                    <th className="text-right font-medium py-2">National</th>
-                    <th className="text-right font-medium py-2">Top 10%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {analysis.data.map((d) => (
-                    <tr key={d.label} className="border-t border-border">
-                      <td className="py-2">{d.label}</td>
-                      <td className="text-right tabular-nums font-semibold">{d.mine.toLocaleString()}</td>
-                      <td className="text-right tabular-nums text-muted-foreground">{d.local.toLocaleString()}</td>
-                      <td className="text-right tabular-nums text-muted-foreground">{d.national.toLocaleString()}</td>
-                      <td className="text-right tabular-nums text-muted-foreground">{d.top10.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="rounded-lg bg-card border border-border p-6 shadow-sm">
-              <h2 className="text-sm font-semibold mb-1">Head-to-head per metric</h2>
-              <p className="text-xs text-muted-foreground mb-4">
-                Bars scaled against the top 10% in {pharmacy.country}. Longer is better.
-              </p>
-              <div className="space-y-5">
-                {analysis.data.map((d) => {
-                  const max = Math.max(d.top10, d.mine, d.local, d.national, 1);
-                  const bars = [
-                    { name: "You", value: d.mine, color: "var(--cmp-1)" },
-                    { name: `${pharmacy.region} avg`, value: d.local, color: "var(--cmp-2)" },
-                    { name: `${pharmacy.country} avg`, value: d.national, color: "var(--cmp-3)" },
-                  ];
-                  return (
-                    <div key={d.label}>
-                      <div className="flex items-baseline justify-between mb-2">
-                        <span className="text-xs font-semibold">{d.label}</span>
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                          Top 10% = {d.top10.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="space-y-1.5">
-                        {bars.map((b) => (
-                          <div key={b.name} className="flex items-center gap-2 text-xs">
-                            <span className="w-28 shrink-0 text-muted-foreground truncate">{b.name}</span>
-                            <div className="flex-1 h-3 rounded-sm bg-secondary/60 overflow-hidden">
-                              <div
-                                className="h-full rounded-sm transition-all"
-                                style={{ width: `${Math.max(2, (b.value / max) * 100)}%`, background: b.color }}
-                              />
-                            </div>
-                            <span className="w-16 text-right tabular-nums font-medium">{b.value.toLocaleString()}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+          {/* Headline scoreboard */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {analysis.rows.slice(0, 4).map((r) => {
+              const fmt = r.metric.fmt || ((n: number) => Math.round(n).toLocaleString());
+              const vsRegion =
+                r.regionAvg > 0 ? Math.round(((r.mineVal - r.regionAvg) / r.regionAvg) * 100) : 0;
+              const tone =
+                vsRegion > 0
+                  ? "text-emerald-700"
+                  : vsRegion < 0
+                  ? "text-rose-700"
+                  : "text-muted-foreground";
+              return (
+                <div
+                  key={r.metric.key}
+                  className="rounded-lg bg-card border border-border p-5 shadow-sm"
+                >
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {r.metric.label}
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums">{fmt(r.mineVal)}</p>
+                  <p className={`mt-1 text-xs ${tone}`}>
+                    {vsRegion >= 0 ? "+" : ""}
+                    {vsRegion}% vs {pharmacy.region}
+                  </p>
+                  <p className="mt-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {monthLabel(r.snap.year, r.snap.month)}
+                    {r.cohortSize > 0 && (
+                      <>
+                        {" · "}#{r.rank.toLocaleString()} of {r.cohortSize.toLocaleString()}
+                      </>
+                    )}
+                  </p>
+                </div>
+              );
+            })}
           </div>
 
-          <div className="mt-6">
-            <div className="flex items-baseline justify-between mb-3">
-              <h2 className="text-sm font-semibold tracking-tight">
-                Where you sit across {pharmacy.region}
-              </h2>
-              <p className="text-xs text-muted-foreground italic">
-                Marker = you. Tick = regional average. Shaded band = middle 50%.
-              </p>
-            </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              {analysis.data.map((d) => {
-                const diff = d.mine - d.local;
-                const pct = Math.round((diff / Math.max(1, d.local)) * 100);
-                const caption =
-                  Math.abs(pct) < 5
-                    ? `In line with ${pharmacy.region} peers — within ±5% of the regional average.`
-                    : `${pct >= 0 ? "Outperforming" : "Trailing"} the ${pharmacy.region} average by ${Math.abs(pct)}% this month.`;
-                return (
-                  <PercentileRail
-                    key={d.label}
-                    label={`${d.label} · ${pharmacy.region}`}
-                    value={d.mine}
-                    values={d.localValues.length > 1 ? d.localValues : d.nationalValues}
-                    peerLabel={`${pharmacy.region} avg`}
-                    nationalLabel="Regional peak"
-                    caption={caption}
-                  />
-                );
-              })}
-            </div>
+          {/* Grouped breakdown */}
+          {(["volume", "service", "revenue", "ratio"] as const).map((g) => {
+            const items = analysis.grouped[g];
+            if (!items?.length) return null;
+            return (
+              <section key={g} className="mb-10">
+                <h2 className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
+                  {GROUP_LABEL[g]}
+                </h2>
 
+                <div className="rounded-lg bg-card border border-border shadow-sm overflow-hidden mb-5">
+                  <table className="w-full text-sm">
+                    <thead className="text-muted-foreground bg-secondary/40">
+                      <tr>
+                        <th className="text-left font-medium py-2 px-4">Metric</th>
+                        <th className="text-right font-medium py-2 px-4">You</th>
+                        <th className="text-right font-medium py-2 px-4">{pharmacy.region}</th>
+                        <th className="text-right font-medium py-2 px-4">{pharmacy.country}</th>
+                        <th className="text-right font-medium py-2 px-4">Top 10%</th>
+                        <th className="text-right font-medium py-2 px-4">Rank</th>
+                        <th className="text-right font-medium py-2 px-4">Period</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((r) => {
+                        const fmt = r.metric.fmt || ((n: number) => Math.round(n).toLocaleString());
+                        return (
+                          <tr key={r.metric.key} className="border-t border-border">
+                            <td className="py-2.5 px-4">
+                              <div className="font-medium">{r.metric.label}</div>
+                              {r.metric.description && (
+                                <div className="text-[11px] text-muted-foreground">
+                                  {r.metric.description}
+                                </div>
+                              )}
+                            </td>
+                            <td className="text-right tabular-nums font-semibold py-2.5 px-4">
+                              {fmt(r.mineVal)}
+                            </td>
+                            <td className="text-right tabular-nums text-muted-foreground py-2.5 px-4">
+                              {fmt(r.regionAvg)}
+                            </td>
+                            <td className="text-right tabular-nums text-muted-foreground py-2.5 px-4">
+                              {fmt(r.countryAvg)}
+                            </td>
+                            <td className="text-right tabular-nums text-muted-foreground py-2.5 px-4">
+                              {fmt(r.top10)}
+                            </td>
+                            <td className="text-right tabular-nums py-2.5 px-4">
+                              <span className="font-medium">{r.rank.toLocaleString()}</span>
+                              <span className="text-muted-foreground">
+                                {" "}
+                                / {r.cohortSize.toLocaleString()}
+                              </span>
+                            </td>
+                            <td className="text-right text-[11px] text-muted-foreground py-2.5 px-4 whitespace-nowrap">
+                              {monthLabel(r.snap.year, r.snap.month)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
 
-            <Link
-              to="/insights"
-              className="inline-block mt-6 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90"
-            >
-              Generate Smart Insight for this data
-            </Link>
-          </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {items.map((r) => {
+                    const fmt = r.metric.fmt || ((n: number) => Math.round(n).toLocaleString());
+                    const diff =
+                      r.regionAvg > 0
+                        ? Math.round(((r.mineVal - r.regionAvg) / r.regionAvg) * 100)
+                        : 0;
+                    const caption =
+                      Math.abs(diff) < 5
+                        ? `In line with ${pharmacy.region} peers — within ±5% of the regional average for ${monthLabel(
+                            r.snap.year,
+                            r.snap.month,
+                          )}.`
+                        : `${diff >= 0 ? "Outperforming" : "Trailing"} the ${pharmacy.region} average by ${Math.abs(
+                            diff,
+                          )}% in ${monthLabel(r.snap.year, r.snap.month)}.`;
+                    return (
+                      <PercentileRail
+                        key={r.metric.key}
+                        label={r.metric.label}
+                        value={r.mineVal}
+                        values={r.regionVals.length > 5 ? r.regionVals : r.countryVals}
+                        peerLabel={`${pharmacy.region} avg`}
+                        nationalLabel="Regional peak"
+                        caption={caption}
+                        formatValue={fmt}
+                      />
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+
+          <Link
+            to="/insights"
+            className="inline-block rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90 transition active:scale-[0.98]"
+          >
+            Generate Smart Insight for this data
+          </Link>
         </>
       )}
 
