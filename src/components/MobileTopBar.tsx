@@ -1,7 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import {
-  LayoutDashboard, Trophy, BarChart2, GitCompare, Sparkles, Upload, Settings,
+  LayoutDashboard, Trophy, BarChart2, GitCompare, Sparkles, Settings,
   LogOut, Menu, User as UserIcon, Search as SearchIcon,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
