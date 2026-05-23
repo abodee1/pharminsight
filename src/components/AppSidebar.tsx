@@ -21,7 +21,7 @@ const links = [
   { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/income", label: "Income Estimator", icon: PoundSterling },
   { to: "/insights", label: "Smart Insights", icon: Sparkles },
-  { to: "/upload", label: "Upload Data", icon: Upload },
+  
   { to: "/admin/data", label: "Data Coverage", icon: Database },
   { to: "/admin/payments-import", label: "Payments Import", icon: Upload },
   { to: "/settings", label: "My Account", icon: Settings },

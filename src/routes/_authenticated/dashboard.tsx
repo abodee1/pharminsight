@@ -22,7 +22,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { Trophy, BarChart2, Upload, GitCompare, Sparkles } from "lucide-react";
+import { Trophy, BarChart2, GitCompare, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
 
@@ -97,24 +97,7 @@ function Dashboard() {
         p_end_month: endM,
       });
 
-      // Latest period country snapshot for rank/distribution. Paginate but
-      // filter by country first so it's ~1-2k rows (Scotland), not 12k.
-      const latestSnapP = fetchAll<Row>((from, to) =>
-        supabase
-          .from("dispensing_data")
-          .select(
-            "pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,pharmacy_first_payment,mcr_payment,smoking_cessation_payment,final_payment,gross_cost,is_actual_payment",
-          )
-          .eq("year", endY)
-          .eq("month", endM)
-          .range(from, to),
-      );
-
-      const [myRowsRes, aggRes, latestSnapAll] = await Promise.all([
-        myRowsP,
-        aggP,
-        latestSnapP,
-      ]);
+      const [myRowsRes, aggRes] = await Promise.all([myRowsP, aggP]);
 
       const myRows = (myRowsRes.data || []) as Row[];
       const agg = (aggRes.data || []) as Array<{
@@ -122,19 +105,44 @@ function Dashboard() {
         avg_items: number; avg_pf: number; avg_nms: number; total_items: number;
       }>;
 
-      // For country rank we need country pharmacies. If no pharmacy chosen, fall back to all.
-      let latestSnap = latestSnapAll;
+      // Stats period: user's latest confirmed (else latest) row, else endY/endM
+      let mineRow: Row | undefined;
+      if (myRows.length) {
+        mineRow =
+          [...myRows].reverse().find((r) => r.is_actual_payment) ??
+          myRows[myRows.length - 1];
+      }
+      const statY = mineRow?.year ?? endY;
+      const statM = mineRow?.month ?? endM;
+      const statKey = statY * 12 + (statM - 1);
+
+      // Country pharmacy ids (paginate — Scotland has >1000)
+      let countryPharmIds = new Set<string>();
       if (targetCountry) {
-        const { data: countryPharms } = await supabase
-          .from("pharmacies")
-          .select("id")
-          .eq("country", targetCountry);
-        const ids = new Set((countryPharms || []).map((p) => p.id));
-        latestSnap = latestSnapAll.filter((r) => ids.has(r.pharmacy_id));
+        const cp = await fetchAll<{ id: string }>((from, to) =>
+          supabase.from("pharmacies").select("id").eq("country", targetCountry).range(from, to),
+        );
+        countryPharmIds = new Set(cp.map((p) => p.id));
       }
 
-      // Mine vs country avg trend (last 12 months from agg)
-      const last12Agg = agg.slice(-12);
+      // Snapshot for rank/distribution — use stat period so user is included
+      const snapAll = await fetchAll<Row>((from, to) =>
+        supabase
+          .from("dispensing_data")
+          .select(
+            "pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,pharmacy_first_payment,mcr_payment,smoking_cessation_payment,final_payment,gross_cost,is_actual_payment",
+          )
+          .eq("year", statY)
+          .eq("month", statM)
+          .range(from, to),
+      );
+      const latestSnap = targetCountry
+        ? snapAll.filter((r) => countryPharmIds.has(r.pharmacy_id))
+        : snapAll;
+
+      // Cap aggregates to statKey so we never show months past user's latest data
+      const cappedAgg = agg.filter((a) => a.year * 12 + (a.month - 1) <= statKey);
+      const last12Agg = cappedAgg.slice(-12);
       const myByKey = new Map<number, Row>();
       myRows.forEach((r) => myByKey.set(r.year * 12 + (r.month - 1), r));
       const points = last12Agg.map((a) => {
@@ -147,9 +155,7 @@ function Dashboard() {
       });
       setSeries(points);
 
-      // PF sparkline — user pharmacy if available, otherwise country avg.
-      // Drop trailing months with no data (provisional period not yet reported)
-      // so the arc doesn't dive to zero and skew the trend.
+      // PF sparkline — trim trailing zeros/missing for clean arc
       const pfRaw = last12Agg.map((a) => {
         const k = a.year * 12 + (a.month - 1);
         const myRow = myByKey.get(k);
@@ -160,23 +166,12 @@ function Dashboard() {
         return { period: labelFor(a.year, a.month), value: v, hasMine };
       });
       let endIdx = pfRaw.length;
-      if (ph) {
-        while (endIdx > 0 && (!pfRaw[endIdx - 1].hasMine || pfRaw[endIdx - 1].value === 0)) endIdx--;
-      } else {
-        while (endIdx > 0 && pfRaw[endIdx - 1].value === 0) endIdx--;
+      while (endIdx > 0) {
+        const e = pfRaw[endIdx - 1];
+        if ((ph && !e.hasMine) || !e.value || e.value <= 0) endIdx--;
+        else break;
       }
       setPfSeries(pfRaw.slice(0, endIdx).map(({ period, value }) => ({ period, value })));
-
-      // Latest period stats — prefer pharmacy's most recent confirmed row,
-      // else its most recent provisional row.
-      let mineRow: Row | undefined;
-      if (myRows.length) {
-        mineRow =
-          [...myRows].reverse().find((r) => r.is_actual_payment) ??
-          myRows[myRows.length - 1];
-      }
-      const statY = mineRow?.year ?? endY;
-      const statM = mineRow?.month ?? endM;
 
       const ranked = [...latestSnap].sort(
         (a, b) => (b.items_dispensed || 0) - (a.items_dispensed || 0),
@@ -348,18 +343,8 @@ function Dashboard() {
         </Link>
       </div>
 
-      <Link to="/upload" className="mt-4 group flex items-center justify-between rounded-xl border border-dashed border-border bg-secondary/30 p-5 hover:border-foreground/40 hover:bg-secondary transition-colors">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-card border border-border flex items-center justify-center">
-            <Upload className="h-4.5 w-4.5" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm">Upload private data</p>
-            <p className="text-xs text-muted-foreground">GLP-1, aesthetics & more — stays in your private workspace</p>
-          </div>
-        </div>
-        <span className="text-xs text-muted-foreground group-hover:text-foreground">Open →</span>
-      </Link>
+
+
 
       {loading && <p className="mt-4 text-xs text-muted-foreground">Loading latest data…</p>}
 

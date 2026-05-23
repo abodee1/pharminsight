@@ -1,7 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import {
-  LayoutDashboard, Trophy, BarChart2, GitCompare, Sparkles, Upload, Settings,
+  LayoutDashboard, Trophy, BarChart2, GitCompare, Sparkles, Settings,
   LogOut, Menu, User as UserIcon, Search as SearchIcon,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
@@ -15,7 +15,7 @@ export const NAV_LINKS = [
   { to: "/benchmarking", label: "Benchmarking", icon: BarChart2 },
   { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/insights", label: "Smart Insights", icon: Sparkles },
-  { to: "/upload", label: "Upload Data", icon: Upload },
+  
   { to: "/settings", label: "My Account", icon: Settings },
 ] as const;
 

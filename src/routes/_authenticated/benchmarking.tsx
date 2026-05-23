@@ -7,9 +7,6 @@ import { PageHeader } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
 import { PercentileRail } from "@/components/Infographics";
-import {
-  ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend, Tooltip,
-} from "recharts";
 
 export const Route = createFileRoute("/_authenticated/benchmarking")({ component: Benchmarking });
 
@@ -92,14 +89,8 @@ function Benchmarking() {
       localValues: local.map((r) => (r[m.key] as number) || 0),
     }));
 
-    const radar = data.map((d) => ({
-      metric: d.label,
-      Mine: Math.round((d.mine / Math.max(1, d.top10)) * 100),
-      Local: Math.round((d.local / Math.max(1, d.top10)) * 100),
-      National: Math.round((d.national / Math.max(1, d.top10)) * 100),
-    }));
+    return { data };
 
-    return { data, radar };
   }, [pharmacy, latest, rows, pharms]);
 
   return (
@@ -161,29 +152,54 @@ function Benchmarking() {
             </div>
 
             <div className="rounded-lg bg-card border border-border p-6 shadow-sm">
-              <h2 className="text-sm font-semibold mb-4">Performance shape (% of top 10%)</h2>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart data={analysis.radar}>
-                    <PolarGrid stroke="var(--border)" />
-                    <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
-                    <PolarRadiusAxis tick={{ fontSize: 10 }} angle={30} />
-                    <Radar name="Mine" dataKey="Mine" stroke="var(--cmp-1)" fill="var(--cmp-1)" fillOpacity={0.45} />
-                    <Radar name="Local" dataKey="Local" stroke="var(--cmp-2)" fill="var(--cmp-2)" fillOpacity={0.25} />
-                    <Radar name="National" dataKey="National" stroke="var(--cmp-3)" fill="var(--cmp-3)" fillOpacity={0.2} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12 }} />
-                  </RadarChart>
-                </ResponsiveContainer>
+              <h2 className="text-sm font-semibold mb-1">Head-to-head per metric</h2>
+              <p className="text-xs text-muted-foreground mb-4">
+                Bars scaled against the top 10% in {pharmacy.country}. Longer is better.
+              </p>
+              <div className="space-y-5">
+                {analysis.data.map((d) => {
+                  const max = Math.max(d.top10, d.mine, d.local, d.national, 1);
+                  const bars = [
+                    { name: "You", value: d.mine, color: "var(--cmp-1)" },
+                    { name: `${pharmacy.region} avg`, value: d.local, color: "var(--cmp-2)" },
+                    { name: `${pharmacy.country} avg`, value: d.national, color: "var(--cmp-3)" },
+                  ];
+                  return (
+                    <div key={d.label}>
+                      <div className="flex items-baseline justify-between mb-2">
+                        <span className="text-xs font-semibold">{d.label}</span>
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Top 10% = {d.top10.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {bars.map((b) => (
+                          <div key={b.name} className="flex items-center gap-2 text-xs">
+                            <span className="w-28 shrink-0 text-muted-foreground truncate">{b.name}</span>
+                            <div className="flex-1 h-3 rounded-sm bg-secondary/60 overflow-hidden">
+                              <div
+                                className="h-full rounded-sm transition-all"
+                                style={{ width: `${Math.max(2, (b.value / max) * 100)}%`, background: b.color }}
+                              />
+                            </div>
+                            <span className="w-16 text-right tabular-nums font-medium">{b.value.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
 
           <div className="mt-6">
             <div className="flex items-baseline justify-between mb-3">
-              <h2 className="text-sm font-semibold tracking-tight">Where you sit nationally</h2>
+              <h2 className="text-sm font-semibold tracking-tight">
+                Where you sit across {pharmacy.region}
+              </h2>
               <p className="text-xs text-muted-foreground italic">
-                Marker = you. Tick = peer average. Shaded band = middle 50%.
+                Marker = you. Tick = regional average. Shaded band = middle 50%.
               </p>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
@@ -192,21 +208,22 @@ function Benchmarking() {
                 const pct = Math.round((diff / Math.max(1, d.local)) * 100);
                 const caption =
                   Math.abs(pct) < 5
-                    ? `In line with ${pharmacy.region} peers — within ±5% of the local average.`
+                    ? `In line with ${pharmacy.region} peers — within ±5% of the regional average.`
                     : `${pct >= 0 ? "Outperforming" : "Trailing"} the ${pharmacy.region} average by ${Math.abs(pct)}% this month.`;
                 return (
                   <PercentileRail
                     key={d.label}
-                    label={d.label}
+                    label={`${d.label} · ${pharmacy.region}`}
                     value={d.mine}
-                    values={d.nationalValues}
+                    values={d.localValues.length > 1 ? d.localValues : d.nationalValues}
                     peerLabel={`${pharmacy.region} avg`}
-                    nationalLabel="National peak"
+                    nationalLabel="Regional peak"
                     caption={caption}
                   />
                 );
               })}
             </div>
+
 
             <Link
               to="/insights"
