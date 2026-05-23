@@ -89,14 +89,8 @@ function Benchmarking() {
       localValues: local.map((r) => (r[m.key] as number) || 0),
     }));
 
-    const radar = data.map((d) => ({
-      metric: d.label,
-      Mine: Math.round((d.mine / Math.max(1, d.top10)) * 100),
-      Local: Math.round((d.local / Math.max(1, d.top10)) * 100),
-      National: Math.round((d.national / Math.max(1, d.top10)) * 100),
-    }));
+    return { data };
 
-    return { data, radar };
   }, [pharmacy, latest, rows, pharms]);
 
   return (
