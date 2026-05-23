@@ -109,7 +109,7 @@ function Benchmarking() {
         supabase
           .from("pharmacies")
           .select("id,name,region,country")
-          .eq("country", ph.country)
+          .eq("country", ph.country ?? "")
           .range(from, to),
       );
       setCountryPharms(country);
