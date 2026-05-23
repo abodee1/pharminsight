@@ -343,18 +343,8 @@ function Dashboard() {
         </Link>
       </div>
 
-      <Link to="/upload" className="mt-4 group flex items-center justify-between rounded-xl border border-dashed border-border bg-secondary/30 p-5 hover:border-foreground/40 hover:bg-secondary transition-colors">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-card border border-border flex items-center justify-center">
-            <Upload className="h-4.5 w-4.5" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm">Upload private data</p>
-            <p className="text-xs text-muted-foreground">GLP-1, aesthetics & more — stays in your private workspace</p>
-          </div>
-        </div>
-        <span className="text-xs text-muted-foreground group-hover:text-foreground">Open →</span>
-      </Link>
+
+
 
       {loading && <p className="mt-4 text-xs text-muted-foreground">Loading latest data…</p>}
 
