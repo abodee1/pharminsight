@@ -1,0 +1,727 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Sparkles, X, Star, Loader2, RefreshCw, Printer, AlertTriangle, CheckCircle2, TrendingUp, TrendingDown, Minus, Upload } from "lucide-react";
+import { toast } from "sonner";
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar,
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+} from "recharts";
+import { confirmCompany, rejectCandidate, searchCompany } from "@/lib/companiesHouse.functions";
+import { generateBenchmarkingInsight, generatePerformanceSummary } from "@/lib/aiAnalysis.functions";
+
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+type Pharmacy = { id: string; ods_code: string; name: string; address: string | null; postcode: string | null; region: string | null; country: string | null };
+type DRow = {
+  month: number; year: number;
+  items_dispensed: number; nms_count: number; pharmacy_first_count: number; flu_vaccinations: number;
+  eps_items: number; eps_nominations: number;
+  final_payment: number | string | null; is_actual_payment: boolean;
+};
+type Company = {
+  id: string; pharmacy_id: string; company_number: string | null; company_name: string | null;
+  company_status: string | null; incorporation_date: string | null; sic_codes: string[] | null;
+  registered_address: string | null; registered_postcode: string | null;
+  last_accounts_date: string | null; accounts_type: string | null;
+  turnover: number | null; gross_profit: number | null; operating_profit: number | null;
+  net_profit: number | null; total_payroll: number | null; avg_employees: number | null;
+  net_assets: number | null; accounts_year: number | null;
+  match_confidence: string | null; matched_by: string | null;
+  is_chain: boolean; chain_name: string | null; fetched_at: string | null;
+};
+type Tab = "overview" | "financials" | "benchmarking" | "acquisition";
+
+const gbp = (n: number | null | undefined) => n == null ? "—" : "£" + Math.round(n).toLocaleString();
+const pct = (n: number) => `${n.toFixed(1)}%`;
+
+function trendArrow(diff: number) {
+  if (diff > 0) return <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />;
+  if (diff < 0) return <TrendingDown className="h-3.5 w-3.5 text-rose-600" />;
+  return <Minus className="h-3.5 w-3.5 text-muted-foreground" />;
+}
+
+export function AnalysisPanel({ pharmacy, open, onClose }: { pharmacy: Pharmacy; open: boolean; onClose: () => void }) {
+  const { user, profile } = useAuth();
+  const [tab, setTab] = useState<Tab>("overview");
+  const [rows, setRows] = useState<DRow[]>([]);
+  const [loadingRows, setLoadingRows] = useState(false);
+  const [saved, setSaved] = useState<{ id: string; is_shortlisted: boolean } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoadingRows(true);
+    (async () => {
+      const { data } = await supabase
+        .from("dispensing_data")
+        .select("month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations,final_payment,is_actual_payment")
+        .eq("pharmacy_id", pharmacy.id)
+        .order("year").order("month");
+      setRows((data as DRow[]) || []);
+      setLoadingRows(false);
+    })();
+    if (user) {
+      supabase.from("saved_analyses").select("id,is_shortlisted").eq("user_id", user.id).eq("pharmacy_id", pharmacy.id).maybeSingle()
+        .then(({ data }) => setSaved(data));
+    }
+  }, [open, pharmacy.id, user]);
+
+  const role = (profile?.role || "").toLowerCase();
+  const canAcquire = role.includes("owner") || role.includes("consultant");
+
+  const saveAnalysis = async () => {
+    if (!user) return toast.error("Sign in to save");
+    if (saved) return toast.info("Already saved");
+    const { data, error } = await supabase.from("saved_analyses")
+      .insert({ user_id: user.id, pharmacy_id: pharmacy.id }).select("id,is_shortlisted").maybeSingle();
+    if (error) return toast.error(error.message);
+    setSaved(data);
+    toast.success("Saved to My Analyses");
+  };
+  const toggleShortlist = async () => {
+    if (!user) return toast.error("Sign in to shortlist");
+    if (!saved) {
+      const { data, error } = await supabase.from("saved_analyses")
+        .insert({ user_id: user.id, pharmacy_id: pharmacy.id, is_shortlisted: true })
+        .select("id,is_shortlisted").maybeSingle();
+      if (error) return toast.error(error.message);
+      setSaved(data);
+      toast.success("Added to shortlist");
+      return;
+    }
+    const { data, error } = await supabase.from("saved_analyses")
+      .update({ is_shortlisted: !saved.is_shortlisted }).eq("id", saved.id)
+      .select("id,is_shortlisted").maybeSingle();
+    if (error) return toast.error(error.message);
+    setSaved(data);
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      <div className="flex-1 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose} />
+      <aside className="w-full md:w-[85%] bg-background border-l border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+        <header className="flex items-center gap-3 border-b border-border px-4 md:px-6 py-3 sticky top-0 bg-background z-10">
+          <div className="min-w-0 flex-1">
+            <h2 className="font-bold text-lg truncate">{pharmacy.name}</h2>
+            <p className="text-xs text-muted-foreground truncate">{pharmacy.address} · {pharmacy.postcode}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={saveAnalysis}>{saved ? "Saved" : "Save Analysis"}</Button>
+          <Button variant={saved?.is_shortlisted ? "default" : "outline"} size="sm" onClick={toggleShortlist} className="gap-1.5">
+            <Star className={"h-4 w-4 " + (saved?.is_shortlisted ? "fill-current" : "")} />
+            <span className="hidden sm:inline">Shortlist</span>
+          </Button>
+          <button onClick={onClose} className="p-2 rounded-md hover:bg-secondary" aria-label="Close"><X className="h-5 w-5" /></button>
+        </header>
+        <div className="border-b border-border px-4 md:px-6 flex gap-1 overflow-x-auto sticky top-[57px] bg-background z-10">
+          {(["overview","financials","benchmarking","acquisition"] as Tab[]).map((t) => (
+            <button key={t} onClick={() => setTab(t)}
+              className={["px-4 py-3 text-sm font-medium capitalize whitespace-nowrap transition-colors border-b-2",
+                tab === t ? "border-gold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"].join(" ")}>
+              {t}
+            </button>
+          ))}
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {loadingRows ? (
+            <div className="p-10 text-center text-sm text-muted-foreground"><Loader2 className="inline h-4 w-4 animate-spin mr-2" />Loading data…</div>
+          ) : (
+            <>
+              {tab === "overview" && <OverviewTab pharmacy={pharmacy} rows={rows} />}
+              {tab === "financials" && <FinancialsTab pharmacy={pharmacy} />}
+              {tab === "benchmarking" && <BenchmarkingTab pharmacy={pharmacy} rows={rows} />}
+              {tab === "acquisition" && (canAcquire ? <AcquisitionTab pharmacy={pharmacy} rows={rows} /> :
+                <div className="p-10 text-center">
+                  <div className="mx-auto max-w-md rounded-xl border border-border bg-card p-8">
+                    <Sparkles className="h-8 w-8 mx-auto text-gold mb-3" />
+                    <p className="font-semibold">Acquisition tools locked</p>
+                    <p className="text-sm text-muted-foreground mt-2">Available for pharmacy owners and consultants. Update your role in settings.</p>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+// ------------------------- OVERVIEW TAB -------------------------
+function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
+  const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
+
+  const latestIdx = useMemo(() => {
+    if (!rows.length) return -1;
+    if (isScot) for (let i = rows.length - 1; i >= 0; i--) if (rows[i].is_actual_payment) return i;
+    // skip trailing all-zero rows
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const r = rows[i];
+      if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) return i;
+    }
+    return rows.length - 1;
+  }, [rows, isScot]);
+
+  const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
+  const prior = latestIdx > 0 ? rows[latestIdx - 1] : undefined;
+
+  const last12 = useMemo(() => rows.slice(Math.max(0, latestIdx - 11), latestIdx + 1), [rows, latestIdx]);
+  const chartData = useMemo(() => last12.map((r, i, arr) => {
+    const prev = i > 0 ? arr[i - 1].items_dispensed : r.items_dispensed;
+    const change = prev ? Math.abs((r.items_dispensed - prev) / prev) : 0;
+    return { label: `${MONTHS[r.month - 1]} ${String(r.year).slice(2)}`, items: r.items_dispensed, flag: change > 0.15 };
+  }), [last12]);
+
+  const epsRate = latest && latest.items_dispensed ? (latest.eps_items / latest.items_dispensed) * 100 : 0;
+  const epsColor = epsRate > 95 ? "text-emerald-600" : epsRate >= 80 ? "text-amber-600" : "text-rose-600";
+
+  const last6Nominations = rows.slice(Math.max(0, latestIdx - 5), latestIdx + 1).map((r) => ({ x: `${r.month}/${String(r.year).slice(2)}`, v: r.eps_nominations }));
+
+  const cards = latest ? [
+    { label: "Items", v: latest.items_dispensed, p: prior?.items_dispensed ?? 0 },
+    { label: "NMS", v: latest.nms_count, p: prior?.nms_count ?? 0 },
+    { label: "Pharmacy First", v: latest.pharmacy_first_count, p: prior?.pharmacy_first_count ?? 0 },
+    { label: "Flu vaccinations", v: latest.flu_vaccinations, p: prior?.flu_vaccinations ?? 0 },
+  ] : [];
+
+  // AI summary
+  const genFn = useServerFn(generatePerformanceSummary);
+  const [aiText, setAiText] = useState("");
+  const [aiAt, setAiAt] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const triggered = useRef(false);
+  useEffect(() => {
+    if (triggered.current || !latest) return;
+    triggered.current = true;
+    setAiLoading(true);
+    const last3 = rows.slice(Math.max(0, latestIdx - 2), latestIdx + 1);
+    const last3Avg = last3.reduce((s, r) => s + r.items_dispensed, 0) / Math.max(1, last3.length);
+    genFn({ data: {
+      pharmacy_name: pharmacy.name, region: pharmacy.region, country: pharmacy.country,
+      last3_avg_items: Math.round(last3Avg),
+      items_trend: last12.map((r) => r.items_dispensed),
+      nms_last: latest.nms_count, nms_rank: null, nms_total: null,
+      pf_last: latest.pharmacy_first_count, pf_rank: null, pf_total: null,
+      eps_rate: epsRate, eps_nominations_last: latest.eps_nominations,
+    }})
+      .then((r) => { setAiText(r.text); setAiAt(r.generated_at); })
+      .catch((e) => toast.error(e.message || "AI summary failed"))
+      .finally(() => setAiLoading(false));
+  }, [latest, rows, latestIdx, last12, epsRate, genFn, pharmacy.name, pharmacy.region, pharmacy.country]);
+
+  if (!latest) return <div className="p-10 text-center text-sm text-muted-foreground">No dispensing data yet.</div>;
+
+  return (
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center text-xs rounded-full bg-secondary px-2.5 py-1">Data current to {MONTHS[latest.month - 1]} {latest.year}</span>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h3 className="text-sm font-semibold mb-3">12-month items dispensed</h3>
+        <div className="h-56">
+          <ResponsiveContainer><LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: -10 }}>
+            <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+            <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
+            <YAxis tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
+            <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
+            <Line type="monotone" dataKey="items" stroke="var(--gold)" strokeWidth={2.5}
+              dot={(p: any) => p.payload.flag
+                ? <circle key={p.key} cx={p.cx} cy={p.cy} r={5} fill="var(--rose-600,#e11d48)" stroke="var(--background)" strokeWidth={2} />
+                : <circle key={p.key} cx={p.cx} cy={p.cy} r={2} fill="var(--gold)" />} />
+          </LineChart></ResponsiveContainer>
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-1">Red dots mark months where change vs prior month exceeds 15%.</p>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {cards.map((c) => {
+          const diff = c.v - c.p;
+          const pctv = c.p ? Math.round((diff / c.p) * 100) : 0;
+          return (
+            <div key={c.label} className="rounded-xl border border-border bg-card p-4">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{c.label}</p>
+              <p className="text-2xl font-bold tabular-nums mt-1">{c.v.toLocaleString()}</p>
+              <p className="flex items-center gap-1 text-xs mt-1">{trendArrow(diff)} <span className={diff > 0 ? "text-emerald-700" : diff < 0 ? "text-rose-700" : "text-muted-foreground"}>{diff === 0 ? "—" : `${diff > 0 ? "+" : ""}${pctv}%`}</span></p>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">EPS rate</p>
+          <p className={`text-3xl font-bold mt-1 ${epsColor}`}>{pct(epsRate)}</p>
+          <p className="text-xs text-muted-foreground mt-1">{">"}95% green · 80-95% amber · {"<"}80% red</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Nominations (6m)</p>
+          <div className="h-16"><ResponsiveContainer><LineChart data={last6Nominations}><Line type="monotone" dataKey="v" stroke="var(--gold)" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-gold/40 bg-gold/5 p-5">
+        <div className="flex items-center gap-2 mb-2"><Sparkles className="h-4 w-4 text-gold" /><h3 className="text-sm font-semibold">AI Performance Summary</h3>{aiAt && <span className="ml-auto text-[10px] text-muted-foreground">{new Date(aiAt).toLocaleString()}</span>}</div>
+          {aiLoading ? <p className="text-sm text-muted-foreground"><Loader2 className="inline h-3 w-3 animate-spin mr-1" /> Generating…</p> : <p className="text-sm whitespace-pre-wrap leading-relaxed">{aiText || "—"}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ------------------------- FINANCIALS TAB -------------------------
+function FinancialsTab({ pharmacy }: { pharmacy: Pharmacy }) {
+  const search = useServerFn(searchCompany);
+  const confirm = useServerFn(confirmCompany);
+  const reject = useServerFn(rejectCandidate);
+  const [state, setState] = useState<"loading" | "cached" | "chain" | "candidates" | "none" | "confirming" | "confirmed" | "error">("loading");
+  const [company, setCompany] = useState<Company | null>(null);
+  const [candidates, setCandidates] = useState<any[]>([]);
+  const [chain, setChain] = useState<{ company_number: string; chain_name: string } | null>(null);
+  const [error, setError] = useState<string>("");
+
+  const runSearch = async () => {
+    setState("loading");
+    try {
+      const r = await search({ data: { pharmacy_id: pharmacy.id, pharmacy_name: pharmacy.name, postcode: pharmacy.postcode } });
+      if (r.cached && r.data) { setCompany(r.data as Company); setState("cached"); return; }
+      if (r.chain) { setChain(r.chain); setState("chain"); return; }
+      if (r.error) { setError(r.error); setState("error"); return; }
+      if (r.candidates && r.candidates.length) { setCandidates(r.candidates); setState("candidates"); return; }
+      setState("none");
+    } catch (e: any) { setError(e.message || "Search failed"); setState("error"); }
+  };
+
+  useEffect(() => { runSearch(); /* eslint-disable-next-line */ }, [pharmacy.id]);
+
+  const handleConfirm = async (company_number: string, is_chain = false, chain_name?: string) => {
+    setState("confirming");
+    try {
+      const r = await confirm({ data: { pharmacy_id: pharmacy.id, company_number, is_chain, chain_name } });
+      setCompany(r.data as Company);
+      setState("confirmed");
+      toast.success("Accounts fetched");
+    } catch (e: any) { setError(e.message); setState("error"); toast.error(e.message); }
+  };
+
+  const handleReject = async (company_number: string) => {
+    await reject({ data: { pharmacy_id: pharmacy.id, company_number } });
+    setCandidates((c) => c.filter((x) => x.company_number !== company_number));
+    if (candidates.length <= 1) setState("none");
+  };
+
+  return (
+    <div className="p-4 md:p-6 space-y-6">
+      {state === "loading" && <div className="text-sm text-muted-foreground"><Loader2 className="inline h-4 w-4 animate-spin mr-2" />Searching Companies House records…</div>}
+
+      {state === "chain" && chain && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-sm">Matched to <span className="font-semibold">{chain.chain_name}</span> (Companies House: <span className="font-mono">{chain.company_number}</span>)</p>
+          <Button className="mt-3" onClick={() => handleConfirm(chain.company_number, true, chain.chain_name)}>Confirm and fetch accounts</Button>
+        </div>
+      )}
+
+      {state === "candidates" && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-base font-semibold">Confirm the registered company</h3>
+          <p className="text-sm text-muted-foreground mt-1">We need to match this pharmacy to its Companies House filing.</p>
+          <div className="mt-4 space-y-3">
+            {candidates.map((c) => {
+              const conf = c.score >= 6 ? "Strong match" : c.score >= 3 ? "Possible match" : "Weak match";
+              return (
+                <div key={c.company_number} className="rounded-lg border border-border p-3">
+                  <p className="font-semibold">{c.company_name}</p>
+                  <p className="text-xs text-muted-foreground">{c.address}</p>
+                  <div className="flex items-center gap-2 text-xs mt-1">
+                    <span className="font-mono">{c.company_number}</span>
+                    <span className="rounded px-2 py-0.5 bg-secondary">{c.company_status}</span>
+                    <span className="ml-auto">{conf} ({c.score})</span>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <Button size="sm" onClick={() => handleConfirm(c.company_number)}>This is correct</Button>
+                    <Button size="sm" variant="outline" onClick={() => handleReject(c.company_number)}>Not this one</Button>
+                  </div>
+                </div>
+              );
+            })}
+            <Button variant="ghost" size="sm" onClick={() => setState("none")}>None of these — skip financials</Button>
+          </div>
+        </div>
+      )}
+
+      {state === "confirming" && <div className="text-sm text-muted-foreground"><Loader2 className="inline h-4 w-4 animate-spin mr-2" />Fetching accounts…</div>}
+
+      {(state === "cached" || state === "confirmed") && company && <CompanyDisplay company={company} onRefresh={runSearch} />}
+
+      {state === "none" && (
+        <div className="rounded-xl border border-border bg-secondary/40 p-5">
+          <p className="text-sm">Financial data unavailable. Upload FP34C schedules in the Acquisition tab for manual entry.</p>
+        </div>
+      )}
+
+      {state === "error" && (
+        <div className="rounded-xl border border-rose-300 bg-rose-50 p-5 text-sm">
+          <p className="font-medium">Lookup failed</p>
+          <p className="text-muted-foreground mt-1">{error}</p>
+          <Button size="sm" variant="outline" className="mt-3" onClick={runSearch}>Retry</Button>
+        </div>
+      )}
+
+      <p className="text-[11px] text-muted-foreground">Source: Companies House public filing · Open Government Licence</p>
+    </div>
+  );
+}
+
+function CompanyDisplay({ company, onRefresh }: { company: Company; onRefresh: () => void }) {
+  const hasFigures = company.turnover != null;
+  const ageMonths = company.last_accounts_date ? Math.round((Date.now() - new Date(company.last_accounts_date).getTime()) / (30 * 24 * 3600 * 1000)) : null;
+  const grossMargin = company.turnover && company.gross_profit ? (company.gross_profit / company.turnover) * 100 : null;
+  const netMargin = company.turnover && company.net_profit ? (company.net_profit / company.turnover) * 100 : null;
+  return (
+    <div className="space-y-4">
+      {company.is_chain && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 text-amber-900 p-3 text-sm">
+          This is a {company.chain_name} branch. Figures below represent the entire {company.chain_name} group.
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs rounded-full bg-secondary px-2.5 py-1">{company.accounts_type || "Accounts"} · {company.accounts_year ?? "—"}</span>
+        {ageMonths !== null && ageMonths > 18 && (
+          <span className="text-xs rounded-full bg-amber-100 text-amber-900 px-2.5 py-1">Accounts {ageMonths} months old</span>
+        )}
+        <span className="text-xs rounded-full bg-secondary px-2.5 py-1">{company.company_status}</span>
+        <button onClick={onRefresh} className="ml-auto text-xs inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"><RefreshCw className="h-3 w-3" /> Refresh</button>
+      </div>
+      <p className="text-sm text-muted-foreground">{company.company_name} · <span className="font-mono">{company.company_number}</span> · {company.registered_address}</p>
+
+      {hasFigures ? (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Cell label="Turnover" v={gbp(company.turnover)} />
+            <Cell label="Gross margin" v={grossMargin != null ? pct(grossMargin) : "—"} />
+            <Cell label="Net margin" v={netMargin != null ? pct(netMargin) : "—"} />
+            <Cell label="Total payroll" v={gbp(company.total_payroll)} />
+          </div>
+        </>
+      ) : (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <Cell label="Net assets" v={gbp(company.net_assets)} />
+          <p className="text-xs text-muted-foreground mt-3">This company files small/abbreviated accounts. Turnover and profit are not publicly available, or we could not parse them from the filing.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Cell({ label, v }: { label: string; v: string }) {
+  return <div className="rounded-xl border border-border bg-card p-4"><p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p><p className="text-2xl font-bold tabular-nums mt-1">{v}</p></div>;
+}
+
+// ------------------------- BENCHMARKING TAB -------------------------
+function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
+  const [localAvg, setLocalAvg] = useState<Record<string, number>>({});
+  const [nationalAvg, setNationalAvg] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [aiText, setAiText] = useState("");
+  const [aiAt, setAiAt] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const gen = useServerFn(generateBenchmarkingInsight);
+
+  const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
+  const latestIdx = useMemo(() => {
+    if (!rows.length) return -1;
+    if (isScot) for (let i = rows.length - 1; i >= 0; i--) if (rows[i].is_actual_payment) return i;
+    return rows.length - 1;
+  }, [rows, isScot]);
+  const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
+
+  useEffect(() => {
+    if (!latest) { setLoading(false); return; }
+    (async () => {
+      setLoading(true);
+      const y = latest.year, m = latest.month;
+      // National
+      const nat = await supabase.rpc("country_monthly_aggregates", {
+        p_country: pharmacy.country, p_start_year: y, p_start_month: m, p_end_year: y, p_end_month: m,
+      });
+      const n = (nat.data?.[0] || {}) as any;
+      setNationalAvg({ items: Number(n.avg_items) || 0, nms: Number(n.avg_nms) || 0, pf: Number(n.avg_pf) || 0 });
+
+      // Local (same region) — fetch peer ids first then compute averages
+      const { data: peers } = await supabase.from("pharmacies").select("id").eq("country", pharmacy.country ?? "").eq("region", pharmacy.region ?? "");
+      const ids = (peers || []).map((p) => p.id);
+      if (!ids.length) { setLocalAvg({ items: 0, nms: 0, pf: 0, eps_items: 0 }); setLoading(false); return; }
+      let items = 0, nms = 0, pf = 0, eps = 0, count = 0;
+      for (let i = 0; i < ids.length; i += 500) {
+        const { data } = await supabase.from("dispensing_data")
+          .select("items_dispensed,nms_count,pharmacy_first_count,eps_items")
+          .eq("year", y).eq("month", m).in("pharmacy_id", ids.slice(i, i + 500));
+        for (const r of (data || []) as any[]) { items += r.items_dispensed || 0; nms += r.nms_count || 0; pf += r.pharmacy_first_count || 0; eps += r.eps_items || 0; count++; }
+      }
+      setLocalAvg(count ? { items: items / count, nms: nms / count, pf: pf / count, eps_items: eps / count } : {});
+      setLoading(false);
+    })();
+  }, [pharmacy, latest]);
+
+  if (!latest) return <div className="p-10 text-sm text-muted-foreground text-center">No data.</div>;
+  if (loading) return <div className="p-10 text-sm text-muted-foreground text-center"><Loader2 className="inline h-4 w-4 animate-spin mr-2" />Computing benchmarks…</div>;
+
+  const epsRateSelf = latest.items_dispensed ? (latest.eps_items / latest.items_dispensed) * 100 : 0;
+  const epsRateNat = nationalAvg.items ? ((localAvg.eps_items || 0) / nationalAvg.items) * 100 : 0;
+
+  const rowsTable = [
+    { label: "Items dispensed", self: latest.items_dispensed, local: localAvg.items || 0, nat: nationalAvg.items || 0 },
+    { label: "NMS", self: latest.nms_count, local: localAvg.nms || 0, nat: nationalAvg.nms || 0 },
+    { label: "Pharmacy First", self: latest.pharmacy_first_count, local: localAvg.pf || 0, nat: nationalAvg.pf || 0 },
+    { label: "Flu vaccinations", self: latest.flu_vaccinations, local: 0, nat: 0 },
+    { label: "EPS rate (%)", self: epsRateSelf, local: 0, nat: epsRateNat, isPct: true },
+  ];
+
+  const colorFor = (self: number, ref: number) => {
+    if (!ref) return "";
+    const pct = ((self - ref) / ref) * 100;
+    if (pct > 10) return "bg-emerald-50 text-emerald-900";
+    if (pct < -10) return "bg-rose-50 text-rose-900";
+    return "bg-amber-50 text-amber-900";
+  };
+
+  const radar = rowsTable.slice(0, 4).map((r) => ({ metric: r.label, you: r.nat ? Math.round((r.self / r.nat) * 100) : 0, nat: 100 }));
+
+  const runAI = async () => {
+    setAiLoading(true);
+    try {
+      const r = await gen({ data: {
+        pharmacy_name: pharmacy.name,
+        items_self: latest.items_dispensed, items_local: Math.round(localAvg.items || 0), items_national: Math.round(nationalAvg.items || 0),
+        nms_self: latest.nms_count, nms_local: Math.round(localAvg.nms || 0), nms_national: Math.round(nationalAvg.nms || 0),
+        pf_self: latest.pharmacy_first_count, pf_local: Math.round(localAvg.pf || 0), pf_national: Math.round(nationalAvg.pf || 0),
+        eps_rate_self: epsRateSelf, eps_rate_national: epsRateNat,
+      }});
+      setAiText(r.text); setAiAt(r.generated_at);
+    } catch (e: any) { toast.error(e.message); } finally { setAiLoading(false); }
+  };
+
+  return (
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-secondary text-muted-foreground"><tr>
+            <th className="text-left px-4 py-2 font-medium">Metric</th>
+            <th className="text-right px-4 py-2 font-medium">This pharmacy</th>
+            <th className="text-right px-4 py-2 font-medium">{pharmacy.region || "Region"}</th>
+            <th className="text-right px-4 py-2 font-medium">National</th>
+          </tr></thead>
+          <tbody>
+            {rowsTable.map((r) => (
+              <tr key={r.label} className="border-t border-border">
+                <td className="px-4 py-2 font-medium">{r.label}</td>
+                <td className={"px-4 py-2 text-right tabular-nums " + colorFor(r.self, r.nat)}>{r.isPct ? pct(r.self) : Math.round(r.self).toLocaleString()}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{r.isPct ? "—" : Math.round(r.local).toLocaleString()}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{r.isPct ? pct(r.nat) : Math.round(r.nat).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h3 className="text-sm font-semibold mb-3">Shape vs national (100 = national average)</h3>
+        <div className="h-64"><ResponsiveContainer><RadarChart data={radar}>
+          <PolarGrid stroke="var(--border)" /><PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
+          <PolarRadiusAxis tick={{ fontSize: 10 }} angle={30} />
+          <Radar name="You" dataKey="you" stroke="var(--gold)" fill="var(--gold)" fillOpacity={0.25} />
+          <Radar name="National" dataKey="nat" stroke="var(--muted-foreground)" fill="var(--muted-foreground)" fillOpacity={0.08} />
+          <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
+        </RadarChart></ResponsiveContainer></div>
+      </div>
+
+      <div className="rounded-xl border border-gold/40 bg-gold/5 p-5">
+        <div className="flex items-center gap-2 mb-2"><Sparkles className="h-4 w-4 text-gold" /><h3 className="text-sm font-semibold">AI Benchmarking Assessment</h3>{aiAt && <span className="ml-auto text-[10px] text-muted-foreground">{new Date(aiAt).toLocaleString()}</span>}</div>
+        {aiText ? <p className="text-sm whitespace-pre-wrap leading-relaxed">{aiText}</p> :
+          <Button size="sm" onClick={runAI} disabled={aiLoading}>{aiLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</> : "Generate insight"}</Button>}
+      </div>
+    </div>
+  );
+}
+
+// ------------------------- ACQUISITION TAB -------------------------
+function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
+  const { user } = useAuth();
+  const [company, setCompany] = useState<Company | null>(null);
+  const [fp34c, setFp34c] = useState<{ actualMonthly: number[]; total: number } | null>(null);
+
+  useEffect(() => {
+    supabase.from("companies").select("*").eq("pharmacy_id", pharmacy.id).maybeSingle()
+      .then(({ data }) => setCompany(data as Company | null));
+  }, [pharmacy.id]);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("private_uploads").select("parsed_data")
+      .eq("user_id", user.id).eq("pharmacy_id", pharmacy.id).eq("upload_type", "acquisition_fp34c")
+      .order("created_at", { ascending: false }).limit(1).maybeSingle()
+      .then(({ data }) => {
+        const parsed = (data?.parsed_data as any) || null;
+        if (parsed?.monthly_payments) setFp34c({ actualMonthly: parsed.monthly_payments, total: parsed.monthly_payments.reduce((a: number, b: number) => a + b, 0) });
+      });
+  }, [user, pharmacy.id]);
+
+  const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
+  const last12 = rows.slice(-12);
+
+  // Income calc
+  let itemsTotal = 0, pfTotal = 0, nmsTotal = 0, fluTotal = 0;
+  last12.forEach((r) => { itemsTotal += r.items_dispensed; pfTotal += r.pharmacy_first_count; nmsTotal += r.nms_count; fluTotal += r.flu_vaccinations; });
+  const estimated = itemsTotal * 1.27 + pfTotal * 15 + nmsTotal * 28 + fluTotal * 12.58;
+  const discount = estimated * 0.05;
+  const estimatedNet = estimated - discount;
+
+  let actualNHS: number | null = null;
+  if (isScot) {
+    const actuals = last12.filter((r) => r.is_actual_payment);
+    if (actuals.length >= 6) actualNHS = actuals.reduce((s, r) => s + (Number(r.final_payment) || 0), 0) * (12 / actuals.length);
+  }
+  if (fp34c) actualNHS = fp34c.total;
+
+  const nhsIncome = actualNHS ?? estimatedNet;
+  const incomeLabel = actualNHS != null ? "Actual annual NHS income" : "Estimated annual NHS income";
+
+  const monthlyBars = last12.map((r) => ({
+    label: `${MONTHS[r.month - 1]}`,
+    v: Math.round(r.items_dispensed * 1.27 + r.pharmacy_first_count * 15 + r.nms_count * 28 + r.flu_vaccinations * 12.58),
+  }));
+
+  // Valuation
+  const turnover = company?.turnover || null;
+  const opProfit = company?.operating_profit || null;
+  const ebitda = opProfit != null ? opProfit + (turnover ? turnover * 0.02 : 0) : null;
+  const val = ebitda ? { low: ebitda * 4, mid: ebitda * 5, high: ebitda * 6 } : null;
+
+  // Red flags
+  const flags: { ok: boolean; msg: string }[] = [];
+  if (last12.length >= 12) {
+    const recent6 = last12.slice(-6).reduce((s, r) => s + r.items_dispensed, 0);
+    const prior6 = last12.slice(0, 6).reduce((s, r) => s + r.items_dispensed, 0);
+    if (prior6 > 0 && (recent6 - prior6) / prior6 < -0.10) flags.push({ ok: false, msg: "Items dispensed declined >10% year on year" });
+  }
+  const last3 = rows.slice(-3);
+  let consecutiveDecline = 0;
+  for (let i = rows.length - 1; i > 0; i--) {
+    if (rows[i].eps_nominations < rows[i - 1].eps_nominations) consecutiveDecline++; else break;
+    if (consecutiveDecline >= 3) break;
+  }
+  if (consecutiveDecline >= 3) flags.push({ ok: false, msg: "EPS nominations declining 3+ months consecutively" });
+  if (last3.length === 3 && last3.every((r) => r.nms_count === 0)) flags.push({ ok: false, msg: "NMS count is zero for last 3 months" });
+  if (company?.last_accounts_date) {
+    const months = Math.round((Date.now() - new Date(company.last_accounts_date).getTime()) / (30 * 24 * 3600 * 1000));
+    if (months > 18) flags.push({ ok: false, msg: `Companies House accounts are ${months} months old` });
+  }
+  if (company?.company_status && company.company_status.toLowerCase() !== "active") flags.push({ ok: false, msg: `Company status: ${company.company_status}` });
+  if (company?.net_assets != null && company.net_assets < 0) flags.push({ ok: false, msg: "Net liabilities on balance sheet" });
+
+  const upload = async (file: File, kind: "acquisition_fp34c" | "acquisition_pl") => {
+    if (!user) return toast.error("Sign in");
+    const text = await file.text();
+    let parsed: any = { raw: text.slice(0, 200) };
+    if (file.name.toLowerCase().endsWith(".csv")) {
+      const lines = text.trim().split(/\r?\n/);
+      const rowsCsv = lines.slice(1).map((l) => l.split(",").map((c) => c.trim()));
+      if (kind === "acquisition_fp34c") {
+        const monthly = rowsCsv.map((r) => Number(r[1] ?? r[0]) || 0).filter((n) => n > 0);
+        parsed = { monthly_payments: monthly };
+      } else {
+        const obj: Record<string, number> = {};
+        for (const r of rowsCsv) if (r[0]) obj[r[0]] = Number(r[1]) || 0;
+        parsed = { pl_lines: obj };
+      }
+    }
+    const { error } = await supabase.from("private_uploads").insert({
+      user_id: user.id, pharmacy_id: pharmacy.id, upload_type: kind, file_name: file.name, parsed_data: parsed,
+    });
+    if (error) return toast.error(error.message);
+    toast.success(`Uploaded ${file.name}`);
+    if (kind === "acquisition_fp34c" && parsed.monthly_payments)
+      setFp34c({ actualMonthly: parsed.monthly_payments, total: parsed.monthly_payments.reduce((a: number, b: number) => a + b, 0) });
+  };
+
+  return (
+    <div className="p-4 md:p-6 space-y-6">
+      <Section title={`Section 1 — ${incomeLabel}`}>
+        <p className="text-3xl font-bold">{gbp(nhsIncome)}</p>
+        <div className="h-40 mt-3"><ResponsiveContainer><BarChart data={monthlyBars} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+          <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+          <XAxis dataKey="label" tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 10 }} />
+          <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} formatter={(v: any) => [gbp(Number(v)), "Est."]} />
+          <Bar dataKey="v" fill="var(--gold)" radius={[3,3,0,0]} />
+        </BarChart></ResponsiveContainer></div>
+      </Section>
+
+      <Section title="Section 2 — Financial performance">
+        {company?.turnover ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Cell label="Turnover" v={gbp(company.turnover)} />
+            <Cell label="Operating profit" v={gbp(company.operating_profit)} />
+            <Cell label="Net profit" v={gbp(company.net_profit)} />
+            <Cell label="Payroll" v={gbp(company.total_payroll)} />
+          </div>
+        ) : <p className="text-sm text-muted-foreground">Financial data not yet fetched. Go to the Financials tab.</p>}
+      </Section>
+
+      <Section title="Section 3 — Valuation estimate">
+        {val ? (
+          <>
+            <div className="grid grid-cols-3 gap-3">
+              <Cell label="Conservative · 4x" v={gbp(val.low)} />
+              <Cell label="Mid-range · 5x" v={gbp(val.mid)} />
+              <Cell label="Premium · 6x" v={gbp(val.high)} />
+            </div>
+            <div className="mt-4 h-3 rounded-full overflow-hidden bg-gradient-to-r from-rose-200 via-amber-200 to-emerald-200" />
+            <p className="text-[11px] text-muted-foreground mt-2">EBITDA estimated as operating profit + 2% turnover (proxy for depreciation).</p>
+            <p className="text-[11px] text-muted-foreground mt-1 italic">Valuation estimates use publicly filed accounts and estimated NHS income. Always verify with management accounts and FP34C schedules.</p>
+          </>
+        ) : <p className="text-sm text-muted-foreground">Match company and fetch full accounts to estimate valuation.</p>}
+      </Section>
+
+      <Section title="Section 4 — Red flags">
+        {flags.length === 0 ? (
+          <div className="rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900 p-3 text-sm inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> No significant red flags identified from available data.</div>
+        ) : (
+          <ul className="space-y-2">{flags.map((f, i) => (
+            <li key={i} className="rounded-lg border border-rose-300 bg-rose-50 text-rose-900 p-3 text-sm flex items-start gap-2"><AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" /><span>{f.msg}</span></li>
+          ))}</ul>
+        )}
+      </Section>
+
+      <Section title="Section 5 — Upload for accuracy">
+        <div className="grid md:grid-cols-2 gap-4">
+          <UploadBox label="FP34C Payment Schedules" hint="CSV with [month,total] rows for exact NHS income"
+            onFile={(f) => upload(f, "acquisition_fp34c")} done={!!fp34c} />
+          <UploadBox label="P&L / Management Accounts" hint="CSV with [line_item,value] rows for exact profitability"
+            onFile={(f) => upload(f, "acquisition_pl")} done={false} />
+        </div>
+      </Section>
+
+      <Button className="w-full bg-gold text-foreground hover:bg-gold/90" onClick={() => window.print()}>
+        <Printer className="h-4 w-4" /> Download Due Diligence Report (PDF)
+      </Button>
+      <p className="text-[11px] text-center text-muted-foreground">Use your browser's "Save as PDF" in the print dialog.</p>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return <div className="rounded-xl border border-border bg-card p-5"><h3 className="text-sm font-semibold mb-3">{title}</h3>{children}</div>;
+}
+function UploadBox({ label, hint, onFile, done }: { label: string; hint: string; onFile: (f: File) => void; done: boolean }) {
+  return (
+    <label className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-6 text-center cursor-pointer hover:bg-secondary/40 transition-colors">
+      <Upload className="h-5 w-5 text-muted-foreground mb-2" />
+      <p className="text-sm font-medium">{label}</p>
+      <p className="text-xs text-muted-foreground mt-1">{hint}</p>
+      {done && <p className="text-xs text-emerald-700 mt-1">Uploaded ✓</p>}
+      <input type="file" className="hidden" accept=".csv,.pdf" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
+    </label>
+  );
+}
