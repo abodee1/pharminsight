@@ -52,6 +52,145 @@ export type Database = {
           },
         ]
       }
+      companies: {
+        Row: {
+          accounts_type: string | null
+          accounts_year: number | null
+          avg_employees: number | null
+          chain_name: string | null
+          company_name: string | null
+          company_number: string | null
+          company_status: string | null
+          created_at: string
+          fetched_at: string | null
+          gross_profit: number | null
+          id: string
+          incorporation_date: string | null
+          is_chain: boolean | null
+          last_accounts_date: string | null
+          match_confidence: string | null
+          matched_by: string | null
+          net_assets: number | null
+          net_profit: number | null
+          operating_profit: number | null
+          pharmacy_id: string | null
+          raw_filing: Json | null
+          registered_address: string | null
+          registered_postcode: string | null
+          sic_codes: string[] | null
+          total_payroll: number | null
+          turnover: number | null
+        }
+        Insert: {
+          accounts_type?: string | null
+          accounts_year?: number | null
+          avg_employees?: number | null
+          chain_name?: string | null
+          company_name?: string | null
+          company_number?: string | null
+          company_status?: string | null
+          created_at?: string
+          fetched_at?: string | null
+          gross_profit?: number | null
+          id?: string
+          incorporation_date?: string | null
+          is_chain?: boolean | null
+          last_accounts_date?: string | null
+          match_confidence?: string | null
+          matched_by?: string | null
+          net_assets?: number | null
+          net_profit?: number | null
+          operating_profit?: number | null
+          pharmacy_id?: string | null
+          raw_filing?: Json | null
+          registered_address?: string | null
+          registered_postcode?: string | null
+          sic_codes?: string[] | null
+          total_payroll?: number | null
+          turnover?: number | null
+        }
+        Update: {
+          accounts_type?: string | null
+          accounts_year?: number | null
+          avg_employees?: number | null
+          chain_name?: string | null
+          company_name?: string | null
+          company_number?: string | null
+          company_status?: string | null
+          created_at?: string
+          fetched_at?: string | null
+          gross_profit?: number | null
+          id?: string
+          incorporation_date?: string | null
+          is_chain?: boolean | null
+          last_accounts_date?: string | null
+          match_confidence?: string | null
+          matched_by?: string | null
+          net_assets?: number | null
+          net_profit?: number | null
+          operating_profit?: number | null
+          pharmacy_id?: string | null
+          raw_filing?: Json | null
+          registered_address?: string | null
+          registered_postcode?: string | null
+          sic_codes?: string[] | null
+          total_payroll?: number | null
+          turnover?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companies_pharmacy_id_fkey"
+            columns: ["pharmacy_id"]
+            isOneToOne: false
+            referencedRelation: "pharmacies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_match_queue: {
+        Row: {
+          candidate_address: string | null
+          candidate_company_name: string | null
+          candidate_company_number: string | null
+          candidate_postcode: string | null
+          created_at: string
+          id: string
+          match_score: number | null
+          pharmacy_id: string | null
+          status: string
+        }
+        Insert: {
+          candidate_address?: string | null
+          candidate_company_name?: string | null
+          candidate_company_number?: string | null
+          candidate_postcode?: string | null
+          created_at?: string
+          id?: string
+          match_score?: number | null
+          pharmacy_id?: string | null
+          status?: string
+        }
+        Update: {
+          candidate_address?: string | null
+          candidate_company_name?: string | null
+          candidate_company_number?: string | null
+          candidate_postcode?: string | null
+          created_at?: string
+          id?: string
+          match_score?: number | null
+          pharmacy_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_match_queue_pharmacy_id_fkey"
+            columns: ["pharmacy_id"]
+            isOneToOne: false
+            referencedRelation: "pharmacies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dispensing_data: {
         Row: {
           created_at: string
@@ -352,6 +491,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      saved_analyses: {
+        Row: {
+          created_at: string
+          id: string
+          is_shortlisted: boolean
+          notes: string | null
+          pharmacy_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_shortlisted?: boolean
+          notes?: string | null
+          pharmacy_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_shortlisted?: boolean
+          notes?: string | null
+          pharmacy_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_analyses_pharmacy_id_fkey"
+            columns: ["pharmacy_id"]
+            isOneToOne: false
+            referencedRelation: "pharmacies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       schema_alerts: {
         Row: {
