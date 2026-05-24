@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PharmacyOdsCodeRouteImport } from './routes/pharmacy.$odsCode'
 import { Route as AuthenticatedUploadRouteImport } from './routes/_authenticated/upload'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedMyAnalysesRouteImport } from './routes/_authenticated/my-analyses'
 import { Route as AuthenticatedLeaderboardsRouteImport } from './routes/_authenticated/leaderboards'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedIncomeRouteImport } from './routes/_authenticated/income'
@@ -62,6 +63,11 @@ const AuthenticatedUploadRoute = AuthenticatedUploadRouteImport.update({
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMyAnalysesRoute = AuthenticatedMyAnalysesRouteImport.update({
+  id: '/my-analyses',
+  path: '/my-analyses',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedLeaderboardsRoute =
@@ -147,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/income': typeof AuthenticatedIncomeRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
+  '/my-analyses': typeof AuthenticatedMyAnalysesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/upload': typeof AuthenticatedUploadRoute
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
@@ -168,6 +175,7 @@ export interface FileRoutesByTo {
   '/income': typeof AuthenticatedIncomeRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
+  '/my-analyses': typeof AuthenticatedMyAnalysesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/upload': typeof AuthenticatedUploadRoute
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   '/_authenticated/income': typeof AuthenticatedIncomeRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/leaderboards': typeof AuthenticatedLeaderboardsRoute
+  '/_authenticated/my-analyses': typeof AuthenticatedMyAnalysesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/upload': typeof AuthenticatedUploadRoute
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
@@ -214,6 +223,7 @@ export interface FileRouteTypes {
     | '/income'
     | '/insights'
     | '/leaderboards'
+    | '/my-analyses'
     | '/settings'
     | '/upload'
     | '/pharmacy/$odsCode'
@@ -235,6 +245,7 @@ export interface FileRouteTypes {
     | '/income'
     | '/insights'
     | '/leaderboards'
+    | '/my-analyses'
     | '/settings'
     | '/upload'
     | '/pharmacy/$odsCode'
@@ -257,6 +268,7 @@ export interface FileRouteTypes {
     | '/_authenticated/income'
     | '/_authenticated/insights'
     | '/_authenticated/leaderboards'
+    | '/_authenticated/my-analyses'
     | '/_authenticated/settings'
     | '/_authenticated/upload'
     | '/pharmacy/$odsCode'
@@ -330,6 +342,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/my-analyses': {
+      id: '/_authenticated/my-analyses'
+      path: '/my-analyses'
+      fullPath: '/my-analyses'
+      preLoaderRoute: typeof AuthenticatedMyAnalysesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/leaderboards': {
@@ -433,6 +452,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedIncomeRoute: typeof AuthenticatedIncomeRoute
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedLeaderboardsRoute: typeof AuthenticatedLeaderboardsRoute
+  AuthenticatedMyAnalysesRoute: typeof AuthenticatedMyAnalysesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedUploadRoute: typeof AuthenticatedUploadRoute
   AuthenticatedAcquisitionOdsCodeRoute: typeof AuthenticatedAcquisitionOdsCodeRoute
@@ -447,6 +467,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedIncomeRoute: AuthenticatedIncomeRoute,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedLeaderboardsRoute: AuthenticatedLeaderboardsRoute,
+  AuthenticatedMyAnalysesRoute: AuthenticatedMyAnalysesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedUploadRoute: AuthenticatedUploadRoute,
   AuthenticatedAcquisitionOdsCodeRoute: AuthenticatedAcquisitionOdsCodeRoute,
@@ -472,3 +493,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
