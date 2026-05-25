@@ -292,26 +292,30 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
           const diff = c.v - c.p;
           const pctv = c.p ? Math.round((diff / c.p) * 100) : 0;
           return (
-            <div key={c.label} className="rounded-xl border border-border bg-card p-4">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{c.label}</p>
-              <p className="text-2xl font-bold tabular-nums mt-1">{c.v.toLocaleString()}</p>
-              <p className="flex items-center gap-1 text-xs mt-1">{trendArrow(diff)} <span className={diff > 0 ? "text-emerald-700" : diff < 0 ? "text-rose-700" : "text-muted-foreground"}>{diff === 0 ? "—" : `${diff > 0 ? "+" : ""}${pctv}%`}</span></p>
-            </div>
+            <FlipCard
+              key={c.label}
+              title={c.label}
+              value={c.v.toLocaleString()}
+              sub={<p className="flex items-center gap-1 text-xs">{trendArrow(diff)} <span className={diff > 0 ? "text-emerald-700" : diff < 0 ? "text-rose-700" : "text-muted-foreground"}>{diff === 0 ? "—" : `${diff > 0 ? "+" : ""}${pctv}% vs prior`}</span></p>}
+              description={METRIC_INFO[c.label] || ""}
+            />
           );
         })}
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">EPS rate</p>
-          <p className={`text-3xl font-bold mt-1 ${epsColor}`}>{pct(epsRate)}</p>
-          <p className="text-xs text-muted-foreground mt-1">{">"}95% green · 80-95% amber · {"<"}80% red</p>
-        </div>
+        <FlipCard
+          title="EPS rate"
+          value={<span className={epsColor}>{pct(epsRate)}</span>}
+          sub={<p className="text-xs text-muted-foreground">{">"}95% green · 80-95% amber · {"<"}80% red</p>}
+          description={METRIC_INFO["EPS rate"]}
+        />
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Nominations (6m)</p>
           <div className="h-16"><ResponsiveContainer><LineChart data={last6Nominations}><Line type="monotone" dataKey="v" stroke="var(--gold)" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></div>
         </div>
       </div>
+
 
       <div className="rounded-xl border border-gold/40 bg-gold/5 p-5">
         <div className="flex items-center gap-2 mb-2"><Sparkles className="h-4 w-4 text-gold" /><h3 className="text-sm font-semibold">AI Performance Summary</h3>{aiAt && <span className="ml-auto text-[10px] text-muted-foreground">{new Date(aiAt).toLocaleString()}</span>}</div>
