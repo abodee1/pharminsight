@@ -10,6 +10,7 @@ import {
   Database,
   LogOut,
   PoundSterling,
+  Bookmark,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { PharmacySearch } from "./PharmacySearch";
@@ -21,7 +22,8 @@ const links = [
   { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/income", label: "Income Estimator", icon: PoundSterling },
   { to: "/insights", label: "Smart Insights", icon: Sparkles },
-  
+  { to: "/my-analyses", label: "My Analyses", icon: Bookmark },
+
   { to: "/admin/data", label: "Data Coverage", icon: Database },
   { to: "/admin/payments-import", label: "Payments Import", icon: Upload },
   { to: "/settings", label: "My Account", icon: Settings },

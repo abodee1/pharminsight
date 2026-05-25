@@ -13,6 +13,7 @@ import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X, ShieldCheck, Spark
 import { PharmacySearch } from "@/components/PharmacySearch";
 import { PercentileRail, AnnotatedSparkline, ShareDonut } from "@/components/Infographics";
 import { LocalLandscape } from "@/components/LocalLandscape";
+import { AnalysisPanel } from "@/components/AnalysisPanel";
 
 export const Route = createFileRoute("/pharmacy/$odsCode")({ component: PharmacyProfile });
 
@@ -69,6 +70,7 @@ function PharmacyProfile() {
   const [peerDistribution, setPeerDistribution] = useState<{
     items_dispensed: number[]; nms_count: number[]; pharmacy_first_count: number[]; eps_items: number[];
   } | null>(null);
+  const [analyseOpen, setAnalyseOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -396,8 +398,13 @@ function PharmacyProfile() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {user && (
+            <Button size="sm" className="gap-1.5" onClick={() => setAnalyseOpen(true)}>
+              <Sparkles className="h-4 w-4" /> Analyse This Pharmacy
+            </Button>
+          )}
+          {user && (
             <Link to="/acquisition/$odsCode" params={{ odsCode: pharmacy.ods_code }}>
-              <Button size="sm" className="gap-1.5">
+              <Button size="sm" variant="outline" className="gap-1.5">
                 <Sparkles className="h-4 w-4" /> Acquisition report
               </Button>
             </Link>
