@@ -470,7 +470,7 @@ function CompanyDisplay({ company, onRefresh }: { company: Company; onRefresh: (
 }
 
 function Cell({ label, v }: { label: string; v: string }) {
-  return <div className="rounded-xl border border-border bg-card p-4"><p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p><p className="text-2xl font-bold tabular-nums mt-1">{v}</p></div>;
+  return <FlipCard title={label} value={v} description={METRIC_INFO[label] || "No description available for this metric yet."} />;
 }
 
 // ------------------------- BENCHMARKING TAB -------------------------
