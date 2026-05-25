@@ -331,6 +331,7 @@ function PharmacyProfile() {
   const backLabel = user ? "Back to dashboard" : "Back home";
 
   return (
+    <>
     <div>
       <div className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="max-w-6xl mx-auto px-4 md:px-10 py-3 flex items-center gap-3">
