@@ -37,6 +37,56 @@ type Tab = "overview" | "financials" | "benchmarking" | "acquisition";
 const gbp = (n: number | null | undefined) => n == null ? "—" : "£" + Math.round(n).toLocaleString();
 const pct = (n: number) => `${n.toFixed(1)}%`;
 
+const METRIC_INFO: Record<string, string> = {
+  "Items": "Total prescription items dispensed this month. Items are the main driver of NHS pharmacy income — each item earns a dispensing fee (~£1.27) plus reimbursement of the drug cost.",
+  "NMS": "New Medicine Service consultations. The NHS pays ~£28 each time a pharmacist supports a patient newly prescribed a medicine for asthma, COPD, hypertension, type 2 diabetes or blood thinners.",
+  "Pharmacy First": "NHS England's walk-in clinical service for 7 common conditions (sore throat, UTI, sinusitis, etc.). The NHS pays ~£15 per consultation plus a monthly fixed payment when minimum thresholds are met.",
+  "Flu vaccinations": "Seasonal NHS flu jabs delivered in pharmacy. Paid at ~£12.58 per vaccination — a key autumn/winter income stream.",
+  "EPS rate": "Percentage of items dispensed via the Electronic Prescription Service rather than paper. Higher EPS means a more efficient workflow, faster reimbursement, and fewer lost scripts. Above 95% is excellent.",
+  "Turnover": "Total sales income reported to Companies House for the most recent filed year. Includes NHS, private and retail income before any costs.",
+  "Gross margin": "Gross profit ÷ turnover. What's left after the cost of goods sold (mainly drug purchases). A typical community pharmacy sits around 30-40%.",
+  "Net margin": "Net profit ÷ turnover. What's left after all costs including staff, rent and tax. Community pharmacy averages 2-5%; above 7% is strong.",
+  "Total payroll": "Total annual staff cost from the company's accounts — wages, NI and pension. Usually the single largest expense.",
+  "Payroll": "Total annual staff cost from the company's accounts — wages, NI and pension. Usually the single largest expense.",
+  "Net assets": "The company's assets minus all liabilities at year-end. Negative net assets (net liabilities) is a red flag.",
+  "Operating profit": "Profit from trading activities before interest and tax. The cleanest measure of how well the pharmacy is run.",
+  "Net profit": "Profit after every cost including tax. What actually flows to the owner.",
+  "Conservative · 4x": "Lower-end valuation = EBITDA × 4. Used for pharmacies with declining items, lease risk or single-handed dispensing.",
+  "Mid-range · 5x": "Mid-market valuation = EBITDA × 5. The typical going rate for a stable independent community pharmacy.",
+  "Premium · 6x": "Premium valuation = EBITDA × 6. Reserved for high-growth, high-margin pharmacies in desirable locations with services income.",
+  "Estimated annual NHS income": "Our estimate of the NHS payment this pharmacy receives per year, based on items, NMS, Pharmacy First and flu volumes multiplied by published Drug Tariff rates, less a 5% clawback. Upload an FP34C to replace with actuals.",
+  "Actual annual NHS income": "Annualised NHS payment based on verified monthly payment data (Scotland open data or your uploaded FP34C schedules). This is not an estimate.",
+};
+
+function FlipCard({ title, value, sub, description, className = "" }: {
+  title: string; value: React.ReactNode; sub?: React.ReactNode; description: string; className?: string;
+}) {
+  const [flipped, setFlipped] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => setFlipped((f) => !f)}
+      className={`group relative w-full text-left [perspective:1000px] focus:outline-none rounded-xl ${className}`}
+      aria-label={`${title}: tap to ${flipped ? "hide" : "show"} description`}
+    >
+      <div className={`relative h-full min-h-[6.5rem] transition-transform duration-500 [transform-style:preserve-3d] ${flipped ? "[transform:rotateY(180deg)]" : ""}`}>
+        <div className="absolute inset-0 rounded-xl border border-border bg-card p-4 [backface-visibility:hidden] group-hover:border-gold/60 transition-colors">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground flex items-center justify-between gap-2">
+            <span className="truncate">{title}</span><span className="text-[9px] opacity-40 group-hover:opacity-100 shrink-0">tap ⓘ</span>
+          </p>
+          <p className="text-2xl font-bold tabular-nums mt-1">{value}</p>
+          {sub && <div className="mt-1">{sub}</div>}
+        </div>
+        <div className="absolute inset-0 rounded-xl border border-gold/50 bg-gold/5 p-4 [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-auto">
+          <p className="text-[11px] uppercase tracking-wider text-gold font-semibold">{title}</p>
+          <p className="text-xs leading-relaxed mt-1.5 text-foreground/90">{description}</p>
+          <p className="text-[10px] text-muted-foreground mt-2">Tap again to flip back.</p>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 function trendArrow(diff: number) {
   if (diff > 0) return <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />;
   if (diff < 0) return <TrendingDown className="h-3.5 w-3.5 text-rose-600" />;
