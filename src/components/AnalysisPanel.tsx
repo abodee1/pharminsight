@@ -703,7 +703,12 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
   return (
     <div className="p-4 md:p-6 space-y-6">
       <Section title={`Section 1 — ${incomeLabel}`}>
-        <p className="text-3xl font-bold">{gbp(nhsIncome)}</p>
+        <FlipCard
+          title={incomeLabel}
+          value={<span className="text-3xl">{gbp(nhsIncome)}</span>}
+          description={METRIC_INFO[incomeLabel] || ""}
+          className="md:max-w-sm"
+        />
         <div className="h-40 mt-3"><ResponsiveContainer><BarChart data={monthlyBars} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
           <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
           <XAxis dataKey="label" tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 10 }} />
@@ -711,6 +716,7 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
           <Bar dataKey="v" fill="var(--gold)" radius={[3,3,0,0]} />
         </BarChart></ResponsiveContainer></div>
       </Section>
+
 
       <Section title="Section 2 — Financial performance">
         {company?.turnover ? (
