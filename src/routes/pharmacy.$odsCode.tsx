@@ -628,6 +628,8 @@ function PharmacyProfile() {
       )}
       </div>
     </div>
+    {pharmacy && <AnalysisPanel pharmacy={pharmacy} open={analyseOpen} onClose={() => setAnalyseOpen(false)} />}
+    </>
   );
 }
 
