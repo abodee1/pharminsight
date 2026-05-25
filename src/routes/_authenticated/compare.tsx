@@ -150,74 +150,90 @@ function Compare() {
     }));
   }, [periods, selectedPharms, rows]);
 
-  // Side-by-side metric data
+  // For each pharmacy + metric, find the most recent period where the
+  // metric is non-zero. The global latest period often has trailing zeros
+  // for some services (e.g. PF, NMS not yet reported), which made every
+  // card show "—". Fall back to 0 only if the pharmacy has never reported.
+  const latestNonZero = useMemo(() => {
+    const out = new Map<string, { value: number; prior: number; period: string | null }>();
+    selectedPharms.forEach((ph) => {
+      const phRows = rows
+        .filter((r) => r.pharmacy_id === ph.id)
+        .sort((a, b) => (a.year - b.year) || (a.month - b.month));
+      METRICS.forEach((mt) => {
+        let idx = -1;
+        for (let i = phRows.length - 1; i >= 0; i--) {
+          if (mt.compute(phRows[i]) > 0) { idx = i; break; }
+        }
+        if (idx === -1) {
+          out.set(`${ph.id}::${mt.key}`, { value: 0, prior: 0, period: null });
+          return;
+        }
+        const cur = phRows[idx];
+        const prv = idx > 0 ? phRows[idx - 1] : undefined;
+        out.set(`${ph.id}::${mt.key}`, {
+          value: mt.compute(cur),
+          prior: prv ? mt.compute(prv) : 0,
+          period: `${MONTHS[cur.month - 1]} ${String(cur.year).slice(2)}`,
+        });
+      });
+    });
+    return out;
+  }, [selectedPharms, rows]);
+
+  // Side-by-side metric data — uses latest non-zero per pharmacy+metric
   const sideBySide = useMemo(() => {
-    if (!latest) return [];
-    const [y, m] = latest.split("-").map(Number);
     return METRICS.map((mt) => {
       const point: Record<string, any> = { metric: mt.short };
       selectedPharms.forEach((ph) => {
-        const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-        point[ph.id] = mt.compute(row);
+        point[ph.id] = latestNonZero.get(`${ph.id}::${mt.key}`)?.value ?? 0;
       });
       return point;
     });
-  }, [latest, selectedPharms, rows]);
+  }, [selectedPharms, latestNonZero]);
 
   // Radar (normalised to max across selected for each metric)
   const radar = useMemo(() => {
-    if (!latest) return [];
-    const [y, m] = latest.split("-").map(Number);
     return METRICS.map((mt) => {
       const point: Record<string, any> = { metric: mt.short };
-      const vals = selectedPharms.map((ph) => {
-        const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-        return mt.compute(row);
-      });
+      const vals = selectedPharms.map((ph) => latestNonZero.get(`${ph.id}::${mt.key}`)?.value ?? 0);
       const max = Math.max(1, ...vals);
       selectedPharms.forEach((ph, i) => {
         point[ph.id] = Math.round((vals[i] / max) * 100);
       });
       return point;
     });
-  }, [latest, selectedPharms, rows]);
+  }, [selectedPharms, latestNonZero]);
 
-  // Headline per pharmacy — all metrics + change vs prior
+  // Headline per pharmacy — all metrics + change vs prior non-zero period
   const headline = useMemo(() => {
-    if (!latest) return [];
-    const [ly, lm] = latest.split("-").map(Number);
-    const [py, pm] = (prev || "0-0").split("-").map(Number);
     return selectedPharms.map((ph) => {
-      const cur = rows.find((r) => r.pharmacy_id === ph.id && r.year === ly && r.month === lm);
-      const prv = prev ? rows.find((r) => r.pharmacy_id === ph.id && r.year === py && r.month === pm) : null;
       const metrics = METRICS.map((mt) => {
-        const v = mt.compute(cur);
-        const p = mt.compute(prv ?? undefined);
+        const entry = latestNonZero.get(`${ph.id}::${mt.key}`);
+        const v = entry?.value ?? 0;
+        const p = entry?.prior ?? 0;
         const diff = v - p;
         const pct = p ? Math.round((diff / p) * 100) : 0;
-        return { mt, value: v, diff, pct };
+        return { mt, value: v, diff, pct, period: entry?.period ?? null };
       });
       return { ph, metrics };
     });
-  }, [latest, prev, selectedPharms, rows]);
+  }, [selectedPharms, latestNonZero]);
 
-  // Winner per metric
+  // Winner per metric — highest latest-non-zero value
   const winners = useMemo(() => {
-    if (!latest) return {} as Record<string, string>;
-    const [y, m] = latest.split("-").map(Number);
     const out: Record<string, string> = {};
     METRICS.forEach((mt) => {
       let best = -1;
       let id = "";
       selectedPharms.forEach((ph) => {
-        const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-        const v = mt.compute(row);
+        const v = latestNonZero.get(`${ph.id}::${mt.key}`)?.value ?? 0;
         if (v > best) { best = v; id = ph.id; }
       });
       out[mt.key] = id;
     });
     return out;
-  }, [latest, selectedPharms, rows]);
+  }, [selectedPharms, latestNonZero]);
 
 
   function remove(id: string) {
