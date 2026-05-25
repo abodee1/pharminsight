@@ -444,7 +444,7 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
       const y = latest.year, m = latest.month;
       // National
       const nat = await supabase.rpc("country_monthly_aggregates", {
-        p_country: pharmacy.country, p_start_year: y, p_start_month: m, p_end_year: y, p_end_month: m,
+        p_country: pharmacy.country ?? "", p_start_year: y, p_start_month: m, p_end_year: y, p_end_month: m,
       });
       const n = (nat.data?.[0] || {}) as any;
       setNationalAvg({ items: Number(n.avg_items) || 0, nms: Number(n.avg_nms) || 0, pf: Number(n.avg_pf) || 0 });
