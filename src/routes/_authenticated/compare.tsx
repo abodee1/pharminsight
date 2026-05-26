@@ -386,28 +386,9 @@ function Compare() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  {metrics.map(({ mt, value, diff, pct }) => {
-                    const up = diff > 0;
-                    const flat = diff === 0;
-                    return (
-                      <div key={mt.key} className="rounded-md bg-secondary/40 px-2 py-1.5">
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">{mt.short}</p>
-                        <p className="text-base font-semibold tabular-nums leading-tight">{value > 0 ? mt.format(value) : "—"}</p>
-                        <div className="mt-0.5 flex items-center gap-0.5 text-[10px]">
-                          {flat ? (
-                            <Minus className="h-3 w-3 text-muted-foreground" />
-                          ) : up ? (
-                            <ArrowUpRight className="h-3 w-3 text-emerald-600" />
-                          ) : (
-                            <ArrowDownRight className="h-3 w-3 text-rose-600" />
-                          )}
-                          <span className={flat ? "text-muted-foreground" : up ? "text-emerald-700" : "text-rose-700"}>
-                            {flat ? "—" : `${up ? "+" : ""}${pct}%`}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {metrics.map(({ mt, value, diff, pct }) => (
+                    <MetricTile key={mt.key} mt={mt} value={value} diff={diff} pct={pct} />
+                  ))}
                 </div>
               </div>
             ))}
