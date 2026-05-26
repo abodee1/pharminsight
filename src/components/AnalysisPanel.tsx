@@ -322,18 +322,35 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
         })}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <FlipCard
-          title="EPS rate"
-          value={<span className={epsColor}>{pct(epsRate)}</span>}
-          sub={<p className="text-xs text-muted-foreground">{">"}95% green · 80-95% amber · {"<"}80% red</p>}
-          description={METRIC_INFO["EPS rate"]}
-        />
-        <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Nominations (6m)</p>
-          <div className="h-16"><ResponsiveContainer><LineChart data={last6Nominations}><Line type="monotone" dataKey="v" stroke="var(--gold)" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></div>
+      {isScot ? (
+        <div className="grid md:grid-cols-2 gap-4">
+          <FlipCard
+            title="Pharmacy First £ (latest)"
+            value={gbp(Number(latest.pharmacy_first_payment) || 0)}
+            sub={<p className="text-xs text-muted-foreground">Verified NHS payment</p>}
+            description="Total NHS payment received for Pharmacy First consultations and the associated fixed monthly fee."
+          />
+          <FlipCard
+            title="MCR payment (latest)"
+            value={gbp(Number(latest.mcr_payment) || 0)}
+            sub={<p className="text-xs text-muted-foreground">Verified NHS payment</p>}
+            description="Total NHS payment received for the Medicines: Care & Review service this month."
+          />
         </div>
-      </div>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4">
+          <FlipCard
+            title="EPS rate"
+            value={<span className={epsColor}>{pct(epsRate)}</span>}
+            sub={<p className="text-xs text-muted-foreground">{">"}95% green · 80-95% amber · {"<"}80% red</p>}
+            description={METRIC_INFO["EPS rate"]}
+          />
+          <div className="rounded-xl border border-border bg-card p-5">
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Nominations (6m)</p>
+            <div className="h-16"><ResponsiveContainer><LineChart data={last6Nominations}><Line type="monotone" dataKey="v" stroke="var(--gold)" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></div>
+          </div>
+        </div>
+      )}
 
 
       <div className="rounded-xl border border-gold/40 bg-gold/5 p-5">
