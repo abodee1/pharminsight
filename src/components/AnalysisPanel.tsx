@@ -110,7 +110,7 @@ export function AnalysisPanel({ pharmacy, open, onClose }: { pharmacy: Pharmacy;
     (async () => {
       const { data } = await supabase
         .from("dispensing_data")
-        .select("month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations,final_payment,is_actual_payment")
+        .select("month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations,mcr_registrations,mcr_items,ehc_items,methadone_items,supervised_methadone_doses,smoking_cessation,pharmacy_first_payment,mcr_payment,smoking_cessation_payment,final_payment,is_actual_payment")
         .eq("pharmacy_id", pharmacy.id)
         .order("year").order("month");
       setRows((data as DRow[]) || []);
