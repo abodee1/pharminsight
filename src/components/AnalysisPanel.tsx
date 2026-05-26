@@ -527,46 +527,66 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
   }, [rows, isScot]);
   const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
 
+  const SCOT_COLS = ["items_dispensed","pharmacy_first_count","mcr_registrations","mcr_items","methadone_items","supervised_methadone_doses","ehc_items","smoking_cessation"] as const;
+  const ENG_COLS = ["items_dispensed","nms_count","pharmacy_first_count","eps_items"] as const;
+
   useEffect(() => {
     if (!latest) { setLoading(false); return; }
     (async () => {
       setLoading(true);
       const y = latest.year, m = latest.month;
-      // National
-      const nat = await supabase.rpc("country_monthly_aggregates", {
-        p_country: pharmacy.country ?? "", p_start_year: y, p_start_month: m, p_end_year: y, p_end_month: m,
-      });
-      const n = (nat.data?.[0] || {}) as any;
-      setNationalAvg({ items: Number(n.avg_items) || 0, nms: Number(n.avg_nms) || 0, pf: Number(n.avg_pf) || 0 });
+      const cols = (isScot ? SCOT_COLS : ENG_COLS).join(",");
 
-      // Local (same region) — fetch peer ids first then compute averages
-      const { data: peers } = await supabase.from("pharmacies").select("id").eq("country", pharmacy.country ?? "").eq("region", pharmacy.region ?? "");
-      const ids = (peers || []).map((p) => p.id);
-      if (!ids.length) { setLocalAvg({ items: 0, nms: 0, pf: 0, eps_items: 0 }); setLoading(false); return; }
-      let items = 0, nms = 0, pf = 0, eps = 0, count = 0;
-      for (let i = 0; i < ids.length; i += 500) {
-        const { data } = await supabase.from("dispensing_data")
-          .select("items_dispensed,nms_count,pharmacy_first_count,eps_items")
-          .eq("year", y).eq("month", m).in("pharmacy_id", ids.slice(i, i + 500));
-        for (const r of (data || []) as any[]) { items += r.items_dispensed || 0; nms += r.nms_count || 0; pf += r.pharmacy_first_count || 0; eps += r.eps_items || 0; count++; }
+      async function avgFor(filter: (q: any) => any) {
+        const base = filter(supabase.from("pharmacies").select("id"));
+        const { data: peers } = await base;
+        const ids = (peers || []).map((p: any) => p.id);
+        if (!ids.length) return { count: 0, sums: {} as Record<string, number> };
+        const sums: Record<string, number> = {};
+        let count = 0;
+        for (let i = 0; i < ids.length; i += 500) {
+          const { data } = await supabase.from("dispensing_data")
+            .select(cols).eq("year", y).eq("month", m)
+            .in("pharmacy_id", ids.slice(i, i + 500));
+          for (const r of (data || []) as any[]) {
+            count++;
+            for (const c of (isScot ? SCOT_COLS : ENG_COLS)) sums[c] = (sums[c] || 0) + (Number(r[c]) || 0);
+          }
+        }
+        return { count, sums };
       }
-      setLocalAvg(count ? { items: items / count, nms: nms / count, pf: pf / count, eps_items: eps / count } : {});
+
+      const local = await avgFor((q) => q.eq("country", pharmacy.country ?? "").eq("region", pharmacy.region ?? ""));
+      const nat = await avgFor((q) => q.eq("country", pharmacy.country ?? ""));
+      const toAvg = (r: { count: number; sums: Record<string, number> }) => {
+        const out: Record<string, number> = {};
+        if (!r.count) return out;
+        for (const c of (isScot ? SCOT_COLS : ENG_COLS)) out[c] = (r.sums[c] || 0) / r.count;
+        return out;
+      };
+      setLocalAvg(toAvg(local));
+      setNationalAvg(toAvg(nat));
       setLoading(false);
     })();
-  }, [pharmacy, latest]);
+  }, [pharmacy, latest, isScot]);
 
   if (!latest) return <div className="p-10 text-sm text-muted-foreground text-center">No data.</div>;
   if (loading) return <div className="p-10 text-sm text-muted-foreground text-center"><Loader2 className="inline h-4 w-4 animate-spin mr-2" />Computing benchmarks…</div>;
 
-  const epsRateSelf = latest.items_dispensed ? (latest.eps_items / latest.items_dispensed) * 100 : 0;
-  const epsRateNat = nationalAvg.items ? ((localAvg.eps_items || 0) / nationalAvg.items) * 100 : 0;
-
-  const rowsTable = [
-    { label: "Items dispensed", self: latest.items_dispensed, local: localAvg.items || 0, nat: nationalAvg.items || 0 },
-    { label: "NMS", self: latest.nms_count, local: localAvg.nms || 0, nat: nationalAvg.nms || 0 },
-    { label: "Pharmacy First", self: latest.pharmacy_first_count, local: localAvg.pf || 0, nat: nationalAvg.pf || 0 },
-    { label: "Flu vaccinations", self: latest.flu_vaccinations, local: 0, nat: 0 },
-    { label: "EPS rate (%)", self: epsRateSelf, local: 0, nat: epsRateNat, isPct: true },
+  const rowsTable = isScot ? [
+    { label: "Items dispensed", self: latest.items_dispensed, local: localAvg.items_dispensed || 0, nat: nationalAvg.items_dispensed || 0 },
+    { label: "Pharmacy First", self: latest.pharmacy_first_count, local: localAvg.pharmacy_first_count || 0, nat: nationalAvg.pharmacy_first_count || 0 },
+    { label: "MCR registrations", self: latest.mcr_registrations, local: localAvg.mcr_registrations || 0, nat: nationalAvg.mcr_registrations || 0 },
+    { label: "MCR items", self: latest.mcr_items, local: localAvg.mcr_items || 0, nat: nationalAvg.mcr_items || 0 },
+    { label: "Methadone items", self: latest.methadone_items, local: localAvg.methadone_items || 0, nat: nationalAvg.methadone_items || 0 },
+    { label: "Supervised doses", self: latest.supervised_methadone_doses, local: localAvg.supervised_methadone_doses || 0, nat: nationalAvg.supervised_methadone_doses || 0 },
+    { label: "EHC items", self: latest.ehc_items, local: localAvg.ehc_items || 0, nat: nationalAvg.ehc_items || 0 },
+    { label: "Smoking cessation", self: latest.smoking_cessation, local: localAvg.smoking_cessation || 0, nat: nationalAvg.smoking_cessation || 0 },
+  ] : [
+    { label: "Items dispensed", self: latest.items_dispensed, local: localAvg.items_dispensed || 0, nat: nationalAvg.items_dispensed || 0 },
+    { label: "NMS", self: latest.nms_count, local: localAvg.nms_count || 0, nat: nationalAvg.nms_count || 0 },
+    { label: "Pharmacy First", self: latest.pharmacy_first_count, local: localAvg.pharmacy_first_count || 0, nat: nationalAvg.pharmacy_first_count || 0 },
+    { label: "EPS items", self: latest.eps_items, local: localAvg.eps_items || 0, nat: nationalAvg.eps_items || 0 },
   ];
 
   const colorFor = (self: number, ref: number) => {
@@ -577,17 +597,20 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
     return "bg-amber-50 text-amber-900";
   };
 
-  const radar = rowsTable.slice(0, 4).map((r) => ({ metric: r.label, you: r.nat ? Math.round((r.self / r.nat) * 100) : 0, nat: 100 }));
+  const radar = rowsTable.slice(0, 6).map((r) => ({ metric: r.label, you: r.nat ? Math.round((r.self / r.nat) * 100) : 0, nat: 100 }));
 
   const runAI = async () => {
     setAiLoading(true);
     try {
       const r = await gen({ data: {
         pharmacy_name: pharmacy.name,
-        items_self: latest.items_dispensed, items_local: Math.round(localAvg.items || 0), items_national: Math.round(nationalAvg.items || 0),
-        nms_self: latest.nms_count, nms_local: Math.round(localAvg.nms || 0), nms_national: Math.round(nationalAvg.nms || 0),
-        pf_self: latest.pharmacy_first_count, pf_local: Math.round(localAvg.pf || 0), pf_national: Math.round(nationalAvg.pf || 0),
-        eps_rate_self: epsRateSelf, eps_rate_national: epsRateNat,
+        items_self: latest.items_dispensed, items_local: Math.round(localAvg.items_dispensed || 0), items_national: Math.round(nationalAvg.items_dispensed || 0),
+        nms_self: isScot ? latest.mcr_registrations : latest.nms_count,
+        nms_local: Math.round((isScot ? localAvg.mcr_registrations : localAvg.nms_count) || 0),
+        nms_national: Math.round((isScot ? nationalAvg.mcr_registrations : nationalAvg.nms_count) || 0),
+        pf_self: latest.pharmacy_first_count, pf_local: Math.round(localAvg.pharmacy_first_count || 0), pf_national: Math.round(nationalAvg.pharmacy_first_count || 0),
+        eps_rate_self: isScot ? (latest.mcr_items || 0) : (latest.items_dispensed ? (latest.eps_items / latest.items_dispensed) * 100 : 0),
+        eps_rate_national: isScot ? Math.round(nationalAvg.mcr_items || 0) : 0,
       }});
       setAiText(r.text); setAiAt(r.generated_at);
     } catch (e: any) { toast.error(e.message); } finally { setAiLoading(false); }
