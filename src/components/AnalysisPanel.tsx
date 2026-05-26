@@ -630,9 +630,9 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
             {rowsTable.map((r) => (
               <tr key={r.label} className="border-t border-border">
                 <td className="px-4 py-2 font-medium">{r.label}</td>
-                <td className={"px-4 py-2 text-right tabular-nums " + colorFor(r.self, r.nat)}>{r.isPct ? pct(r.self) : Math.round(r.self).toLocaleString()}</td>
-                <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{r.isPct ? "—" : Math.round(r.local).toLocaleString()}</td>
-                <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{r.isPct ? pct(r.nat) : Math.round(r.nat).toLocaleString()}</td>
+                <td className={"px-4 py-2 text-right tabular-nums " + colorFor(r.self, r.nat)}>{Math.round(r.self).toLocaleString()}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{Math.round(r.local).toLocaleString()}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{Math.round(r.nat).toLocaleString()}</td>
               </tr>
             ))}
           </tbody>
