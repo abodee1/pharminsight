@@ -403,13 +403,6 @@ function PharmacyProfile() {
               <Sparkles className="h-4 w-4" /> Analyse This Pharmacy
             </Button>
           )}
-          {user && (
-            <Link to="/acquisition/$odsCode" params={{ odsCode: pharmacy.ods_code }}>
-              <Button size="sm" variant="outline" className="gap-1.5">
-                <Sparkles className="h-4 w-4" /> Acquisition report
-              </Button>
-            </Link>
-          )}
           {user && !isMine && !showClaimBanner && (
             <button onClick={claimAsMine} className="text-xs text-primary hover:underline">
               Set as my pharmacy
