@@ -240,12 +240,21 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
 
   const last6Nominations = rows.slice(Math.max(0, latestIdx - 5), latestIdx + 1).map((r) => ({ x: `${r.month}/${String(r.year).slice(2)}`, v: r.eps_nominations }));
 
-  const cards = latest ? [
+  const cards = latest ? (isScot ? [
+    { label: "Items", v: latest.items_dispensed, p: prior?.items_dispensed ?? 0 },
+    { label: "Pharmacy First", v: latest.pharmacy_first_count, p: prior?.pharmacy_first_count ?? 0 },
+    { label: "MCR registrations", v: latest.mcr_registrations, p: prior?.mcr_registrations ?? 0 },
+    { label: "MCR items", v: latest.mcr_items, p: prior?.mcr_items ?? 0 },
+    { label: "Methadone items", v: latest.methadone_items, p: prior?.methadone_items ?? 0 },
+    { label: "Supervised doses", v: latest.supervised_methadone_doses, p: prior?.supervised_methadone_doses ?? 0 },
+    { label: "EHC items", v: latest.ehc_items, p: prior?.ehc_items ?? 0 },
+    { label: "Smoking cessation", v: latest.smoking_cessation, p: prior?.smoking_cessation ?? 0 },
+  ] : [
     { label: "Items", v: latest.items_dispensed, p: prior?.items_dispensed ?? 0 },
     { label: "NMS", v: latest.nms_count, p: prior?.nms_count ?? 0 },
     { label: "Pharmacy First", v: latest.pharmacy_first_count, p: prior?.pharmacy_first_count ?? 0 },
     { label: "Flu vaccinations", v: latest.flu_vaccinations, p: prior?.flu_vaccinations ?? 0 },
-  ] : [];
+  ]) : [];
 
   // AI summary
   const genFn = useServerFn(generatePerformanceSummary);
