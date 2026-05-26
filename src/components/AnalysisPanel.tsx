@@ -19,6 +19,10 @@ type DRow = {
   month: number; year: number;
   items_dispensed: number; nms_count: number; pharmacy_first_count: number; flu_vaccinations: number;
   eps_items: number; eps_nominations: number;
+  mcr_registrations: number; mcr_items: number; ehc_items: number;
+  methadone_items: number; supervised_methadone_doses: number; smoking_cessation: number;
+  pharmacy_first_payment: number | string | null; mcr_payment: number | string | null;
+  smoking_cessation_payment: number | string | null;
   final_payment: number | string | null; is_actual_payment: boolean;
 };
 type Company = {
@@ -43,6 +47,12 @@ const METRIC_INFO: Record<string, string> = {
   "Pharmacy First": "NHS England's walk-in clinical service for 7 common conditions (sore throat, UTI, sinusitis, etc.). The NHS pays ~£15 per consultation plus a monthly fixed payment when minimum thresholds are met.",
   "Flu vaccinations": "Seasonal NHS flu jabs delivered in pharmacy. Paid at ~£12.58 per vaccination — a key autumn/winter income stream.",
   "EPS rate": "Percentage of items dispensed via the Electronic Prescription Service rather than paper. Higher EPS means a more efficient workflow, faster reimbursement, and fewer lost scripts. Above 95% is excellent.",
+  "MCR registrations": "Patients registered for Medicines: Care & Review — the Scottish chronic medication service. Indicates the size of the active managed caseload.",
+  "MCR items": "Items dispensed under the Scottish MCR service this month. A direct proxy for chronic dispensing workload and serial-prescription income.",
+  "EHC items": "Emergency hormonal contraception (Plan B / Levonelle) supplied under the Scottish Public Health Service. Each supply attracts a service fee.",
+  "Methadone items": "Opioid replacement therapy items dispensed under the Pharmacy Public Health Service — a significant fee-paying workload in many Scottish pharmacies.",
+  "Supervised doses": "Methadone or buprenorphine doses consumed under direct pharmacist supervision. Paid per supervised dose — material monthly income for pharmacies with active OST caseloads.",
+  "Smoking cessation": "Completed smoking-cessation interventions under the Public Health Service. Each completed episode attracts a service payment.",
   "Turnover": "Total sales income reported to Companies House for the most recent filed year. Includes NHS, private and retail income before any costs.",
   "Gross margin": "Gross profit ÷ turnover. What's left after the cost of goods sold (mainly drug purchases). A typical community pharmacy sits around 30-40%.",
   "Net margin": "Net profit ÷ turnover. What's left after all costs including staff, rent and tax. Community pharmacy averages 2-5%; above 7% is strong.",
@@ -106,7 +116,7 @@ export function AnalysisPanel({ pharmacy, open, onClose }: { pharmacy: Pharmacy;
     (async () => {
       const { data } = await supabase
         .from("dispensing_data")
-        .select("month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations,final_payment,is_actual_payment")
+        .select("month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations,mcr_registrations,mcr_items,ehc_items,methadone_items,supervised_methadone_doses,smoking_cessation,pharmacy_first_payment,mcr_payment,smoking_cessation_payment,final_payment,is_actual_payment")
         .eq("pharmacy_id", pharmacy.id)
         .order("year").order("month");
       setRows((data as DRow[]) || []);
@@ -230,12 +240,21 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
 
   const last6Nominations = rows.slice(Math.max(0, latestIdx - 5), latestIdx + 1).map((r) => ({ x: `${r.month}/${String(r.year).slice(2)}`, v: r.eps_nominations }));
 
-  const cards = latest ? [
+  const cards = latest ? (isScot ? [
+    { label: "Items", v: latest.items_dispensed, p: prior?.items_dispensed ?? 0 },
+    { label: "Pharmacy First", v: latest.pharmacy_first_count, p: prior?.pharmacy_first_count ?? 0 },
+    { label: "MCR registrations", v: latest.mcr_registrations, p: prior?.mcr_registrations ?? 0 },
+    { label: "MCR items", v: latest.mcr_items, p: prior?.mcr_items ?? 0 },
+    { label: "Methadone items", v: latest.methadone_items, p: prior?.methadone_items ?? 0 },
+    { label: "Supervised doses", v: latest.supervised_methadone_doses, p: prior?.supervised_methadone_doses ?? 0 },
+    { label: "EHC items", v: latest.ehc_items, p: prior?.ehc_items ?? 0 },
+    { label: "Smoking cessation", v: latest.smoking_cessation, p: prior?.smoking_cessation ?? 0 },
+  ] : [
     { label: "Items", v: latest.items_dispensed, p: prior?.items_dispensed ?? 0 },
     { label: "NMS", v: latest.nms_count, p: prior?.nms_count ?? 0 },
     { label: "Pharmacy First", v: latest.pharmacy_first_count, p: prior?.pharmacy_first_count ?? 0 },
     { label: "Flu vaccinations", v: latest.flu_vaccinations, p: prior?.flu_vaccinations ?? 0 },
-  ] : [];
+  ]) : [];
 
   // AI summary
   const genFn = useServerFn(generatePerformanceSummary);
@@ -303,18 +322,35 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
         })}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <FlipCard
-          title="EPS rate"
-          value={<span className={epsColor}>{pct(epsRate)}</span>}
-          sub={<p className="text-xs text-muted-foreground">{">"}95% green · 80-95% amber · {"<"}80% red</p>}
-          description={METRIC_INFO["EPS rate"]}
-        />
-        <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Nominations (6m)</p>
-          <div className="h-16"><ResponsiveContainer><LineChart data={last6Nominations}><Line type="monotone" dataKey="v" stroke="var(--gold)" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></div>
+      {isScot ? (
+        <div className="grid md:grid-cols-2 gap-4">
+          <FlipCard
+            title="Pharmacy First £ (latest)"
+            value={gbp(Number(latest.pharmacy_first_payment) || 0)}
+            sub={<p className="text-xs text-muted-foreground">Verified NHS payment</p>}
+            description="Total NHS payment received for Pharmacy First consultations and the associated fixed monthly fee."
+          />
+          <FlipCard
+            title="MCR payment (latest)"
+            value={gbp(Number(latest.mcr_payment) || 0)}
+            sub={<p className="text-xs text-muted-foreground">Verified NHS payment</p>}
+            description="Total NHS payment received for the Medicines: Care & Review service this month."
+          />
         </div>
-      </div>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4">
+          <FlipCard
+            title="EPS rate"
+            value={<span className={epsColor}>{pct(epsRate)}</span>}
+            sub={<p className="text-xs text-muted-foreground">{">"}95% green · 80-95% amber · {"<"}80% red</p>}
+            description={METRIC_INFO["EPS rate"]}
+          />
+          <div className="rounded-xl border border-border bg-card p-5">
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Nominations (6m)</p>
+            <div className="h-16"><ResponsiveContainer><LineChart data={last6Nominations}><Line type="monotone" dataKey="v" stroke="var(--gold)" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></div>
+          </div>
+        </div>
+      )}
 
 
       <div className="rounded-xl border border-gold/40 bg-gold/5 p-5">
@@ -491,46 +527,66 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
   }, [rows, isScot]);
   const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
 
+  const SCOT_COLS = ["items_dispensed","pharmacy_first_count","mcr_registrations","mcr_items","methadone_items","supervised_methadone_doses","ehc_items","smoking_cessation"] as const;
+  const ENG_COLS = ["items_dispensed","nms_count","pharmacy_first_count","eps_items"] as const;
+
   useEffect(() => {
     if (!latest) { setLoading(false); return; }
     (async () => {
       setLoading(true);
       const y = latest.year, m = latest.month;
-      // National
-      const nat = await supabase.rpc("country_monthly_aggregates", {
-        p_country: pharmacy.country ?? "", p_start_year: y, p_start_month: m, p_end_year: y, p_end_month: m,
-      });
-      const n = (nat.data?.[0] || {}) as any;
-      setNationalAvg({ items: Number(n.avg_items) || 0, nms: Number(n.avg_nms) || 0, pf: Number(n.avg_pf) || 0 });
+      const cols = (isScot ? SCOT_COLS : ENG_COLS).join(",");
 
-      // Local (same region) — fetch peer ids first then compute averages
-      const { data: peers } = await supabase.from("pharmacies").select("id").eq("country", pharmacy.country ?? "").eq("region", pharmacy.region ?? "");
-      const ids = (peers || []).map((p) => p.id);
-      if (!ids.length) { setLocalAvg({ items: 0, nms: 0, pf: 0, eps_items: 0 }); setLoading(false); return; }
-      let items = 0, nms = 0, pf = 0, eps = 0, count = 0;
-      for (let i = 0; i < ids.length; i += 500) {
-        const { data } = await supabase.from("dispensing_data")
-          .select("items_dispensed,nms_count,pharmacy_first_count,eps_items")
-          .eq("year", y).eq("month", m).in("pharmacy_id", ids.slice(i, i + 500));
-        for (const r of (data || []) as any[]) { items += r.items_dispensed || 0; nms += r.nms_count || 0; pf += r.pharmacy_first_count || 0; eps += r.eps_items || 0; count++; }
+      async function avgFor(filter: (q: any) => any) {
+        const base = filter(supabase.from("pharmacies").select("id"));
+        const { data: peers } = await base;
+        const ids = (peers || []).map((p: any) => p.id);
+        if (!ids.length) return { count: 0, sums: {} as Record<string, number> };
+        const sums: Record<string, number> = {};
+        let count = 0;
+        for (let i = 0; i < ids.length; i += 500) {
+          const { data } = await supabase.from("dispensing_data")
+            .select(cols).eq("year", y).eq("month", m)
+            .in("pharmacy_id", ids.slice(i, i + 500));
+          for (const r of (data || []) as any[]) {
+            count++;
+            for (const c of (isScot ? SCOT_COLS : ENG_COLS)) sums[c] = (sums[c] || 0) + (Number(r[c]) || 0);
+          }
+        }
+        return { count, sums };
       }
-      setLocalAvg(count ? { items: items / count, nms: nms / count, pf: pf / count, eps_items: eps / count } : {});
+
+      const local = await avgFor((q) => q.eq("country", pharmacy.country ?? "").eq("region", pharmacy.region ?? ""));
+      const nat = await avgFor((q) => q.eq("country", pharmacy.country ?? ""));
+      const toAvg = (r: { count: number; sums: Record<string, number> }) => {
+        const out: Record<string, number> = {};
+        if (!r.count) return out;
+        for (const c of (isScot ? SCOT_COLS : ENG_COLS)) out[c] = (r.sums[c] || 0) / r.count;
+        return out;
+      };
+      setLocalAvg(toAvg(local));
+      setNationalAvg(toAvg(nat));
       setLoading(false);
     })();
-  }, [pharmacy, latest]);
+  }, [pharmacy, latest, isScot]);
 
   if (!latest) return <div className="p-10 text-sm text-muted-foreground text-center">No data.</div>;
   if (loading) return <div className="p-10 text-sm text-muted-foreground text-center"><Loader2 className="inline h-4 w-4 animate-spin mr-2" />Computing benchmarks…</div>;
 
-  const epsRateSelf = latest.items_dispensed ? (latest.eps_items / latest.items_dispensed) * 100 : 0;
-  const epsRateNat = nationalAvg.items ? ((localAvg.eps_items || 0) / nationalAvg.items) * 100 : 0;
-
-  const rowsTable = [
-    { label: "Items dispensed", self: latest.items_dispensed, local: localAvg.items || 0, nat: nationalAvg.items || 0 },
-    { label: "NMS", self: latest.nms_count, local: localAvg.nms || 0, nat: nationalAvg.nms || 0 },
-    { label: "Pharmacy First", self: latest.pharmacy_first_count, local: localAvg.pf || 0, nat: nationalAvg.pf || 0 },
-    { label: "Flu vaccinations", self: latest.flu_vaccinations, local: 0, nat: 0 },
-    { label: "EPS rate (%)", self: epsRateSelf, local: 0, nat: epsRateNat, isPct: true },
+  const rowsTable = isScot ? [
+    { label: "Items dispensed", self: latest.items_dispensed, local: localAvg.items_dispensed || 0, nat: nationalAvg.items_dispensed || 0 },
+    { label: "Pharmacy First", self: latest.pharmacy_first_count, local: localAvg.pharmacy_first_count || 0, nat: nationalAvg.pharmacy_first_count || 0 },
+    { label: "MCR registrations", self: latest.mcr_registrations, local: localAvg.mcr_registrations || 0, nat: nationalAvg.mcr_registrations || 0 },
+    { label: "MCR items", self: latest.mcr_items, local: localAvg.mcr_items || 0, nat: nationalAvg.mcr_items || 0 },
+    { label: "Methadone items", self: latest.methadone_items, local: localAvg.methadone_items || 0, nat: nationalAvg.methadone_items || 0 },
+    { label: "Supervised doses", self: latest.supervised_methadone_doses, local: localAvg.supervised_methadone_doses || 0, nat: nationalAvg.supervised_methadone_doses || 0 },
+    { label: "EHC items", self: latest.ehc_items, local: localAvg.ehc_items || 0, nat: nationalAvg.ehc_items || 0 },
+    { label: "Smoking cessation", self: latest.smoking_cessation, local: localAvg.smoking_cessation || 0, nat: nationalAvg.smoking_cessation || 0 },
+  ] : [
+    { label: "Items dispensed", self: latest.items_dispensed, local: localAvg.items_dispensed || 0, nat: nationalAvg.items_dispensed || 0 },
+    { label: "NMS", self: latest.nms_count, local: localAvg.nms_count || 0, nat: nationalAvg.nms_count || 0 },
+    { label: "Pharmacy First", self: latest.pharmacy_first_count, local: localAvg.pharmacy_first_count || 0, nat: nationalAvg.pharmacy_first_count || 0 },
+    { label: "EPS items", self: latest.eps_items, local: localAvg.eps_items || 0, nat: nationalAvg.eps_items || 0 },
   ];
 
   const colorFor = (self: number, ref: number) => {
@@ -541,17 +597,20 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
     return "bg-amber-50 text-amber-900";
   };
 
-  const radar = rowsTable.slice(0, 4).map((r) => ({ metric: r.label, you: r.nat ? Math.round((r.self / r.nat) * 100) : 0, nat: 100 }));
+  const radar = rowsTable.slice(0, 6).map((r) => ({ metric: r.label, you: r.nat ? Math.round((r.self / r.nat) * 100) : 0, nat: 100 }));
 
   const runAI = async () => {
     setAiLoading(true);
     try {
       const r = await gen({ data: {
         pharmacy_name: pharmacy.name,
-        items_self: latest.items_dispensed, items_local: Math.round(localAvg.items || 0), items_national: Math.round(nationalAvg.items || 0),
-        nms_self: latest.nms_count, nms_local: Math.round(localAvg.nms || 0), nms_national: Math.round(nationalAvg.nms || 0),
-        pf_self: latest.pharmacy_first_count, pf_local: Math.round(localAvg.pf || 0), pf_national: Math.round(nationalAvg.pf || 0),
-        eps_rate_self: epsRateSelf, eps_rate_national: epsRateNat,
+        items_self: latest.items_dispensed, items_local: Math.round(localAvg.items_dispensed || 0), items_national: Math.round(nationalAvg.items_dispensed || 0),
+        nms_self: isScot ? latest.mcr_registrations : latest.nms_count,
+        nms_local: Math.round((isScot ? localAvg.mcr_registrations : localAvg.nms_count) || 0),
+        nms_national: Math.round((isScot ? nationalAvg.mcr_registrations : nationalAvg.nms_count) || 0),
+        pf_self: latest.pharmacy_first_count, pf_local: Math.round(localAvg.pharmacy_first_count || 0), pf_national: Math.round(nationalAvg.pharmacy_first_count || 0),
+        eps_rate_self: isScot ? (latest.mcr_items || 0) : (latest.items_dispensed ? (latest.eps_items / latest.items_dispensed) * 100 : 0),
+        eps_rate_national: isScot ? Math.round(nationalAvg.mcr_items || 0) : 0,
       }});
       setAiText(r.text); setAiAt(r.generated_at);
     } catch (e: any) { toast.error(e.message); } finally { setAiLoading(false); }
@@ -571,9 +630,9 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
             {rowsTable.map((r) => (
               <tr key={r.label} className="border-t border-border">
                 <td className="px-4 py-2 font-medium">{r.label}</td>
-                <td className={"px-4 py-2 text-right tabular-nums " + colorFor(r.self, r.nat)}>{r.isPct ? pct(r.self) : Math.round(r.self).toLocaleString()}</td>
-                <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{r.isPct ? "—" : Math.round(r.local).toLocaleString()}</td>
-                <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{r.isPct ? pct(r.nat) : Math.round(r.nat).toLocaleString()}</td>
+                <td className={"px-4 py-2 text-right tabular-nums " + colorFor(r.self, r.nat)}>{Math.round(r.self).toLocaleString()}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{Math.round(r.local).toLocaleString()}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{Math.round(r.nat).toLocaleString()}</td>
               </tr>
             ))}
           </tbody>

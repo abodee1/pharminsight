@@ -403,13 +403,6 @@ function PharmacyProfile() {
               <Sparkles className="h-4 w-4" /> Analyse This Pharmacy
             </Button>
           )}
-          {user && (
-            <Link to="/acquisition/$odsCode" params={{ odsCode: pharmacy.ods_code }}>
-              <Button size="sm" variant="outline" className="gap-1.5">
-                <Sparkles className="h-4 w-4" /> Acquisition report
-              </Button>
-            </Link>
-          )}
           {user && !isMine && !showClaimBanner && (
             <button onClick={claimAsMine} className="text-xs text-primary hover:underline">
               Set as my pharmacy
@@ -634,37 +627,75 @@ function PharmacyProfile() {
   );
 }
 
+const METRIC_DESCRIPTIONS: Record<string, string> = {
+  "Items dispensed": "Total prescription items dispensed this month. The primary driver of NHS pharmacy income — each item earns a dispensing fee plus drug cost reimbursement.",
+  "EPS items": "Items dispensed via the Electronic Prescription Service. Higher EPS share means a faster, more efficient workflow and quicker reimbursement.",
+  "EPS nominations": "Patients who have nominated this pharmacy as their default EPS dispenser. A leading indicator of future script volume and patient loyalty.",
+  "NMS": "New Medicine Service consultations — paid by the NHS (~£28 each) when a pharmacist supports a patient newly started on a long-term medicine.",
+  "Pharmacy First": "Pharmacy First clinical consultations. In England paid per consultation plus a monthly fixed fee; in Scotland forms a core part of the contract.",
+  "MCR registrations": "Patients registered for Medicines: Care & Review — the Scottish chronic medication service. A higher count means a larger ongoing managed caseload.",
+  "MCR items": "Items dispensed under the MCR service this month. Tracks the active workload of the Scottish chronic medication caseload.",
+  "EHC items": "Emergency hormonal contraception supplies (Plan B / Levonelle) under the NHS Public Health Service.",
+  "Methadone items": "Substance misuse / opioid replacement prescriptions dispensed under the Pharmacy Public Health Service.",
+  "Supervised doses": "Methadone or buprenorphine doses consumed under direct pharmacist supervision. Paid per supervised dose.",
+  "Smoking cessation": "Smoking cessation interventions delivered under the Public Health Service. Each completed episode attracts a service payment.",
+  "Smoking cessation £": "Total NHS payment received this month for smoking cessation services delivered.",
+  "Pharmacy First £": "Total NHS payment received this month for Pharmacy First consultations and the associated fixed fee.",
+  "MCR payment": "Total NHS payment received this month for the Medicines: Care & Review service.",
+  "Gross cost": "Total gross drug cost reimbursed by the NHS for items dispensed this month, before clawbacks and deductions.",
+  "Final NHS payment": "The actual net payment received from the NHS for this month — gross cost plus all fees and service payments, less clawbacks and deductions.",
+};
+
 function MetricCard({ label, value, prior, yoy, format, rank }: {
   label: string; value: number; prior: number; yoy: number;
   format?: (n: number) => string;
   rank?: { rank: number; total: number };
 }) {
+  const [flipped, setFlipped] = useState(false);
   const fmt = format ?? ((n: number) => n.toLocaleString());
   const delta = prior ? ((value - prior) / prior) * 100 : 0;
   const yoyDelta = yoy ? ((value - yoy) / yoy) * 100 : 0;
   const Icon = delta > 1 ? TrendingUp : delta < -1 ? TrendingDown : Minus;
   const color = delta > 1 ? "text-emerald-600" : delta < -1 ? "text-red-600" : "text-muted-foreground";
+  const description = METRIC_DESCRIPTIONS[label] || "No description available for this metric yet.";
   return (
-    <div className="rounded-lg bg-card border border-border p-4 shadow-sm">
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xl font-bold">{fmt(value)}</p>
-      {prior > 0 && (
-        <div className={`mt-1 flex items-center gap-1 text-xs ${color}`}>
-          <Icon className="h-3 w-3" />
-          {Math.abs(delta).toFixed(1)}% vs prior
+    <button
+      type="button"
+      onClick={() => setFlipped((f) => !f)}
+      className="group relative w-full text-left [perspective:1000px] focus:outline-none rounded-lg"
+      aria-label={`${label}: tap to ${flipped ? "hide" : "show"} description`}
+    >
+      <div className={`relative h-full min-h-[8.5rem] transition-transform duration-500 [transform-style:preserve-3d] ${flipped ? "[transform:rotateY(180deg)]" : ""}`}>
+        <div className="absolute inset-0 rounded-lg bg-card border border-border p-4 shadow-sm [backface-visibility:hidden]">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center justify-between gap-2">
+            <span className="truncate">{label}</span>
+            <span className="text-[9px] opacity-40 group-hover:opacity-100 shrink-0">tap ⓘ</span>
+          </p>
+          <p className="mt-1 text-xl font-bold">{fmt(value)}</p>
+          {prior > 0 && (
+            <div className={`mt-1 flex items-center gap-1 text-xs ${color}`}>
+              <Icon className="h-3 w-3" />
+              {Math.abs(delta).toFixed(1)}% vs prior
+            </div>
+          )}
+          {yoy > 0 && (
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
+              {yoyDelta >= 0 ? "+" : ""}{yoyDelta.toFixed(1)}% YoY
+            </div>
+          )}
+          {rank && rank.total > 0 && (
+            <div className="mt-1 text-[11px] text-muted-foreground">
+              Rank #{rank.rank.toLocaleString()} of {rank.total.toLocaleString()}
+            </div>
+          )}
         </div>
-      )}
-      {yoy > 0 && (
-        <div className="mt-0.5 text-[11px] text-muted-foreground">
-          {yoyDelta >= 0 ? "+" : ""}{yoyDelta.toFixed(1)}% YoY
+        <div className="absolute inset-0 rounded-lg border border-gold/50 bg-gold/5 p-4 shadow-sm [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-auto">
+          <p className="text-[11px] uppercase tracking-wider text-gold font-semibold">{label}</p>
+          <p className="text-xs leading-relaxed mt-1.5 text-foreground/90">{description}</p>
+          <p className="text-[10px] text-muted-foreground mt-2">Tap to flip back.</p>
         </div>
-      )}
-      {rank && rank.total > 0 && (
-        <div className="mt-1 text-[11px] text-muted-foreground">
-          Rank #{rank.rank.toLocaleString()} of {rank.total.toLocaleString()}
-        </div>
-      )}
-    </div>
+      </div>
+    </button>
   );
 }
 
