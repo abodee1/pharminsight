@@ -59,6 +59,48 @@ const METRICS: MetricDef[] = [
     }, format: fmtPct },
 ];
 
+const METRIC_DESC: Record<string, string> = {
+  "Items": "Total prescription items dispensed this month. The primary driver of NHS pharmacy income.",
+  "NMS": "New Medicine Service consultations — the NHS pays ~£28 per completed intervention.",
+  "PF": "Pharmacy First consultations delivered this month.",
+  "EPS": "Items dispensed via the Electronic Prescription Service (England / Wales).",
+  "PF/1k": "Pharmacy First consultations per 1,000 items dispensed — a size-adjusted clinical-services intensity score.",
+  "NMS/1k": "NMS interventions per 1,000 items dispensed — measures how aggressively the team converts new prescriptions into paid NMS consultations.",
+  "EPS %": "Share of items routed through EPS rather than paper. Above 95% is excellent.",
+};
+
+function MetricTile({ mt, value, diff, pct }: { mt: MetricDef; value: number; diff: number; pct: number }) {
+  const [flipped, setFlipped] = useState(false);
+  const up = diff > 0, flat = diff === 0;
+  return (
+    <button
+      type="button"
+      onClick={() => setFlipped((f) => !f)}
+      className="group relative w-full text-left [perspective:800px] focus:outline-none"
+      aria-label={`${mt.label}: tap for explanation`}
+    >
+      <div className={`relative h-full min-h-[4.5rem] transition-transform duration-500 [transform-style:preserve-3d] ${flipped ? "[transform:rotateY(180deg)]" : ""}`}>
+        <div className="absolute inset-0 rounded-md bg-secondary/40 px-2 py-1.5 [backface-visibility:hidden]">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground truncate flex items-center justify-between gap-1">
+            <span className="truncate">{mt.short}</span><span className="text-[8px] opacity-30 group-hover:opacity-100">ⓘ</span>
+          </p>
+          <p className="text-base font-semibold tabular-nums leading-tight">{value > 0 ? mt.format(value) : "—"}</p>
+          <div className="mt-0.5 flex items-center gap-0.5 text-[10px]">
+            {flat ? <Minus className="h-3 w-3 text-muted-foreground" /> : up ? <ArrowUpRight className="h-3 w-3 text-emerald-600" /> : <ArrowDownRight className="h-3 w-3 text-rose-600" />}
+            <span className={flat ? "text-muted-foreground" : up ? "text-emerald-700" : "text-rose-700"}>
+              {flat ? "—" : `${up ? "+" : ""}${pct}%`}
+            </span>
+          </div>
+        </div>
+        <div className="absolute inset-0 rounded-md border border-gold/50 bg-gold/5 px-2 py-1.5 [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-auto">
+          <p className="text-[9px] uppercase tracking-wider text-gold font-semibold">{mt.short}</p>
+          <p className="text-[10px] leading-snug mt-0.5 text-foreground/90">{METRIC_DESC[mt.short] || mt.label}</p>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 const SERIES_COLORS = [
   "var(--cmp-1)",
   "var(--cmp-2)",
