@@ -4,7 +4,6 @@ import {
   Trophy,
   BarChart2,
   GitCompare,
-  Sparkles,
   Upload,
   Settings,
   Database,
@@ -21,7 +20,6 @@ const links = [
   { to: "/benchmarking", label: "Benchmarking", icon: BarChart2 },
   { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/income", label: "Income Estimator", icon: PoundSterling },
-  { to: "/insights", label: "Smart Insights", icon: Sparkles },
   { to: "/my-analyses", label: "My Analyses", icon: Bookmark },
 
   { to: "/admin/data", label: "Data Coverage", icon: Database },

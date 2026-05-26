@@ -18,7 +18,6 @@ import { Route as AuthenticatedUploadRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedMyAnalysesRouteImport } from './routes/_authenticated/my-analyses'
 import { Route as AuthenticatedLeaderboardsRouteImport } from './routes/_authenticated/leaderboards'
-import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedIncomeRouteImport } from './routes/_authenticated/income'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCompareRouteImport } from './routes/_authenticated/compare'
@@ -76,11 +75,6 @@ const AuthenticatedLeaderboardsRoute =
     path: '/leaderboards',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedInsightsRoute = AuthenticatedInsightsRouteImport.update({
-  id: '/insights',
-  path: '/insights',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedIncomeRoute = AuthenticatedIncomeRouteImport.update({
   id: '/income',
   path: '/income',
@@ -151,7 +145,6 @@ export interface FileRoutesByFullPath {
   '/compare': typeof AuthenticatedCompareRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/income': typeof AuthenticatedIncomeRoute
-  '/insights': typeof AuthenticatedInsightsRoute
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/my-analyses': typeof AuthenticatedMyAnalysesRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -173,7 +166,6 @@ export interface FileRoutesByTo {
   '/compare': typeof AuthenticatedCompareRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/income': typeof AuthenticatedIncomeRoute
-  '/insights': typeof AuthenticatedInsightsRoute
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/my-analyses': typeof AuthenticatedMyAnalysesRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -197,7 +189,6 @@ export interface FileRoutesById {
   '/_authenticated/compare': typeof AuthenticatedCompareRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/income': typeof AuthenticatedIncomeRoute
-  '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/_authenticated/my-analyses': typeof AuthenticatedMyAnalysesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -221,7 +212,6 @@ export interface FileRouteTypes {
     | '/compare'
     | '/dashboard'
     | '/income'
-    | '/insights'
     | '/leaderboards'
     | '/my-analyses'
     | '/settings'
@@ -243,7 +233,6 @@ export interface FileRouteTypes {
     | '/compare'
     | '/dashboard'
     | '/income'
-    | '/insights'
     | '/leaderboards'
     | '/my-analyses'
     | '/settings'
@@ -266,7 +255,6 @@ export interface FileRouteTypes {
     | '/_authenticated/compare'
     | '/_authenticated/dashboard'
     | '/_authenticated/income'
-    | '/_authenticated/insights'
     | '/_authenticated/leaderboards'
     | '/_authenticated/my-analyses'
     | '/_authenticated/settings'
@@ -358,13 +346,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLeaderboardsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/insights': {
-      id: '/_authenticated/insights'
-      path: '/insights'
-      fullPath: '/insights'
-      preLoaderRoute: typeof AuthenticatedInsightsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/income': {
       id: '/_authenticated/income'
       path: '/income'
@@ -450,7 +431,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCompareRoute: typeof AuthenticatedCompareRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedIncomeRoute: typeof AuthenticatedIncomeRoute
-  AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedLeaderboardsRoute: typeof AuthenticatedLeaderboardsRoute
   AuthenticatedMyAnalysesRoute: typeof AuthenticatedMyAnalysesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -465,7 +445,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCompareRoute: AuthenticatedCompareRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedIncomeRoute: AuthenticatedIncomeRoute,
-  AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedLeaderboardsRoute: AuthenticatedLeaderboardsRoute,
   AuthenticatedMyAnalysesRoute: AuthenticatedMyAnalysesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
