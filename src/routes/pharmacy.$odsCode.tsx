@@ -735,6 +735,33 @@ const METRIC_DESCRIPTIONS: Record<string, string> = {
   "Final NHS payment": "The actual net payment received from the NHS for this month — gross cost plus all fees and service payments, less clawbacks and deductions.",
 };
 
+type MetricAccent = "indigo" | "emerald" | "amber" | "rose" | "sky" | "violet" | "slate" | "teal";
+
+const METRIC_ACCENTS: Record<MetricAccent, { ring: string; chip: string; glow: string; bar: string }> = {
+  indigo:  { ring: "ring-indigo-500/15",  chip: "bg-indigo-500/10 text-indigo-600",   glow: "from-indigo-500/15",  bar: "bg-indigo-500" },
+  emerald: { ring: "ring-emerald-500/15", chip: "bg-emerald-500/10 text-emerald-600", glow: "from-emerald-500/15", bar: "bg-emerald-500" },
+  amber:   { ring: "ring-amber-500/15",   chip: "bg-amber-500/10 text-amber-600",     glow: "from-amber-500/15",   bar: "bg-amber-500" },
+  rose:    { ring: "ring-rose-500/15",    chip: "bg-rose-500/10 text-rose-600",       glow: "from-rose-500/15",    bar: "bg-rose-500" },
+  sky:     { ring: "ring-sky-500/15",     chip: "bg-sky-500/10 text-sky-600",         glow: "from-sky-500/15",     bar: "bg-sky-500" },
+  violet:  { ring: "ring-violet-500/15",  chip: "bg-violet-500/10 text-violet-600",   glow: "from-violet-500/15",  bar: "bg-violet-500" },
+  slate:   { ring: "ring-slate-500/15",   chip: "bg-slate-500/10 text-slate-600",     glow: "from-slate-500/15",   bar: "bg-slate-500" },
+  teal:    { ring: "ring-teal-500/15",    chip: "bg-teal-500/10 text-teal-600",       glow: "from-teal-500/15",    bar: "bg-teal-500" },
+};
+
+function metricStyle(label: string): { icon: LucideIcon; accent: MetricAccent } {
+  const l = label.toLowerCase();
+  if (l.includes("pharmacy first")) return { icon: Stethoscope, accent: "emerald" };
+  if (l.includes("nms")) return { icon: ClipboardCheck, accent: "sky" };
+  if (l.includes("eps")) return { icon: FileText, accent: "violet" };
+  if (l.includes("mcr")) return { icon: HeartPulse, accent: "rose" };
+  if (l.includes("smoking")) return { icon: Cigarette, accent: "amber" };
+  if (l.includes("methadone") || l.includes("supervised")) return { icon: Pill, accent: "teal" };
+  if (l.includes("ehc")) return { icon: Syringe, accent: "rose" };
+  if (l.includes("£") || l.includes("payment") || l.includes("cost")) return { icon: PoundSterling, accent: "amber" };
+  if (l.includes("items")) return { icon: Package, accent: "indigo" };
+  return { icon: Activity, accent: "slate" };
+}
+
 function MetricCard({ label, value, prior, yoy, format, rank, period }: {
   label: string; value: number; prior: number; yoy: number;
   format?: (n: number) => string;
@@ -745,44 +772,68 @@ function MetricCard({ label, value, prior, yoy, format, rank, period }: {
   const fmt = format ?? ((n: number) => n.toLocaleString());
   const delta = prior ? ((value - prior) / prior) * 100 : 0;
   const yoyDelta = yoy ? ((value - yoy) / yoy) * 100 : 0;
-  const Icon = delta > 1 ? TrendingUp : delta < -1 ? TrendingDown : Minus;
-  const color = delta > 1 ? "text-emerald-600" : delta < -1 ? "text-red-600" : "text-muted-foreground";
+  const TrendIcon = delta > 1 ? TrendingUp : delta < -1 ? TrendingDown : Minus;
+  const trendColor = delta > 1 ? "bg-emerald-500/10 text-emerald-600" : delta < -1 ? "bg-rose-500/10 text-rose-600" : "bg-muted text-muted-foreground";
   const description = METRIC_DESCRIPTIONS[label] || "No description available for this metric yet.";
+  const { icon: Icon, accent } = metricStyle(label);
+  const a = METRIC_ACCENTS[accent];
   return (
     <button
       type="button"
       onClick={() => setFlipped((f) => !f)}
-      className="group relative w-full text-left [perspective:1000px] focus:outline-none rounded-lg"
+      className="group relative w-full text-left [perspective:1000px] focus:outline-none rounded-xl"
       aria-label={`${label}: tap to ${flipped ? "hide" : "show"} description`}
     >
-      <div className={`relative h-full min-h-[9.5rem] transition-transform duration-500 [transform-style:preserve-3d] ${flipped ? "[transform:rotateY(180deg)]" : ""}`}>
-        <div className="absolute inset-0 rounded-lg bg-card border border-border p-4 shadow-sm [backface-visibility:hidden] flex flex-col">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center justify-between gap-2">
-            <span className="truncate">{label}</span>
-            <span className="text-[9px] opacity-40 group-hover:opacity-100 shrink-0">tap ⓘ</span>
+      <div className={`relative h-full min-h-[10.5rem] transition-transform duration-500 [transform-style:preserve-3d] ${flipped ? "[transform:rotateY(180deg)]" : ""}`}>
+        <div
+          className={cn(
+            "absolute inset-0 overflow-hidden rounded-xl bg-card border border-border p-4 shadow-sm ring-1 [backface-visibility:hidden] flex flex-col transition-all duration-200 group-hover:-translate-y-0.5 group-hover:shadow-md",
+            a.ring,
+          )}
+        >
+          <div className={cn("pointer-events-none absolute -top-10 -right-10 h-28 w-28 rounded-full bg-gradient-to-br to-transparent opacity-70 blur-2xl", a.glow)} />
+          <div className={cn("absolute left-0 top-0 h-full w-[3px]", a.bar)} />
+
+          <div className="relative flex items-start justify-between gap-2">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground flex-1 min-w-0 truncate">
+              {label}
+            </p>
+            <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", a.chip)}>
+              <Icon className="h-3.5 w-3.5" />
+            </div>
+          </div>
+
+          <p className="relative mt-2 text-[1.55rem] leading-none font-semibold tracking-tight text-foreground tabular-nums">
+            {fmt(value)}
           </p>
-          <p className="mt-1.5 text-xl font-bold leading-tight">{fmt(value)}</p>
+
           {period && (
-            <p className="text-[10px] text-muted-foreground mt-1">Monthly · {period}</p>
+            <p className="relative mt-1.5 text-[10px] text-muted-foreground">Monthly · {period}</p>
           )}
-          {prior > 0 && (
-            <div className={`mt-1 flex items-center gap-1 text-xs ${color}`}>
-              <Icon className="h-3 w-3" />
-              {Math.abs(delta).toFixed(1)}% vs prior
-            </div>
-          )}
-          {yoy > 0 && (
-            <div className="mt-0.5 text-[11px] text-muted-foreground">
-              {yoyDelta >= 0 ? "+" : ""}{yoyDelta.toFixed(1)}% YoY
-            </div>
-          )}
-          {rank && rank.total > 0 && (
-            <div className="mt-1 text-[11px] text-muted-foreground">
-              Rank #{rank.rank.toLocaleString()} of {rank.total.toLocaleString()}
-            </div>
-          )}
+
+          <div className="relative mt-auto pt-2 flex flex-wrap items-center gap-1.5">
+            {prior > 0 && (
+              <span className={cn("inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-semibold", trendColor)}>
+                <TrendIcon className="h-2.5 w-2.5" />
+                {Math.abs(delta).toFixed(1)}%
+                <span className="font-normal opacity-70">vs prior</span>
+              </span>
+            )}
+            {yoy > 0 && (
+              <span className="text-[10px] text-muted-foreground">
+                {yoyDelta >= 0 ? "+" : ""}{yoyDelta.toFixed(1)}% YoY
+              </span>
+            )}
+            {rank && rank.total > 0 && (
+              <span className="text-[10px] text-muted-foreground">
+                #{rank.rank.toLocaleString()} / {rank.total.toLocaleString()}
+              </span>
+            )}
+          </div>
+
+          <span className="absolute bottom-2 right-3 text-[9px] text-muted-foreground/50 group-hover:text-muted-foreground transition-colors">tap ⓘ</span>
         </div>
-        <div className="absolute inset-0 rounded-lg border border-gold/50 bg-gold/5 p-4 shadow-sm [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-auto">
+        <div className="absolute inset-0 rounded-xl border border-gold/50 bg-gold/5 p-4 shadow-sm [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-auto">
           <p className="text-[11px] uppercase tracking-wider text-gold font-semibold">{label}</p>
           <p className="text-xs leading-relaxed mt-1.5 text-foreground/90">{description}</p>
           <p className="text-[10px] text-muted-foreground mt-2">Tap to flip back.</p>
