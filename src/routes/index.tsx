@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Trophy, BarChart2, Sparkles } from "lucide-react";
+import { Trophy, BarChart2, Building2 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: Landing,
@@ -75,9 +75,9 @@ function Landing() {
               body: "Compare yourself against the local average, national average, and top 10% — with a gap analysis in plain English.",
             },
             {
-              icon: Sparkles,
-              title: "Smart Insights",
-              body: "Generate SWOT analyses, performance commentary, and acquisition assessments grounded in your real NHS data.",
+              icon: Building2,
+              title: "Pharmacy Analysis",
+              body: "Drill into any pharmacy: Companies House financials, valuation ranges, red flags and an AI-written performance summary in one click.",
             },
           ].map((f) => (
             <div
