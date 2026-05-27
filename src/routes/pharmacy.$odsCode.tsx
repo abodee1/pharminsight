@@ -9,12 +9,14 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, Cell,
 } from "recharts";
-import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X, ShieldCheck, Sparkles } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X, ShieldCheck, Sparkles, Package, Stethoscope, ClipboardCheck, FileText, PoundSterling, Cigarette, Pill, Syringe, HeartPulse, Activity } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { PharmacySearch } from "@/components/PharmacySearch";
 import { PercentileRail, AnnotatedSparkline, ShareDonut } from "@/components/Infographics";
 import { LocalLandscape } from "@/components/LocalLandscape";
 import { AnalysisPanel } from "@/components/AnalysisPanel";
 import { fetchAll } from "@/lib/fetchAll";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/pharmacy/$odsCode")({ component: PharmacyProfile });
 
