@@ -753,15 +753,15 @@ function MetricCard({ label, value, prior, yoy, format, rank, period }: {
       className="group relative w-full text-left [perspective:1000px] focus:outline-none rounded-lg"
       aria-label={`${label}: tap to ${flipped ? "hide" : "show"} description`}
     >
-      <div className={`relative h-full min-h-[8.5rem] transition-transform duration-500 [transform-style:preserve-3d] ${flipped ? "[transform:rotateY(180deg)]" : ""}`}>
-        <div className="absolute inset-0 rounded-lg bg-card border border-border p-4 shadow-sm [backface-visibility:hidden]">
+      <div className={`relative h-full min-h-[9.5rem] transition-transform duration-500 [transform-style:preserve-3d] ${flipped ? "[transform:rotateY(180deg)]" : ""}`}>
+        <div className="absolute inset-0 rounded-lg bg-card border border-border p-4 shadow-sm [backface-visibility:hidden] flex flex-col">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center justify-between gap-2">
             <span className="truncate">{label}</span>
             <span className="text-[9px] opacity-40 group-hover:opacity-100 shrink-0">tap ⓘ</span>
           </p>
-          <p className="mt-1 text-xl font-bold">{fmt(value)}</p>
+          <p className="mt-1.5 text-xl font-bold leading-tight">{fmt(value)}</p>
           {period && (
-            <p className="text-[10px] text-muted-foreground mt-0.5">Monthly · {period}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Monthly · {period}</p>
           )}
           {prior > 0 && (
             <div className={`mt-1 flex items-center gap-1 text-xs ${color}`}>
