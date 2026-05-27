@@ -664,10 +664,11 @@ const METRIC_DESCRIPTIONS: Record<string, string> = {
   "Final NHS payment": "The actual net payment received from the NHS for this month — gross cost plus all fees and service payments, less clawbacks and deductions.",
 };
 
-function MetricCard({ label, value, prior, yoy, format, rank }: {
+function MetricCard({ label, value, prior, yoy, format, rank, period }: {
   label: string; value: number; prior: number; yoy: number;
   format?: (n: number) => string;
   rank?: { rank: number; total: number };
+  period?: string;
 }) {
   const [flipped, setFlipped] = useState(false);
   const fmt = format ?? ((n: number) => n.toLocaleString());
@@ -690,6 +691,9 @@ function MetricCard({ label, value, prior, yoy, format, rank }: {
             <span className="text-[9px] opacity-40 group-hover:opacity-100 shrink-0">tap ⓘ</span>
           </p>
           <p className="mt-1 text-xl font-bold">{fmt(value)}</p>
+          {period && (
+            <p className="text-[10px] text-muted-foreground mt-0.5">Monthly · {period}</p>
+          )}
           {prior > 0 && (
             <div className={`mt-1 flex items-center gap-1 text-xs ${color}`}>
               <Icon className="h-3 w-3" />
