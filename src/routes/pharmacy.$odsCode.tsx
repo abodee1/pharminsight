@@ -446,13 +446,8 @@ function PharmacyProfile() {
           </div>
 
           {!showVerified && !hasFp34c && (
-            <div className="mt-4 rounded-lg border border-border bg-muted/40 p-3 flex items-center justify-between gap-3 text-sm">
-              <span className="text-muted-foreground">
-                Payment data isn't publicly available for this pharmacy.
-              </span>
-              <Link to="/income" className="text-primary font-medium hover:underline whitespace-nowrap">
-                View income estimator →
-              </Link>
+            <div className="mt-4 rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+              Payment data isn't publicly available for this pharmacy.
             </div>
           )}
 

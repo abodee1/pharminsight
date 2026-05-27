@@ -18,12 +18,10 @@ import { Route as AuthenticatedUploadRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedMyAnalysesRouteImport } from './routes/_authenticated/my-analyses'
 import { Route as AuthenticatedLeaderboardsRouteImport } from './routes/_authenticated/leaderboards'
-import { Route as AuthenticatedIncomeRouteImport } from './routes/_authenticated/income'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCompareRouteImport } from './routes/_authenticated/compare'
 import { Route as AuthenticatedBenchmarkingRouteImport } from './routes/_authenticated/benchmarking'
 import { Route as AuthenticatedAdminPaymentsImportRouteImport } from './routes/_authenticated/admin.payments-import'
-import { Route as AuthenticatedAdminDataRouteImport } from './routes/_authenticated/admin.data'
 import { Route as AuthenticatedAcquisitionOdsCodeRouteImport } from './routes/_authenticated/acquisition.$odsCode'
 import { Route as ApiPublicIngestPharmacyPaymentsRouteImport } from './routes/api/public/ingest.pharmacy-payments'
 import { Route as ApiPublicHooksIngestScotlandRouteImport } from './routes/api/public/hooks/ingest-scotland'
@@ -75,11 +73,6 @@ const AuthenticatedLeaderboardsRoute =
     path: '/leaderboards',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedIncomeRoute = AuthenticatedIncomeRouteImport.update({
-  id: '/income',
-  path: '/income',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -102,11 +95,6 @@ const AuthenticatedAdminPaymentsImportRoute =
     path: '/admin/payments-import',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAdminDataRoute = AuthenticatedAdminDataRouteImport.update({
-  id: '/admin/data',
-  path: '/admin/data',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedAcquisitionOdsCodeRoute =
   AuthenticatedAcquisitionOdsCodeRouteImport.update({
     id: '/acquisition/$odsCode',
@@ -144,14 +132,12 @@ export interface FileRoutesByFullPath {
   '/benchmarking': typeof AuthenticatedBenchmarkingRoute
   '/compare': typeof AuthenticatedCompareRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/income': typeof AuthenticatedIncomeRoute
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/my-analyses': typeof AuthenticatedMyAnalysesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/upload': typeof AuthenticatedUploadRoute
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/acquisition/$odsCode': typeof AuthenticatedAcquisitionOdsCodeRoute
-  '/admin/data': typeof AuthenticatedAdminDataRoute
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-ni': typeof ApiPublicHooksIngestNiRoute
@@ -165,14 +151,12 @@ export interface FileRoutesByTo {
   '/benchmarking': typeof AuthenticatedBenchmarkingRoute
   '/compare': typeof AuthenticatedCompareRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/income': typeof AuthenticatedIncomeRoute
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/my-analyses': typeof AuthenticatedMyAnalysesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/upload': typeof AuthenticatedUploadRoute
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/acquisition/$odsCode': typeof AuthenticatedAcquisitionOdsCodeRoute
-  '/admin/data': typeof AuthenticatedAdminDataRoute
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-ni': typeof ApiPublicHooksIngestNiRoute
@@ -188,14 +172,12 @@ export interface FileRoutesById {
   '/_authenticated/benchmarking': typeof AuthenticatedBenchmarkingRoute
   '/_authenticated/compare': typeof AuthenticatedCompareRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/income': typeof AuthenticatedIncomeRoute
   '/_authenticated/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/_authenticated/my-analyses': typeof AuthenticatedMyAnalysesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/upload': typeof AuthenticatedUploadRoute
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/_authenticated/acquisition/$odsCode': typeof AuthenticatedAcquisitionOdsCodeRoute
-  '/_authenticated/admin/data': typeof AuthenticatedAdminDataRoute
   '/_authenticated/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-ni': typeof ApiPublicHooksIngestNiRoute
@@ -211,14 +193,12 @@ export interface FileRouteTypes {
     | '/benchmarking'
     | '/compare'
     | '/dashboard'
-    | '/income'
     | '/leaderboards'
     | '/my-analyses'
     | '/settings'
     | '/upload'
     | '/pharmacy/$odsCode'
     | '/acquisition/$odsCode'
-    | '/admin/data'
     | '/admin/payments-import'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-ni'
@@ -232,14 +212,12 @@ export interface FileRouteTypes {
     | '/benchmarking'
     | '/compare'
     | '/dashboard'
-    | '/income'
     | '/leaderboards'
     | '/my-analyses'
     | '/settings'
     | '/upload'
     | '/pharmacy/$odsCode'
     | '/acquisition/$odsCode'
-    | '/admin/data'
     | '/admin/payments-import'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-ni'
@@ -254,14 +232,12 @@ export interface FileRouteTypes {
     | '/_authenticated/benchmarking'
     | '/_authenticated/compare'
     | '/_authenticated/dashboard'
-    | '/_authenticated/income'
     | '/_authenticated/leaderboards'
     | '/_authenticated/my-analyses'
     | '/_authenticated/settings'
     | '/_authenticated/upload'
     | '/pharmacy/$odsCode'
     | '/_authenticated/acquisition/$odsCode'
-    | '/_authenticated/admin/data'
     | '/_authenticated/admin/payments-import'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-ni'
@@ -346,13 +322,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLeaderboardsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/income': {
-      id: '/_authenticated/income'
-      path: '/income'
-      fullPath: '/income'
-      preLoaderRoute: typeof AuthenticatedIncomeRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -379,13 +348,6 @@ declare module '@tanstack/react-router' {
       path: '/admin/payments-import'
       fullPath: '/admin/payments-import'
       preLoaderRoute: typeof AuthenticatedAdminPaymentsImportRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/admin/data': {
-      id: '/_authenticated/admin/data'
-      path: '/admin/data'
-      fullPath: '/admin/data'
-      preLoaderRoute: typeof AuthenticatedAdminDataRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/acquisition/$odsCode': {
@@ -430,13 +392,11 @@ interface AuthenticatedRouteChildren {
   AuthenticatedBenchmarkingRoute: typeof AuthenticatedBenchmarkingRoute
   AuthenticatedCompareRoute: typeof AuthenticatedCompareRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedIncomeRoute: typeof AuthenticatedIncomeRoute
   AuthenticatedLeaderboardsRoute: typeof AuthenticatedLeaderboardsRoute
   AuthenticatedMyAnalysesRoute: typeof AuthenticatedMyAnalysesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedUploadRoute: typeof AuthenticatedUploadRoute
   AuthenticatedAcquisitionOdsCodeRoute: typeof AuthenticatedAcquisitionOdsCodeRoute
-  AuthenticatedAdminDataRoute: typeof AuthenticatedAdminDataRoute
   AuthenticatedAdminPaymentsImportRoute: typeof AuthenticatedAdminPaymentsImportRoute
 }
 
@@ -444,13 +404,11 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBenchmarkingRoute: AuthenticatedBenchmarkingRoute,
   AuthenticatedCompareRoute: AuthenticatedCompareRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedIncomeRoute: AuthenticatedIncomeRoute,
   AuthenticatedLeaderboardsRoute: AuthenticatedLeaderboardsRoute,
   AuthenticatedMyAnalysesRoute: AuthenticatedMyAnalysesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedUploadRoute: AuthenticatedUploadRoute,
   AuthenticatedAcquisitionOdsCodeRoute: AuthenticatedAcquisitionOdsCodeRoute,
-  AuthenticatedAdminDataRoute: AuthenticatedAdminDataRoute,
   AuthenticatedAdminPaymentsImportRoute: AuthenticatedAdminPaymentsImportRoute,
 }
 

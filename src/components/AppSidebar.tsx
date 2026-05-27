@@ -6,9 +6,7 @@ import {
   GitCompare,
   Upload,
   Settings,
-  Database,
   LogOut,
-  PoundSterling,
   Bookmark,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,10 +17,8 @@ const links = [
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy },
   { to: "/benchmarking", label: "Benchmarking", icon: BarChart2 },
   { to: "/compare", label: "Compare", icon: GitCompare },
-  { to: "/income", label: "Income Estimator", icon: PoundSterling },
   { to: "/my-analyses", label: "My Analyses", icon: Bookmark },
 
-  { to: "/admin/data", label: "Data Coverage", icon: Database },
   { to: "/admin/payments-import", label: "Payments Import", icon: Upload },
   { to: "/settings", label: "My Account", icon: Settings },
 ];
