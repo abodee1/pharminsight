@@ -286,6 +286,183 @@ export type Database = {
           },
         ]
       }
+      gp_dispensing_by_pharmacy: {
+        Row: {
+          created_at: string
+          data_source: string | null
+          gross_cost: number
+          health_board: string | null
+          id: string
+          items_dispensed: number
+          month: number
+          pharmacy_name: string | null
+          pharmacy_ods_code: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          data_source?: string | null
+          gross_cost?: number
+          health_board?: string | null
+          id?: string
+          items_dispensed?: number
+          month: number
+          pharmacy_name?: string | null
+          pharmacy_ods_code: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          data_source?: string | null
+          gross_cost?: number
+          health_board?: string | null
+          id?: string
+          items_dispensed?: number
+          month?: number
+          pharmacy_name?: string | null
+          pharmacy_ods_code?: string
+          year?: number
+        }
+        Relationships: []
+      }
+      gp_list_sizes: {
+        Row: {
+          country: string
+          created_at: string
+          data_source: string | null
+          id: string
+          list_size_date: string
+          practice_code: string
+          registered_patients: number
+        }
+        Insert: {
+          country: string
+          created_at?: string
+          data_source?: string | null
+          id?: string
+          list_size_date: string
+          practice_code: string
+          registered_patients?: number
+        }
+        Update: {
+          country?: string
+          created_at?: string
+          data_source?: string | null
+          id?: string
+          list_size_date?: string
+          practice_code?: string
+          registered_patients?: number
+        }
+        Relationships: []
+      }
+      gp_pharmacy_linkage: {
+        Row: {
+          created_at: string
+          data_source: string | null
+          id: string
+          is_provisional: boolean
+          items_dispensed: number
+          month: number
+          pharmacy_ods_code: string
+          practice_code: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          data_source?: string | null
+          id?: string
+          is_provisional?: boolean
+          items_dispensed?: number
+          month: number
+          pharmacy_ods_code: string
+          practice_code: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          data_source?: string | null
+          id?: string
+          is_provisional?: boolean
+          items_dispensed?: number
+          month?: number
+          pharmacy_ods_code?: string
+          practice_code?: string
+          year?: number
+        }
+        Relationships: []
+      }
+      gp_practices: {
+        Row: {
+          country: string | null
+          created_at: string
+          health_board: string | null
+          postcode: string | null
+          practice_code: string
+          practice_name: string | null
+          status_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          health_board?: string | null
+          postcode?: string | null
+          practice_code: string
+          practice_name?: string | null
+          status_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          health_board?: string | null
+          postcode?: string | null
+          practice_code?: string
+          practice_name?: string | null
+          status_code?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      gp_prescribing: {
+        Row: {
+          country: string
+          created_at: string
+          data_source: string | null
+          id: string
+          is_provisional: boolean
+          month: number
+          practice_code: string
+          total_items: number
+          total_nic: number
+          year: number
+        }
+        Insert: {
+          country: string
+          created_at?: string
+          data_source?: string | null
+          id?: string
+          is_provisional?: boolean
+          month: number
+          practice_code: string
+          total_items?: number
+          total_nic?: number
+          year: number
+        }
+        Update: {
+          country?: string
+          created_at?: string
+          data_source?: string | null
+          id?: string
+          is_provisional?: boolean
+          month?: number
+          practice_code?: string
+          total_items?: number
+          total_nic?: number
+          year?: number
+        }
+        Relationships: []
+      }
       health_boards: {
         Row: {
           code: string
