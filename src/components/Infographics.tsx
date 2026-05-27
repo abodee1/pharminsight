@@ -285,8 +285,7 @@ export function AnnotatedSparkline({
       <div className="flex items-baseline justify-between gap-4">
         <h3 className="text-sm font-semibold tracking-tight">{label}</h3>
         <p className={`text-xs font-semibold ${tone}`}>
-          {yoy >= 0 ? "+" : ""}
-          {yoy}% over the period
+          {hasChange ? `${yoy >= 0 ? "+" : ""}${yoy}% over the period` : "Insufficient reported data"}
         </p>
       </div>
 
