@@ -14,6 +14,7 @@ import { PharmacySearch } from "@/components/PharmacySearch";
 import { PercentileRail, AnnotatedSparkline, ShareDonut } from "@/components/Infographics";
 import { LocalLandscape } from "@/components/LocalLandscape";
 import { AnalysisPanel } from "@/components/AnalysisPanel";
+import { fetchAll } from "@/lib/fetchAll";
 
 export const Route = createFileRoute("/pharmacy/$odsCode")({ component: PharmacyProfile });
 
