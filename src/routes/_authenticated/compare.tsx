@@ -5,24 +5,30 @@ import { fetchAll } from "@/lib/fetchAll";
 import { PageHeader } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
-import { X, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
+import { X, ArrowUpRight, ArrowDownRight, Minus, Trophy } from "lucide-react";
 import { PharmacySearch } from "@/components/PharmacySearch";
 import { CountryBadge } from "@/components/CountryBadge";
 import { Badge } from "@/components/ui/badge";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   LineChart, Line, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+  PieChart, Pie, Cell,
 } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/compare")({ component: Compare });
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+const isScot = (c: string | null | undefined) => (c || "").toLowerCase() === "scotland";
+
+type Applies = "all" | "england" | "scotland";
+
 type MetricDef = {
   key: string;
   label: string;
   short: string;
-  group: "volume" | "rate";
+  group: "volume" | "rate" | "money";
+  applies: Applies;
   compute: (r: Row | undefined) => number;
   format: (v: number) => string;
 };
@@ -30,46 +36,99 @@ type MetricDef = {
 const fmtInt = (v: number) => Math.round(v).toLocaleString();
 const fmtRate = (v: number) => v.toFixed(1);
 const fmtPct = (v: number) => `${v.toFixed(1)}%`;
+const fmtGbp = (v: number) => "£" + Math.round(v).toLocaleString();
 
 const METRICS: MetricDef[] = [
-  // Raw volume metrics
-  { key: "items_dispensed", label: "Items dispensed", short: "Items", group: "volume",
+  // ---------- Volume (universal) ----------
+  { key: "items_dispensed", label: "Items dispensed", short: "Items", group: "volume", applies: "all",
     compute: (r) => r?.items_dispensed ?? 0, format: fmtInt },
-  { key: "nms_count", label: "NMS consultations", short: "NMS", group: "volume",
-    compute: (r) => r?.nms_count ?? 0, format: fmtInt },
-  { key: "pharmacy_first_count", label: "Pharmacy First", short: "PF", group: "volume",
+  { key: "pharmacy_first_count", label: "Pharmacy First", short: "PF", group: "volume", applies: "all",
     compute: (r) => r?.pharmacy_first_count ?? 0, format: fmtInt },
-  { key: "eps_items", label: "EPS items", short: "EPS", group: "volume",
+
+  // ---------- Volume (England only) ----------
+  { key: "nms_count", label: "NMS consultations", short: "NMS", group: "volume", applies: "england",
+    compute: (r) => r?.nms_count ?? 0, format: fmtInt },
+  { key: "eps_items", label: "EPS items", short: "EPS", group: "volume", applies: "england",
     compute: (r) => r?.eps_items ?? 0, format: fmtInt },
-  // Derived service-intensity metrics — far more comparable across pharmacy size
-  { key: "pf_per_1k", label: "PF per 1k items", short: "PF/1k", group: "rate",
+  { key: "flu_vaccinations", label: "Flu vaccinations", short: "Flu", group: "volume", applies: "england",
+    compute: (r) => r?.flu_vaccinations ?? 0, format: fmtInt },
+
+  // ---------- Volume (Scotland only) ----------
+  { key: "mcr_items", label: "MCR items", short: "MCR items", group: "volume", applies: "scotland",
+    compute: (r) => r?.mcr_items ?? 0, format: fmtInt },
+  { key: "mcr_registrations", label: "MCR registrations", short: "MCR reg.", group: "volume", applies: "scotland",
+    compute: (r) => r?.mcr_registrations ?? 0, format: fmtInt },
+  { key: "methadone_items", label: "Methadone items", short: "Methadone", group: "volume", applies: "scotland",
+    compute: (r) => r?.methadone_items ?? 0, format: fmtInt },
+  { key: "supervised_methadone_doses", label: "Supervised doses", short: "Supervised", group: "volume", applies: "scotland",
+    compute: (r) => r?.supervised_methadone_doses ?? 0, format: fmtInt },
+  { key: "ehc_items", label: "EHC items", short: "EHC", group: "volume", applies: "scotland",
+    compute: (r) => r?.ehc_items ?? 0, format: fmtInt },
+  { key: "smoking_cessation", label: "Smoking cessation", short: "Smoking", group: "volume", applies: "scotland",
+    compute: (r) => r?.smoking_cessation ?? 0, format: fmtInt },
+
+  // ---------- Rate (size-adjusted) ----------
+  { key: "pf_per_1k", label: "PF per 1k items", short: "PF/1k", group: "rate", applies: "all",
     compute: (r) => {
       const items = r?.items_dispensed ?? 0;
       return items > 0 ? ((r?.pharmacy_first_count ?? 0) * 1000) / items : 0;
     }, format: fmtRate },
-  { key: "nms_per_1k", label: "NMS per 1k items", short: "NMS/1k", group: "rate",
+  { key: "nms_per_1k", label: "NMS per 1k items", short: "NMS/1k", group: "rate", applies: "england",
     compute: (r) => {
       const items = r?.items_dispensed ?? 0;
       return items > 0 ? ((r?.nms_count ?? 0) * 1000) / items : 0;
     }, format: fmtRate },
-  { key: "eps_share", label: "EPS share", short: "EPS %", group: "rate",
+  { key: "eps_share", label: "EPS share", short: "EPS %", group: "rate", applies: "england",
     compute: (r) => {
       const items = r?.items_dispensed ?? 0;
       return items > 0 ? ((r?.eps_items ?? 0) / items) * 100 : 0;
     }, format: fmtPct },
+  { key: "mcr_share", label: "MCR share of items", short: "MCR %", group: "rate", applies: "scotland",
+    compute: (r) => {
+      const items = r?.items_dispensed ?? 0;
+      return items > 0 ? ((r?.mcr_items ?? 0) / items) * 100 : 0;
+    }, format: fmtPct },
+
+  // ---------- Money (universal where reported) ----------
+  { key: "gross_cost", label: "Gross cost (£)", short: "Gross £", group: "money", applies: "all",
+    compute: (r) => Number(r?.gross_cost) || 0, format: fmtGbp },
+  { key: "pharmacy_first_payment", label: "Pharmacy First (£)", short: "PF £", group: "money", applies: "all",
+    compute: (r) => Number(r?.pharmacy_first_payment) || 0, format: fmtGbp },
+  { key: "mcr_payment", label: "MCR payment (£)", short: "MCR £", group: "money", applies: "scotland",
+    compute: (r) => Number(r?.mcr_payment) || 0, format: fmtGbp },
+  { key: "final_payment", label: "Final NHS payment (£)", short: "NHS £", group: "money", applies: "all",
+    compute: (r) => Number(r?.final_payment) || 0, format: fmtGbp },
 ];
 
 const METRIC_DESC: Record<string, string> = {
   "Items": "Total prescription items dispensed this month. The primary driver of NHS pharmacy income.",
-  "NMS": "New Medicine Service consultations — the NHS pays ~£28 per completed intervention.",
+  "NMS": "New Medicine Service consultations — the NHS pays ~£28 per completed intervention (England).",
   "PF": "Pharmacy First consultations delivered this month.",
-  "EPS": "Items dispensed via the Electronic Prescription Service (England / Wales).",
-  "PF/1k": "Pharmacy First consultations per 1,000 items dispensed — a size-adjusted clinical-services intensity score.",
-  "NMS/1k": "NMS interventions per 1,000 items dispensed — measures how aggressively the team converts new prescriptions into paid NMS consultations.",
+  "EPS": "Items dispensed via the Electronic Prescription Service (England).",
+  "Flu": "Seasonal NHS flu vaccinations delivered this month (England).",
+  "MCR items": "Items dispensed under Scotland's Medicines Care & Review serial-prescription service.",
+  "MCR reg.": "Patients registered for MCR — a proxy for chronic-care caseload.",
+  "Methadone": "Methadone (and other OST) items dispensed this month.",
+  "Supervised": "Doses of methadone/buprenorphine consumed under direct pharmacist supervision.",
+  "EHC": "Emergency hormonal contraception supplies issued this month.",
+  "Smoking": "Smoking-cessation interventions delivered under the NHS Scotland service.",
+  "PF/1k": "Pharmacy First consultations per 1,000 items — a size-adjusted clinical-services intensity score.",
+  "NMS/1k": "NMS interventions per 1,000 items — measures conversion of new prescriptions into paid NMS.",
   "EPS %": "Share of items routed through EPS rather than paper. Above 95% is excellent.",
+  "MCR %": "Share of total items dispensed under the MCR serial-prescription pathway.",
+  "Gross £": "Gross ingredient cost of drugs dispensed before any clawback or deductions.",
+  "PF £": "Direct NHS payments received for Pharmacy First consultations.",
+  "MCR £": "NHS Scotland payment for MCR service delivery.",
+  "NHS £": "Final NHS payment for the month after all fees, allowances and clawbacks.",
 };
 
-function MetricTile({ mt, value, diff, pct }: { mt: MetricDef; value: number; diff: number; pct: number }) {
+function appliesToCountry(applies: Applies, country: string | null | undefined) {
+  if (applies === "all") return true;
+  if (applies === "scotland") return isScot(country);
+  return !isScot(country);
+}
+
+function MetricTile({ mt, value, diff, pct, na }: { mt: MetricDef; value: number; diff: number; pct: number; na?: boolean }) {
   const [flipped, setFlipped] = useState(false);
   const up = diff > 0, flat = diff === 0;
   return (
@@ -79,18 +138,24 @@ function MetricTile({ mt, value, diff, pct }: { mt: MetricDef; value: number; di
       className="group relative w-full text-left [perspective:800px] focus:outline-none"
       aria-label={`${mt.label}: tap for explanation`}
     >
-      <div className={`relative h-full min-h-[4.5rem] transition-transform duration-500 [transform-style:preserve-3d] ${flipped ? "[transform:rotateY(180deg)]" : ""}`}>
+      <div className={`relative h-full min-h-[4.75rem] transition-transform duration-500 [transform-style:preserve-3d] ${flipped ? "[transform:rotateY(180deg)]" : ""}`}>
         <div className="absolute inset-0 rounded-md bg-secondary/40 px-2 py-1.5 [backface-visibility:hidden]">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground truncate flex items-center justify-between gap-1">
             <span className="truncate">{mt.short}</span><span className="text-[8px] opacity-30 group-hover:opacity-100">ⓘ</span>
           </p>
-          <p className="text-base font-semibold tabular-nums leading-tight">{value > 0 ? mt.format(value) : "—"}</p>
-          <div className="mt-0.5 flex items-center gap-0.5 text-[10px]">
-            {flat ? <Minus className="h-3 w-3 text-muted-foreground" /> : up ? <ArrowUpRight className="h-3 w-3 text-emerald-600" /> : <ArrowDownRight className="h-3 w-3 text-rose-600" />}
-            <span className={flat ? "text-muted-foreground" : up ? "text-emerald-700" : "text-rose-700"}>
-              {flat ? "—" : `${up ? "+" : ""}${pct}%`}
-            </span>
-          </div>
+          {na ? (
+            <p className="text-sm font-medium text-muted-foreground/70 italic leading-tight mt-0.5">n/a</p>
+          ) : (
+            <>
+              <p className="text-base font-semibold tabular-nums leading-tight">{value > 0 ? mt.format(value) : "—"}</p>
+              <div className="mt-0.5 flex items-center gap-0.5 text-[10px]">
+                {flat ? <Minus className="h-3 w-3 text-muted-foreground" /> : up ? <ArrowUpRight className="h-3 w-3 text-emerald-600" /> : <ArrowDownRight className="h-3 w-3 text-rose-600" />}
+                <span className={flat ? "text-muted-foreground" : up ? "text-emerald-700" : "text-rose-700"}>
+                  {flat ? "—" : `${up ? "+" : ""}${pct}%`}
+                </span>
+              </div>
+            </>
+          )}
         </div>
         <div className="absolute inset-0 rounded-md border border-gold/50 bg-gold/5 px-2 py-1.5 [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-auto">
           <p className="text-[9px] uppercase tracking-wider text-gold font-semibold">{mt.short}</p>
@@ -113,6 +178,13 @@ type Row = {
   pharmacy_id: string; month: number; year: number;
   items_dispensed: number; nms_count: number; pharmacy_first_count: number;
   flu_vaccinations: number; eps_items: number; eps_nominations: number;
+  gross_cost: number | string | null;
+  pharmacy_first_payment: number | string | null;
+  mcr_payment: number | string | null;
+  final_payment: number | string | null;
+  mcr_registrations: number; mcr_items: number;
+  ehc_items: number; methadone_items: number; supervised_methadone_doses: number;
+  smoking_cessation: number;
 };
 
 const MAX_SELECT = 4;
@@ -122,7 +194,7 @@ function Compare() {
   const [pharms, setPharms] = useState<Pharm[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
 
   // Preload the user's primary pharmacy as the first selection.
   useEffect(() => {
@@ -152,7 +224,7 @@ function Compare() {
       const data = await fetchAll<Row>((from, to) =>
         supabase
           .from("dispensing_data")
-          .select("pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations")
+          .select("pharmacy_id,month,year,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,eps_items,eps_nominations,gross_cost,pharmacy_first_payment,mcr_payment,final_payment,mcr_registrations,mcr_items,ehc_items,methadone_items,supervised_methadone_doses,smoking_cessation")
           .in("pharmacy_id", selected)
           .gte("year", cutoffYear)
           .order("year", { ascending: true })
@@ -169,33 +241,20 @@ function Compare() {
     [selected, pharms]
   );
 
+  // Metrics relevant to AT LEAST one selected pharmacy. Drives compare visuals.
+  const activeMetrics = useMemo(
+    () => METRICS.filter((mt) => selectedPharms.some((ph) => appliesToCountry(mt.applies, ph.country))),
+    [selectedPharms]
+  );
+
   const periods = useMemo(
     () => Array.from(new Set(rows.map((r) => `${r.year}-${String(r.month).padStart(2, "0")}`))).sort(),
     [rows]
   );
   const latest = periods[periods.length - 1];
-  const prev = periods[periods.length - 2];
-
-  // Trend data — one series per metric, x-axis = period, lines = selected pharmacies
-  const trendByMetric = useMemo(() => {
-    return METRICS.map((mt) => ({
-      metric: mt,
-      data: periods.map((p) => {
-        const [y, m] = p.split("-").map(Number);
-        const point: Record<string, any> = { label: `${MONTHS[m - 1]} ${String(y).slice(2)}` };
-        selectedPharms.forEach((ph) => {
-          const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-          point[ph.id] = mt.compute(row);
-        });
-        return point;
-      }),
-    }));
-  }, [periods, selectedPharms, rows]);
 
   // For each pharmacy + metric, find the most recent period where the
-  // metric is non-zero. The global latest period often has trailing zeros
-  // for some services (e.g. PF, NMS not yet reported), which made every
-  // card show "—". Fall back to 0 only if the pharmacy has never reported.
+  // metric is non-zero (skip provisional / trailing-empty months).
   const latestNonZero = useMemo(() => {
     const out = new Map<string, { value: number; prior: number; period: string | null }>();
     selectedPharms.forEach((ph) => {
@@ -203,6 +262,10 @@ function Compare() {
         .filter((r) => r.pharmacy_id === ph.id)
         .sort((a, b) => (a.year - b.year) || (a.month - b.month));
       METRICS.forEach((mt) => {
+        if (!appliesToCountry(mt.applies, ph.country)) {
+          out.set(`${ph.id}::${mt.key}`, { value: 0, prior: 0, period: null });
+          return;
+        }
         let idx = -1;
         for (let i = phRows.length - 1; i >= 0; i--) {
           if (mt.compute(phRows[i]) > 0) { idx = i; break; }
@@ -223,60 +286,108 @@ function Compare() {
     return out;
   }, [selectedPharms, rows]);
 
-  // Side-by-side metric data — uses latest non-zero per pharmacy+metric
-  const sideBySide = useMemo(() => {
-    return METRICS.map((mt) => {
-      const point: Record<string, any> = { metric: mt.short };
-      selectedPharms.forEach((ph) => {
-        point[ph.id] = latestNonZero.get(`${ph.id}::${mt.key}`)?.value ?? 0;
+  // 12-month rolling totals per pharmacy per metric (for the totals bar)
+  const totals12m = useMemo(() => {
+    const out = new Map<string, number>();
+    selectedPharms.forEach((ph) => {
+      const phRows = rows
+        .filter((r) => r.pharmacy_id === ph.id)
+        .slice(-12);
+      METRICS.forEach((mt) => {
+        if (!appliesToCountry(mt.applies, ph.country)) {
+          out.set(`${ph.id}::${mt.key}`, 0);
+          return;
+        }
+        out.set(`${ph.id}::${mt.key}`, phRows.reduce((s, r) => s + mt.compute(r), 0));
       });
-      return point;
     });
-  }, [selectedPharms, latestNonZero]);
+    return out;
+  }, [selectedPharms, rows]);
 
-  // Radar (normalised to max across selected for each metric)
+  // Trend data — one chart per active metric
+  const trendByMetric = useMemo(() => {
+    return activeMetrics.map((mt) => ({
+      metric: mt,
+      data: periods.map((p) => {
+        const [y, m] = p.split("-").map(Number);
+        const point: Record<string, any> = { label: `${MONTHS[m - 1]} ${String(y).slice(2)}` };
+        selectedPharms.forEach((ph) => {
+          if (!appliesToCountry(mt.applies, ph.country)) return;
+          const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
+          point[ph.id] = mt.compute(row);
+        });
+        return point;
+      }),
+    }));
+  }, [periods, selectedPharms, rows, activeMetrics]);
+
+  // Radar: normalise per metric across active pharmacies
   const radar = useMemo(() => {
-    return METRICS.map((mt) => {
+    return activeMetrics.filter((mt) => mt.group !== "money").map((mt) => {
       const point: Record<string, any> = { metric: mt.short };
-      const vals = selectedPharms.map((ph) => latestNonZero.get(`${ph.id}::${mt.key}`)?.value ?? 0);
+      const vals = selectedPharms.map((ph) =>
+        appliesToCountry(mt.applies, ph.country) ? (latestNonZero.get(`${ph.id}::${mt.key}`)?.value ?? 0) : 0
+      );
       const max = Math.max(1, ...vals);
       selectedPharms.forEach((ph, i) => {
         point[ph.id] = Math.round((vals[i] / max) * 100);
       });
       return point;
     });
-  }, [selectedPharms, latestNonZero]);
+  }, [selectedPharms, latestNonZero, activeMetrics]);
 
-  // Headline per pharmacy — all metrics + change vs prior non-zero period
+  // Headline per pharmacy — country-specific metrics only
   const headline = useMemo(() => {
     return selectedPharms.map((ph) => {
-      const metrics = METRICS.map((mt) => {
-        const entry = latestNonZero.get(`${ph.id}::${mt.key}`);
-        const v = entry?.value ?? 0;
-        const p = entry?.prior ?? 0;
-        const diff = v - p;
-        const pct = p ? Math.round((diff / p) * 100) : 0;
-        return { mt, value: v, diff, pct, period: entry?.period ?? null };
-      });
+      const metrics = METRICS
+        .filter((mt) => appliesToCountry(mt.applies, ph.country))
+        .map((mt) => {
+          const entry = latestNonZero.get(`${ph.id}::${mt.key}`);
+          const v = entry?.value ?? 0;
+          const p = entry?.prior ?? 0;
+          const diff = v - p;
+          const pct = p ? Math.round((diff / p) * 100) : 0;
+          return { mt, value: v, diff, pct, period: entry?.period ?? null };
+        });
       return { ph, metrics };
     });
   }, [selectedPharms, latestNonZero]);
 
-  // Winner per metric — highest latest-non-zero value
+  // Winner per metric — highest latest-non-zero among pharmacies that support it
   const winners = useMemo(() => {
     const out: Record<string, string> = {};
-    METRICS.forEach((mt) => {
+    activeMetrics.forEach((mt) => {
       let best = -1;
       let id = "";
       selectedPharms.forEach((ph) => {
+        if (!appliesToCountry(mt.applies, ph.country)) return;
         const v = latestNonZero.get(`${ph.id}::${mt.key}`)?.value ?? 0;
         if (v > best) { best = v; id = ph.id; }
       });
-      out[mt.key] = id;
+      if (id) out[mt.key] = id;
     });
     return out;
-  }, [selectedPharms, latestNonZero]);
+  }, [selectedPharms, latestNonZero, activeMetrics]);
 
+  // Wins count per pharmacy across active metrics
+  const winsCount = useMemo(() => {
+    const out: Record<string, number> = {};
+    selectedPharms.forEach((ph) => { out[ph.id] = 0; });
+    Object.values(winners).forEach((id) => { out[id] = (out[id] ?? 0) + 1; });
+    return out;
+  }, [winners, selectedPharms]);
+
+  // Items market-share donut data (12m totals)
+  const itemsShare = useMemo(
+    () =>
+      selectedPharms.map((ph) => ({
+        id: ph.id,
+        name: ph.name,
+        value: totals12m.get(`${ph.id}::items_dispensed`) ?? 0,
+      })),
+    [selectedPharms, totals12m]
+  );
+  const itemsTotal = itemsShare.reduce((s, x) => s + x.value, 0);
 
   function remove(id: string) {
     setSelected((cur) => cur.filter((x) => x !== id));
@@ -303,7 +414,6 @@ function Compare() {
                 onSelect={(p) => {
                   if (selected.includes(p.id)) return;
                   if (selected.length >= MAX_SELECT) return;
-                  // Ensure pharmacy exists in local pharms list (it should — fetchAll loads all)
                   setPharms((cur) =>
                     cur.some((x) => x.id === p.id)
                       ? cur
@@ -365,9 +475,53 @@ function Compare() {
 
       </div>
 
+      {selectedPharms.length >= 2 && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+          {selectedPharms.map((ph) => {
+            const items12 = totals12m.get(`${ph.id}::items_dispensed`) ?? 0;
+            const pf12 = totals12m.get(`${ph.id}::pharmacy_first_count`) ?? 0;
+            const nhs12 = totals12m.get(`${ph.id}::final_payment`) ?? 0;
+            const wins = winsCount[ph.id] ?? 0;
+            return (
+              <div
+                key={ph.id}
+                className="rounded-xl bg-card border border-border p-4 shadow-sm relative overflow-hidden"
+                style={{ borderTop: `3px solid ${colorFor(ph.id)}` }}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold truncate">{ph.name}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{ph.region}</p>
+                  </div>
+                  {wins > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-gold/15 border border-gold/40 px-2 py-0.5 text-[11px] font-semibold text-gold shrink-0">
+                      <Trophy className="h-3 w-3" /> {wins}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <div>
+                    <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Items 12m</p>
+                    <p className="text-sm font-bold tabular-nums">{items12 ? fmtInt(items12) : "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] uppercase tracking-wider text-muted-foreground">PF 12m</p>
+                    <p className="text-sm font-bold tabular-nums">{pf12 ? fmtInt(pf12) : "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] uppercase tracking-wider text-muted-foreground">NHS £ 12m</p>
+                    <p className="text-sm font-bold tabular-nums">{nhs12 ? fmtGbp(nhs12) : "—"}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {selectedPharms.length >= 1 && (
         <>
-          {/* Headline cards — all metrics per pharmacy */}
+          {/* Headline cards — country-aware metrics per pharmacy */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {headline.map(({ ph, metrics }) => (
               <div
@@ -380,10 +534,11 @@ function Compare() {
                     className="mt-1 h-2.5 w-2.5 rounded-full shrink-0"
                     style={{ background: colorFor(ph.id) }}
                   />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold truncate">{ph.name}</p>
                     <p className="text-xs text-muted-foreground truncate">{ph.region}</p>
                   </div>
+                  <CountryBadge country={ph.country} />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {metrics.map(({ mt, value, diff, pct }) => (
@@ -396,7 +551,90 @@ function Compare() {
 
           {selectedPharms.length >= 2 && (
             <>
-              {/* Trend small multiples — one chart per metric */}
+              {/* Market share donut + 12-month items totals */}
+              {itemsTotal > 0 && (
+                <div className="grid lg:grid-cols-2 gap-6 mb-6">
+                  <div className="rounded-xl bg-card border border-border p-6 shadow-sm">
+                    <h2 className="text-sm font-semibold mb-1">Share of items — last 12 months</h2>
+                    <p className="text-xs text-muted-foreground mb-3">Who dispenses more, in proportion.</p>
+                    <div className="h-64 flex items-center">
+                      <div className="w-1/2 h-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={itemsShare}
+                              dataKey="value"
+                              nameKey="name"
+                              innerRadius="55%"
+                              outerRadius="85%"
+                              paddingAngle={2}
+                              stroke="var(--card)"
+                            >
+                              {itemsShare.map((d) => (
+                                <Cell key={d.id} fill={colorFor(d.id)} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                              formatter={(v: any, n: any) => [fmtInt(Number(v)), n]}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <ul className="w-1/2 space-y-2 text-sm pl-2">
+                        {itemsShare.map((d) => {
+                          const pct = itemsTotal > 0 ? (d.value / itemsTotal) * 100 : 0;
+                          return (
+                            <li key={d.id} className="flex items-center gap-2">
+                              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: colorFor(d.id) }} />
+                              <span className="flex-1 truncate text-xs">{d.name}</span>
+                              <span className="text-xs font-semibold tabular-nums">{pct.toFixed(1)}%</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-card border border-border p-6 shadow-sm">
+                    <h2 className="text-sm font-semibold mb-1">12-month service totals</h2>
+                    <p className="text-xs text-muted-foreground mb-3">Cumulative volumes across every reporting month.</p>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          layout="vertical"
+                          data={activeMetrics
+                            .filter((mt) => mt.group === "volume")
+                            .slice(0, 6)
+                            .map((mt) => {
+                              const point: Record<string, any> = { metric: mt.short };
+                              selectedPharms.forEach((ph) => {
+                                point[ph.id] = appliesToCountry(mt.applies, ph.country)
+                                  ? (totals12m.get(`${ph.id}::${mt.key}`) ?? 0)
+                                  : 0;
+                              });
+                              return point;
+                            })}
+                          margin={{ top: 5, right: 12, bottom: 0, left: 0 }}
+                        >
+                          <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+                          <XAxis type="number" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
+                          <YAxis dataKey="metric" type="category" width={70} tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
+                          <Tooltip
+                            contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                            formatter={(v: any, n: any) => [fmtInt(Number(v)), pharms.find((p) => p.id === n)?.name ?? n]}
+                          />
+                          {selectedPharms.map((ph) => (
+                            <Bar key={ph.id} dataKey={ph.id} fill={colorFor(ph.id)} radius={[0, 4, 4, 0]} />
+                          ))}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Trend small multiples — one chart per active metric */}
               <div className="rounded-xl bg-card border border-border p-6 shadow-sm mb-6">
                 <div className="flex items-baseline justify-between mb-4">
                   <h2 className="text-sm font-semibold">24-month trend by service</h2>
@@ -412,7 +650,14 @@ function Compare() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {trendByMetric.map(({ metric: mt, data }) => (
                     <div key={mt.key}>
-                      <p className="text-xs font-medium text-muted-foreground mb-2">{mt.label}</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center justify-between">
+                        <span>{mt.label}</span>
+                        {mt.applies !== "all" && (
+                          <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70">
+                            {mt.applies === "england" ? "England only" : "Scotland only"}
+                          </span>
+                        )}
+                      </p>
                       <div className="h-48">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={data} margin={{ top: 5, right: 8, bottom: 0, left: -15 }}>
@@ -423,20 +668,22 @@ function Compare() {
                               contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
                               formatter={(v: any, _n: any, ctx: any) => {
                                 const ph = pharms.find((p) => p.id === ctx.dataKey);
-                                return [Number(v).toLocaleString(), ph?.name ?? ctx.dataKey];
+                                return [mt.format(Number(v)), ph?.name ?? ctx.dataKey];
                               }}
                             />
-                            {selectedPharms.map((ph) => (
-                              <Line
-                                key={ph.id}
-                                type="monotone"
-                                dataKey={ph.id}
-                                stroke={colorFor(ph.id)}
-                                strokeWidth={2}
-                                dot={false}
-                                activeDot={{ r: 4 }}
-                              />
-                            ))}
+                            {selectedPharms
+                              .filter((ph) => appliesToCountry(mt.applies, ph.country))
+                              .map((ph) => (
+                                <Line
+                                  key={ph.id}
+                                  type="monotone"
+                                  dataKey={ph.id}
+                                  stroke={colorFor(ph.id)}
+                                  strokeWidth={2}
+                                  dot={false}
+                                  activeDot={{ r: 4 }}
+                                />
+                              ))}
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -445,32 +692,12 @@ function Compare() {
                 </div>
               </div>
 
-              {/* Side-by-side + Radar */}
-              <div className="grid lg:grid-cols-2 gap-6 mb-6">
-                <div className="rounded-xl bg-card border border-border p-6 shadow-sm">
-                  <h2 className="text-sm font-semibold mb-1">Latest month — service volumes</h2>
-                  <p className="text-xs text-muted-foreground mb-3">Raw monthly counts</p>
-                  <div className="h-72">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={sideBySide.filter((d) => METRICS.find((m) => m.short === d.metric)?.group === "volume")} margin={{ top: 5, right: 12, bottom: 0, left: -10 }}>
-                        <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-                        <XAxis dataKey="metric" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                        <YAxis tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                        <Tooltip
-                          contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
-                          formatter={(v: any, n: any) => [Number(v).toLocaleString(), pharms.find((p) => p.id === n)?.name ?? n]}
-                        />
-                        {selectedPharms.map((ph) => (
-                          <Bar key={ph.id} dataKey={ph.id} fill={colorFor(ph.id)} radius={[4, 4, 0, 0]} />
-                        ))}
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                <div className="rounded-xl bg-card border border-border p-6 shadow-sm">
-                  <h2 className="text-sm font-semibold mb-4">Performance shape (% of leader per metric)</h2>
-                  <div className="h-72">
+              {/* Radar */}
+              {radar.length >= 3 && (
+                <div className="rounded-xl bg-card border border-border p-6 shadow-sm mb-6">
+                  <h2 className="text-sm font-semibold mb-1">Performance shape</h2>
+                  <p className="text-xs text-muted-foreground mb-4">Each spoke is a service, scaled to the leader's value (100). Bigger area = broader strength.</p>
+                  <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radar}>
                         <PolarGrid stroke="var(--border)" />
@@ -491,27 +718,32 @@ function Compare() {
                     </ResponsiveContainer>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {selectedPharms.length > 1 && latest && (
+              {latest && (
                 <div className="rounded-xl bg-card border border-border shadow-sm p-6 mb-6">
                   <div className="flex items-baseline justify-between mb-4">
-                    <h2 className="text-sm font-semibold tracking-tight">Metric leadership · this month</h2>
+                    <h2 className="text-sm font-semibold tracking-tight">Metric leadership · latest reported</h2>
                     <p className="text-xs text-muted-foreground italic">Who leads, and by how wide a margin.</p>
                   </div>
                   <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {METRICS.map((mt) => {
-                      const [y, m] = latest.split("-").map(Number);
-                      const vals = selectedPharms.map((ph) => {
-                        const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-                        return { ph, v: mt.compute(row) };
-                      }).sort((a, b) => b.v - a.v);
+                    {activeMetrics.map((mt) => {
+                      const vals = selectedPharms
+                        .filter((ph) => appliesToCountry(mt.applies, ph.country))
+                        .map((ph) => ({ ph, v: latestNonZero.get(`${ph.id}::${mt.key}`)?.value ?? 0 }))
+                        .sort((a, b) => b.v - a.v);
+                      if (!vals.length) return null;
                       const leader = vals[0];
                       const runner = vals[1];
                       const margin = runner && runner.v ? Math.round(((leader.v - runner.v) / runner.v) * 100) : null;
                       return (
                         <div key={mt.key} className="border-l-2 pl-3" style={{ borderColor: colorFor(leader.ph.id) }}>
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{mt.label}</p>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center justify-between gap-2">
+                            <span className="truncate">{mt.label}</span>
+                            {mt.applies !== "all" && (
+                              <span className="text-[9px] opacity-70">{mt.applies === "england" ? "Eng" : "Sco"}</span>
+                            )}
+                          </p>
                           <p className="text-sm font-semibold truncate" title={leader.ph.name}>{leader.ph.name}</p>
                           <p className="text-lg font-bold tabular-nums">{leader.v > 0 ? mt.format(leader.v) : "—"}</p>
                           {runner && (
@@ -532,8 +764,8 @@ function Compare() {
               {/* Comparison table */}
               <div className="rounded-xl bg-card border border-border shadow-sm overflow-hidden mb-6">
                 <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-                  <h2 className="text-sm font-semibold">Side-by-side numbers</h2>
-                  <span className="text-xs text-muted-foreground">Best per row highlighted</span>
+                  <h2 className="text-sm font-semibold">Side-by-side numbers · latest reported</h2>
+                  <span className="text-xs text-muted-foreground">Best per row highlighted · n/a = service not offered in that country</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -551,43 +783,62 @@ function Compare() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(["volume", "rate"] as const).map((group) => (
-                        <Fragment key={group}>
-                          <tr className="bg-secondary/40 border-t border-border">
-                            <td colSpan={selectedPharms.length + 1} className="px-6 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                              {group === "volume" ? "Monthly volumes" : "Service intensity (size-adjusted)"}
-                            </td>
-                          </tr>
-                          {METRICS.filter((mt) => mt.group === group).map((mt) => {
-                            const [y, m] = (latest || "0-0").split("-").map(Number);
-                            const winnerId = winners[mt.key];
-                            return (
-                              <tr key={mt.key} className="border-t border-border">
-                                <td className="px-6 py-3 font-medium">{mt.label}</td>
-                                {selectedPharms.map((ph) => {
-                                  const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-                                  const v = mt.compute(row);
-                                  const isWin = ph.id === winnerId && selectedPharms.length > 1 && v > 0;
-                                  return (
-                                    <td
-                                      key={ph.id}
-                                      className={[
-                                        "px-6 py-3 text-right tabular-nums",
-                                        isWin ? "font-semibold text-foreground" : "text-muted-foreground",
-                                      ].join(" ")}
-                                    >
-                                      <div className="inline-flex items-center gap-2 justify-end">
-                                        {v > 0 ? mt.format(v) : "—"}
-                                        {isWin && <Badge variant="secondary" className="text-[10px] py-0">Best</Badge>}
-                                      </div>
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                            );
-                          })}
-                        </Fragment>
-                      ))}
+                      {(["volume", "rate", "money"] as const).map((group) => {
+                        const groupMetrics = activeMetrics.filter((mt) => mt.group === group);
+                        if (!groupMetrics.length) return null;
+                        return (
+                          <Fragment key={group}>
+                            <tr className="bg-secondary/40 border-t border-border">
+                              <td colSpan={selectedPharms.length + 1} className="px-6 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                                {group === "volume" ? "Monthly volumes" : group === "rate" ? "Service intensity (size-adjusted)" : "Payments (£)"}
+                              </td>
+                            </tr>
+                            {groupMetrics.map((mt) => {
+                              const winnerId = winners[mt.key];
+                              return (
+                                <tr key={mt.key} className="border-t border-border">
+                                  <td className="px-6 py-3 font-medium">
+                                    <div className="flex items-center gap-2">
+                                      <span>{mt.label}</span>
+                                      {mt.applies !== "all" && (
+                                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70">
+                                          {mt.applies === "england" ? "Eng" : "Sco"}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  {selectedPharms.map((ph) => {
+                                    const supported = appliesToCountry(mt.applies, ph.country);
+                                    if (!supported) {
+                                      return (
+                                        <td key={ph.id} className="px-6 py-3 text-right text-muted-foreground/60 italic">
+                                          n/a
+                                        </td>
+                                      );
+                                    }
+                                    const v = latestNonZero.get(`${ph.id}::${mt.key}`)?.value ?? 0;
+                                    const isWin = ph.id === winnerId && winners[mt.key] && v > 0;
+                                    return (
+                                      <td
+                                        key={ph.id}
+                                        className={[
+                                          "px-6 py-3 text-right tabular-nums",
+                                          isWin ? "font-semibold text-foreground" : "text-muted-foreground",
+                                        ].join(" ")}
+                                      >
+                                        <div className="inline-flex items-center gap-2 justify-end">
+                                          {v > 0 ? mt.format(v) : "—"}
+                                          {isWin && <Badge variant="secondary" className="text-[10px] py-0">Best</Badge>}
+                                        </div>
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            })}
+                          </Fragment>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
