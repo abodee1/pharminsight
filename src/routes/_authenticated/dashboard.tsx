@@ -207,7 +207,28 @@ function Dashboard() {
         nmsPeriod: nmsRow ? labelFor(nmsRow.year, nmsRow.month) : "",
       });
       setPeerItems(latestSnap.map((r) => r.items_dispensed || 0));
-      setPeerPf(latestSnap.map((r) => r.pharmacy_first_count || 0));
+
+      // Pharmacy First peer distribution — fetch from PF's reported period
+      // (Scottish PF lags items-dispensed by 1-2 months, so the items-period
+      // snapshot would be all zeros). Falls back to the items snapshot.
+      const pfY = pfRow?.year ?? statY;
+      const pfM = pfRow?.month ?? statM;
+      if (pfY === statY && pfM === statM) {
+        setPeerPf(latestSnap.map((r) => r.pharmacy_first_count || 0));
+        setPeerPfPeriod(labelFor(statY, statM));
+      } else {
+        const pfSnapAll = await fetchAll<Row>((from, to) =>
+          supabase
+            .from("dispensing_data")
+            .select("pharmacy_id,month,year,pharmacy_first_count,items_dispensed,nms_count,pharmacy_first_payment,mcr_payment,smoking_cessation_payment,final_payment,gross_cost,is_actual_payment")
+            .eq("year", pfY)
+            .eq("month", pfM)
+            .range(from, to),
+        );
+        const pfSnap = targetCountry ? pfSnapAll.filter((r) => countryPharmIds.has(r.pharmacy_id)) : pfSnapAll;
+        setPeerPf(pfSnap.map((r) => r.pharmacy_first_count || 0));
+        setPeerPfPeriod(labelFor(pfY, pfM));
+      }
 
       // Revenue mix (user pharmacy latest row, else country totals at latest)
       const source: Row[] = mineRow ? [mineRow] : latestSnap;
