@@ -43,7 +43,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [series, setSeries] = useState<{ label: string; mine: number; national: number }[]>([]);
   const [pfSeries, setPfSeries] = useState<{ period: string; value: number }[]>([]);
-  const [stats, setStats] = useState({ items: 0, pf: 0, nms: 0, rank: 0, total: 0, period: "" });
+  const [stats, setStats] = useState({ items: 0, pf: 0, nms: 0, rank: 0, total: 0, period: "", pfPeriod: "", nmsPeriod: "" });
   const [peerItems, setPeerItems] = useState<number[]>([]);
   const [peerPf, setPeerPf] = useState<number[]>([]);
   const [revenueMix, setRevenueMix] = useState<{ label: string; value: number }[]>([]);
