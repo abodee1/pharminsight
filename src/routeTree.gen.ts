@@ -29,6 +29,7 @@ import { Route as ApiPublicHooksIngestScotlandGpLinkageRouteImport } from './rou
 import { Route as ApiPublicHooksIngestScotlandGpRouteImport } from './routes/api/public/hooks/ingest-scotland-gp'
 import { Route as ApiPublicHooksIngestScotlandRouteImport } from './routes/api/public/hooks/ingest-scotland'
 import { Route as ApiPublicHooksIngestNiRouteImport } from './routes/api/public/hooks/ingest-ni'
+import { Route as ApiPublicHooksIngestEnglandGpListsizeRouteImport } from './routes/api/public/hooks/ingest-england-gp-listsize'
 import { Route as ApiPublicHooksIngestEnglandGpRouteImport } from './routes/api/public/hooks/ingest-england-gp'
 import { Route as ApiPublicHooksIngestEnglandRouteImport } from './routes/api/public/hooks/ingest-england'
 
@@ -140,6 +141,12 @@ const ApiPublicHooksIngestNiRoute = ApiPublicHooksIngestNiRouteImport.update({
   path: '/api/public/hooks/ingest-ni',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksIngestEnglandGpListsizeRoute =
+  ApiPublicHooksIngestEnglandGpListsizeRouteImport.update({
+    id: '/api/public/hooks/ingest-england-gp-listsize',
+    path: '/api/public/hooks/ingest-england-gp-listsize',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksIngestEnglandGpRoute =
   ApiPublicHooksIngestEnglandGpRouteImport.update({
     id: '/api/public/hooks/ingest-england-gp',
@@ -169,6 +176,7 @@ export interface FileRoutesByFullPath {
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-england-gp': typeof ApiPublicHooksIngestEnglandGpRoute
+  '/api/public/hooks/ingest-england-gp-listsize': typeof ApiPublicHooksIngestEnglandGpListsizeRoute
   '/api/public/hooks/ingest-ni': typeof ApiPublicHooksIngestNiRoute
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
   '/api/public/hooks/ingest-scotland-gp': typeof ApiPublicHooksIngestScotlandGpRoute
@@ -192,6 +200,7 @@ export interface FileRoutesByTo {
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-england-gp': typeof ApiPublicHooksIngestEnglandGpRoute
+  '/api/public/hooks/ingest-england-gp-listsize': typeof ApiPublicHooksIngestEnglandGpListsizeRoute
   '/api/public/hooks/ingest-ni': typeof ApiPublicHooksIngestNiRoute
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
   '/api/public/hooks/ingest-scotland-gp': typeof ApiPublicHooksIngestScotlandGpRoute
@@ -217,6 +226,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-england-gp': typeof ApiPublicHooksIngestEnglandGpRoute
+  '/api/public/hooks/ingest-england-gp-listsize': typeof ApiPublicHooksIngestEnglandGpListsizeRoute
   '/api/public/hooks/ingest-ni': typeof ApiPublicHooksIngestNiRoute
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
   '/api/public/hooks/ingest-scotland-gp': typeof ApiPublicHooksIngestScotlandGpRoute
@@ -242,6 +252,7 @@ export interface FileRouteTypes {
     | '/admin/payments-import'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-england-gp'
+    | '/api/public/hooks/ingest-england-gp-listsize'
     | '/api/public/hooks/ingest-ni'
     | '/api/public/hooks/ingest-scotland'
     | '/api/public/hooks/ingest-scotland-gp'
@@ -265,6 +276,7 @@ export interface FileRouteTypes {
     | '/admin/payments-import'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-england-gp'
+    | '/api/public/hooks/ingest-england-gp-listsize'
     | '/api/public/hooks/ingest-ni'
     | '/api/public/hooks/ingest-scotland'
     | '/api/public/hooks/ingest-scotland-gp'
@@ -289,6 +301,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/payments-import'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-england-gp'
+    | '/api/public/hooks/ingest-england-gp-listsize'
     | '/api/public/hooks/ingest-ni'
     | '/api/public/hooks/ingest-scotland'
     | '/api/public/hooks/ingest-scotland-gp'
@@ -305,6 +318,7 @@ export interface RootRouteChildren {
   PharmacyOdsCodeRoute: typeof PharmacyOdsCodeRoute
   ApiPublicHooksIngestEnglandRoute: typeof ApiPublicHooksIngestEnglandRoute
   ApiPublicHooksIngestEnglandGpRoute: typeof ApiPublicHooksIngestEnglandGpRoute
+  ApiPublicHooksIngestEnglandGpListsizeRoute: typeof ApiPublicHooksIngestEnglandGpListsizeRoute
   ApiPublicHooksIngestNiRoute: typeof ApiPublicHooksIngestNiRoute
   ApiPublicHooksIngestScotlandRoute: typeof ApiPublicHooksIngestScotlandRoute
   ApiPublicHooksIngestScotlandGpRoute: typeof ApiPublicHooksIngestScotlandGpRoute
@@ -455,6 +469,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksIngestNiRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/ingest-england-gp-listsize': {
+      id: '/api/public/hooks/ingest-england-gp-listsize'
+      path: '/api/public/hooks/ingest-england-gp-listsize'
+      fullPath: '/api/public/hooks/ingest-england-gp-listsize'
+      preLoaderRoute: typeof ApiPublicHooksIngestEnglandGpListsizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/ingest-england-gp': {
       id: '/api/public/hooks/ingest-england-gp'
       path: '/api/public/hooks/ingest-england-gp'
@@ -508,6 +529,8 @@ const rootRouteChildren: RootRouteChildren = {
   PharmacyOdsCodeRoute: PharmacyOdsCodeRoute,
   ApiPublicHooksIngestEnglandRoute: ApiPublicHooksIngestEnglandRoute,
   ApiPublicHooksIngestEnglandGpRoute: ApiPublicHooksIngestEnglandGpRoute,
+  ApiPublicHooksIngestEnglandGpListsizeRoute:
+    ApiPublicHooksIngestEnglandGpListsizeRoute,
   ApiPublicHooksIngestNiRoute: ApiPublicHooksIngestNiRoute,
   ApiPublicHooksIngestScotlandRoute: ApiPublicHooksIngestScotlandRoute,
   ApiPublicHooksIngestScotlandGpRoute: ApiPublicHooksIngestScotlandGpRoute,
