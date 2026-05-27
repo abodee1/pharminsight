@@ -285,25 +285,41 @@ function PharmacyProfile() {
   };
 
   const isScotlandPharm = (pharmacy?.country || "").toLowerCase() === "scotland";
+  // Latest row with ANY reported activity — used as the headline "as of" date,
+  // chart cut-off, and YoY anchor. Applies to all countries; we no longer
+  // prefer is_actual_payment because Scottish verified payments lag 2 months
+  // behind provisional dispensing data.
   const latestIdx = useMemo(() => {
     if (rows.length === 0) return -1;
-    if (isScotlandPharm) {
-      for (let i = rows.length - 1; i >= 0; i--) if (rows[i].is_actual_payment) return i;
-    }
-    // Skip trailing rows where the headline metric is zero (partial/preview months
-    // sometimes land before the official release fills in).
     for (let i = rows.length - 1; i >= 0; i--) {
       const r = rows[i];
       if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) return i;
     }
     return rows.length - 1;
-  }, [rows, isScotlandPharm]);
+  }, [rows]);
   const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
   const prior = latestIdx > 0 ? rows[latestIdx - 1] : undefined;
   const yoy = useMemo(() => {
     if (!latest) return null;
     return rows.find((r) => r.year === latest.year - 1 && r.month === latest.month) ?? null;
   }, [rows, latest]);
+
+  // Per-metric latest reported row — each metric finds its own most recent
+  // non-zero month so a single laggy field doesn't drag everything to a
+  // months-old period.
+  const latestFor = useMemo(() => {
+    return (key: keyof Row): { row: Row; prior?: Row; yoy?: Row } | null => {
+      for (let i = rows.length - 1; i >= 0; i--) {
+        if ((Number(rows[i][key]) || 0) > 0) {
+          const row = rows[i];
+          const priorR = i > 0 ? rows[i - 1] : undefined;
+          const yoyR = rows.find((r) => r.year === row.year - 1 && r.month === row.month) ?? undefined;
+          return { row, prior: priorR, yoy: yoyR };
+        }
+      }
+      return null;
+    };
+  }, [rows]);
 
   const trimmedRows = useMemo(
     () => (latestIdx >= 0 ? rows.slice(0, latestIdx + 1) : rows),
