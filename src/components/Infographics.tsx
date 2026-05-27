@@ -266,18 +266,26 @@ export function AnnotatedSparkline({
 
   const peakIdx = vals.indexOf(max);
   const troughIdx = vals.indexOf(min);
-  const last = points[points.length - 1].value;
-  const first = points[0].value;
-  const yoy = first ? Math.round(((last - first) / first) * 100) : 0;
-  const tone = yoy > 0 ? "text-emerald-700" : yoy < 0 ? "text-rose-700" : "text-muted-foreground";
+  // Use first/last non-zero values so leading/trailing months with no
+  // reported data (common for Pharmacy First, NMS, etc.) don't produce
+  // a misleading -100% change.
+  const firstNonZeroIdx = vals.findIndex((v) => v > 0);
+  let lastNonZeroIdx = -1;
+  for (let i = vals.length - 1; i >= 0; i--) {
+    if (vals[i] > 0) { lastNonZeroIdx = i; break; }
+  }
+  const hasChange = firstNonZeroIdx >= 0 && lastNonZeroIdx > firstNonZeroIdx;
+  const first = hasChange ? vals[firstNonZeroIdx] : 0;
+  const last = hasChange ? vals[lastNonZeroIdx] : 0;
+  const yoy = hasChange ? Math.round(((last - first) / first) * 100) : 0;
+  const tone = !hasChange ? "text-muted-foreground" : yoy > 0 ? "text-emerald-700" : yoy < 0 ? "text-rose-700" : "text-muted-foreground";
 
   return (
     <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
       <div className="flex items-baseline justify-between gap-4">
         <h3 className="text-sm font-semibold tracking-tight">{label}</h3>
         <p className={`text-xs font-semibold ${tone}`}>
-          {yoy >= 0 ? "+" : ""}
-          {yoy}% over the period
+          {hasChange ? `${yoy >= 0 ? "+" : ""}${yoy}% over the period` : "Insufficient reported data"}
         </p>
       </div>
 
