@@ -523,6 +523,10 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
   const latestIdx = useMemo(() => {
     if (!rows.length) return -1;
     if (isScot) for (let i = rows.length - 1; i >= 0; i--) if (rows[i].is_actual_payment) return i;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const r = rows[i];
+      if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) return i;
+    }
     return rows.length - 1;
   }, [rows, isScot]);
   const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
