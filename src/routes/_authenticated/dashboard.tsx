@@ -332,7 +332,7 @@ function Dashboard() {
             caption={`Your pharmacy versus ${peerItems.length.toLocaleString()} reporting peers in ${pharmacy.country}.`}
           />
           <PercentileRail
-            label={`Pharmacy First · ${stats.period}`}
+            label={`Pharmacy First · ${peerPfPeriod || stats.period}`}
             value={stats.pf}
             values={peerPf}
             peerLabel={`${pharmacy.country || "Country"} avg`}
