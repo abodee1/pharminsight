@@ -624,13 +624,8 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
     try {
       const r = await gen({ data: {
         pharmacy_name: pharmacy.name,
-        items_self: latest.items_dispensed, items_local: Math.round(localAvg.items_dispensed || 0), items_national: Math.round(nationalAvg.items_dispensed || 0),
-        nms_self: isScot ? latest.mcr_registrations : latest.nms_count,
-        nms_local: Math.round((isScot ? localAvg.mcr_registrations : localAvg.nms_count) || 0),
-        nms_national: Math.round((isScot ? nationalAvg.mcr_registrations : nationalAvg.nms_count) || 0),
-        pf_self: latest.pharmacy_first_count, pf_local: Math.round(localAvg.pharmacy_first_count || 0), pf_national: Math.round(nationalAvg.pharmacy_first_count || 0),
-        eps_rate_self: isScot ? (latest.mcr_items || 0) : (latest.items_dispensed ? (latest.eps_items / latest.items_dispensed) * 100 : 0),
-        eps_rate_national: isScot ? Math.round(nationalAvg.mcr_items || 0) : 0,
+        country: pharmacy.country,
+        rows: rowsTable.map((rw) => ({ label: rw.label, self: rw.self, local: rw.local, national: rw.nat })),
       }});
       setAiText(r.text); setAiAt(r.generated_at);
     } catch (e: any) { toast.error(e.message); } finally { setAiLoading(false); }
