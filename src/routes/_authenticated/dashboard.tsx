@@ -46,6 +46,7 @@ function Dashboard() {
   const [stats, setStats] = useState({ items: 0, pf: 0, nms: 0, rank: 0, total: 0, period: "", pfPeriod: "", nmsPeriod: "" });
   const [peerItems, setPeerItems] = useState<number[]>([]);
   const [peerPf, setPeerPf] = useState<number[]>([]);
+  const [peerPfPeriod, setPeerPfPeriod] = useState<string>("");
   const [revenueMix, setRevenueMix] = useState<{ label: string; value: number }[]>([]);
 
   useEffect(() => {
