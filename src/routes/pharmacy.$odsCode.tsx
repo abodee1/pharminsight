@@ -537,47 +537,47 @@ function PharmacyProfile() {
 
           {peerDistribution && latest && (
             <section className="mt-8">
-              <div className="flex items-baseline justify-between mb-3">
+              <div className="flex items-baseline justify-between mb-3 gap-3 flex-wrap">
                 <h2 className="text-sm font-semibold tracking-tight">How this pharmacy ranks in {pharmacy.country}</h2>
                 <p className="text-xs text-muted-foreground italic">
-                  {MONTHS[latest.month - 1]} {latest.year} · {peerDistribution.items_dispensed.length.toLocaleString()} peers
+                  Each rail uses the latest reported month for that metric.
                 </p>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <PercentileRail
-                  label="Items dispensed"
-                  value={latest.items_dispensed}
+                  label={`Items dispensed${peerPeriods.items_dispensed ? ` · ${peerPeriods.items_dispensed}` : ""}`}
+                  value={latestFor("items_dispensed")?.row.items_dispensed ?? latest.items_dispensed}
                   values={peerDistribution.items_dispensed}
                   peerLabel={`${pharmacy.country} avg`}
                   nationalLabel="Highest"
-                  caption="Where this pharmacy's monthly prescription volume sits against every reporting peer in the country. The marker is this pharmacy; ticks show the country average and the top reporter."
+                  caption={`Monthly prescription volume against ${peerDistribution.items_dispensed.length.toLocaleString()} reporting peers.`}
                 />
                 <PercentileRail
-                  label="Pharmacy First consultations"
-                  value={latest.pharmacy_first_count}
+                  label={`Pharmacy First${peerPeriods.pharmacy_first_count ? ` · ${peerPeriods.pharmacy_first_count}` : ""}`}
+                  value={latestFor("pharmacy_first_count")?.row.pharmacy_first_count ?? latest.pharmacy_first_count}
                   values={peerDistribution.pharmacy_first_count}
                   peerLabel={`${pharmacy.country} avg`}
                   nationalLabel="Highest"
-                  caption="Clinical consultations delivered under the Pharmacy First pathway this month, ranked against country peers."
+                  caption={`Clinical consultations under Pharmacy First versus ${peerDistribution.pharmacy_first_count.length.toLocaleString()} country peers.`}
                 />
                 {!isScotland && (
                   <PercentileRail
-                    label="New Medicine Service"
-                    value={latest.nms_count}
+                    label={`New Medicine Service${peerPeriods.nms_count ? ` · ${peerPeriods.nms_count}` : ""}`}
+                    value={latestFor("nms_count")?.row.nms_count ?? latest.nms_count}
                     values={peerDistribution.nms_count}
                     peerLabel={`${pharmacy.country} avg`}
                     nationalLabel="Highest"
-                    caption="NMS interventions completed this month versus other pharmacies in the country."
+                    caption={`NMS interventions versus ${peerDistribution.nms_count.length.toLocaleString()} country peers.`}
                   />
                 )}
                 {!isScotland && (
                   <PercentileRail
-                    label="EPS items"
-                    value={latest.eps_items}
+                    label={`EPS items${peerPeriods.eps_items ? ` · ${peerPeriods.eps_items}` : ""}`}
+                    value={latestFor("eps_items")?.row.eps_items ?? latest.eps_items}
                     values={peerDistribution.eps_items}
                     peerLabel={`${pharmacy.country} avg`}
                     nationalLabel="Highest"
-                    caption="Items dispensed electronically via EPS this month, ranked against country peers."
+                    caption={`Items dispensed via EPS versus ${peerDistribution.eps_items.length.toLocaleString()} country peers.`}
                   />
                 )}
               </div>
