@@ -184,13 +184,26 @@ function Dashboard() {
         (a, b) => (b.items_dispensed || 0) - (a.items_dispensed || 0),
       );
       const rank = ph ? ranked.findIndex((r) => r.pharmacy_id === ph.id) + 1 : 0;
+
+      // For PF and NMS, fall back to the latest month with reported activity
+      // (Scottish PF / NMS reporting lags items-dispensed by 1-2 months).
+      let pfRow: Row | undefined;
+      let nmsRow: Row | undefined;
+      for (let i = myRows.length - 1; i >= 0; i--) {
+        if (!pfRow && (myRows[i].pharmacy_first_count || 0) > 0) pfRow = myRows[i];
+        if (!nmsRow && (myRows[i].nms_count || 0) > 0) nmsRow = myRows[i];
+        if (pfRow && nmsRow) break;
+      }
+
       setStats({
         items: mineRow?.items_dispensed ?? 0,
-        pf: mineRow?.pharmacy_first_count ?? 0,
-        nms: mineRow?.nms_count ?? 0,
+        pf: pfRow?.pharmacy_first_count ?? 0,
+        nms: nmsRow?.nms_count ?? 0,
         rank,
         total: latestSnap.length,
         period: labelFor(statY, statM),
+        pfPeriod: pfRow ? labelFor(pfRow.year, pfRow.month) : "",
+        nmsPeriod: nmsRow ? labelFor(nmsRow.year, nmsRow.month) : "",
       });
       setPeerItems(latestSnap.map((r) => r.items_dispensed || 0));
       setPeerPf(latestSnap.map((r) => r.pharmacy_first_count || 0));
