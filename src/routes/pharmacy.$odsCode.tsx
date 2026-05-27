@@ -503,10 +503,10 @@ function PharmacyProfile() {
           <div className="mt-6 flex items-baseline justify-between gap-3 flex-wrap">
             <h2 className="text-sm font-semibold tracking-tight">Headline metrics</h2>
             <p className="text-xs text-muted-foreground italic">
-              All figures are monthly totals for {latest ? `${MONTHS[latest.month - 1]} ${latest.year}` : "the latest reported month"}.
+              All figures are monthly totals. Each card shows its latest reported month.
             </p>
           </div>
-          <div className="mt-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {metrics.map((m) => (
               <MetricCard
                 key={m.label}
@@ -516,7 +516,7 @@ function PharmacyProfile() {
                 yoy={m.yoy}
                 format={m.format}
                 rank={m.key !== "money" ? ranks[m.key as RankKey] : undefined}
-                period={latest ? `${MONTHS[latest.month - 1]} ${latest.year}` : ""}
+                period={m.period}
               />
             ))}
           </div>
