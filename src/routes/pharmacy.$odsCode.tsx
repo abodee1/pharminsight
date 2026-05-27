@@ -247,6 +247,12 @@ function PharmacyProfile() {
     if (isScotlandPharm) {
       for (let i = rows.length - 1; i >= 0; i--) if (rows[i].is_actual_payment) return i;
     }
+    // Skip trailing rows where the headline metric is zero (partial/preview months
+    // sometimes land before the official release fills in).
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const r = rows[i];
+      if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) return i;
+    }
     return rows.length - 1;
   }, [rows, isScotlandPharm]);
   const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
