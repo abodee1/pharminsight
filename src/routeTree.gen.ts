@@ -24,6 +24,7 @@ import { Route as AuthenticatedBenchmarkingRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminPaymentsImportRouteImport } from './routes/_authenticated/admin.payments-import'
 import { Route as AuthenticatedAcquisitionOdsCodeRouteImport } from './routes/_authenticated/acquisition.$odsCode'
 import { Route as ApiPublicIngestPharmacyPaymentsRouteImport } from './routes/api/public/ingest.pharmacy-payments'
+import { Route as ApiPublicHooksIngestScotlandGpListsizeRouteImport } from './routes/api/public/hooks/ingest-scotland-gp-listsize'
 import { Route as ApiPublicHooksIngestScotlandGpLinkageRouteImport } from './routes/api/public/hooks/ingest-scotland-gp-linkage'
 import { Route as ApiPublicHooksIngestScotlandGpRouteImport } from './routes/api/public/hooks/ingest-scotland-gp'
 import { Route as ApiPublicHooksIngestScotlandRouteImport } from './routes/api/public/hooks/ingest-scotland'
@@ -109,6 +110,12 @@ const ApiPublicIngestPharmacyPaymentsRoute =
     path: '/api/public/ingest/pharmacy-payments',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksIngestScotlandGpListsizeRoute =
+  ApiPublicHooksIngestScotlandGpListsizeRouteImport.update({
+    id: '/api/public/hooks/ingest-scotland-gp-listsize',
+    path: '/api/public/hooks/ingest-scotland-gp-listsize',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksIngestScotlandGpLinkageRoute =
   ApiPublicHooksIngestScotlandGpLinkageRouteImport.update({
     id: '/api/public/hooks/ingest-scotland-gp-linkage',
@@ -158,6 +165,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
   '/api/public/hooks/ingest-scotland-gp': typeof ApiPublicHooksIngestScotlandGpRoute
   '/api/public/hooks/ingest-scotland-gp-linkage': typeof ApiPublicHooksIngestScotlandGpLinkageRoute
+  '/api/public/hooks/ingest-scotland-gp-listsize': typeof ApiPublicHooksIngestScotlandGpListsizeRoute
   '/api/public/ingest/pharmacy-payments': typeof ApiPublicIngestPharmacyPaymentsRoute
 }
 export interface FileRoutesByTo {
@@ -179,6 +187,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
   '/api/public/hooks/ingest-scotland-gp': typeof ApiPublicHooksIngestScotlandGpRoute
   '/api/public/hooks/ingest-scotland-gp-linkage': typeof ApiPublicHooksIngestScotlandGpLinkageRoute
+  '/api/public/hooks/ingest-scotland-gp-listsize': typeof ApiPublicHooksIngestScotlandGpListsizeRoute
   '/api/public/ingest/pharmacy-payments': typeof ApiPublicIngestPharmacyPaymentsRoute
 }
 export interface FileRoutesById {
@@ -202,6 +211,7 @@ export interface FileRoutesById {
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
   '/api/public/hooks/ingest-scotland-gp': typeof ApiPublicHooksIngestScotlandGpRoute
   '/api/public/hooks/ingest-scotland-gp-linkage': typeof ApiPublicHooksIngestScotlandGpLinkageRoute
+  '/api/public/hooks/ingest-scotland-gp-listsize': typeof ApiPublicHooksIngestScotlandGpListsizeRoute
   '/api/public/ingest/pharmacy-payments': typeof ApiPublicIngestPharmacyPaymentsRoute
 }
 export interface FileRouteTypes {
@@ -225,6 +235,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/ingest-scotland'
     | '/api/public/hooks/ingest-scotland-gp'
     | '/api/public/hooks/ingest-scotland-gp-linkage'
+    | '/api/public/hooks/ingest-scotland-gp-listsize'
     | '/api/public/ingest/pharmacy-payments'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -246,6 +257,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/ingest-scotland'
     | '/api/public/hooks/ingest-scotland-gp'
     | '/api/public/hooks/ingest-scotland-gp-linkage'
+    | '/api/public/hooks/ingest-scotland-gp-listsize'
     | '/api/public/ingest/pharmacy-payments'
   id:
     | '__root__'
@@ -268,6 +280,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/ingest-scotland'
     | '/api/public/hooks/ingest-scotland-gp'
     | '/api/public/hooks/ingest-scotland-gp-linkage'
+    | '/api/public/hooks/ingest-scotland-gp-listsize'
     | '/api/public/ingest/pharmacy-payments'
   fileRoutesById: FileRoutesById
 }
@@ -282,6 +295,7 @@ export interface RootRouteChildren {
   ApiPublicHooksIngestScotlandRoute: typeof ApiPublicHooksIngestScotlandRoute
   ApiPublicHooksIngestScotlandGpRoute: typeof ApiPublicHooksIngestScotlandGpRoute
   ApiPublicHooksIngestScotlandGpLinkageRoute: typeof ApiPublicHooksIngestScotlandGpLinkageRoute
+  ApiPublicHooksIngestScotlandGpListsizeRoute: typeof ApiPublicHooksIngestScotlandGpListsizeRoute
   ApiPublicIngestPharmacyPaymentsRoute: typeof ApiPublicIngestPharmacyPaymentsRoute
 }
 
@@ -392,6 +406,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicIngestPharmacyPaymentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/ingest-scotland-gp-listsize': {
+      id: '/api/public/hooks/ingest-scotland-gp-listsize'
+      path: '/api/public/hooks/ingest-scotland-gp-listsize'
+      fullPath: '/api/public/hooks/ingest-scotland-gp-listsize'
+      preLoaderRoute: typeof ApiPublicHooksIngestScotlandGpListsizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/ingest-scotland-gp-linkage': {
       id: '/api/public/hooks/ingest-scotland-gp-linkage'
       path: '/api/public/hooks/ingest-scotland-gp-linkage'
@@ -470,6 +491,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksIngestScotlandGpRoute: ApiPublicHooksIngestScotlandGpRoute,
   ApiPublicHooksIngestScotlandGpLinkageRoute:
     ApiPublicHooksIngestScotlandGpLinkageRoute,
+  ApiPublicHooksIngestScotlandGpListsizeRoute:
+    ApiPublicHooksIngestScotlandGpListsizeRoute,
   ApiPublicIngestPharmacyPaymentsRoute: ApiPublicIngestPharmacyPaymentsRoute,
 }
 export const routeTree = rootRouteImport
