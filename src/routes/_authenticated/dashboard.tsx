@@ -43,7 +43,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [series, setSeries] = useState<{ label: string; mine: number; national: number }[]>([]);
   const [pfSeries, setPfSeries] = useState<{ period: string; value: number }[]>([]);
-  const [stats, setStats] = useState({ items: 0, pf: 0, nms: 0, rank: 0, total: 0, period: "" });
+  const [stats, setStats] = useState({ items: 0, pf: 0, nms: 0, rank: 0, total: 0, period: "", pfPeriod: "", nmsPeriod: "" });
   const [peerItems, setPeerItems] = useState<number[]>([]);
   const [peerPf, setPeerPf] = useState<number[]>([]);
   const [revenueMix, setRevenueMix] = useState<{ label: string; value: number }[]>([]);
@@ -184,13 +184,26 @@ function Dashboard() {
         (a, b) => (b.items_dispensed || 0) - (a.items_dispensed || 0),
       );
       const rank = ph ? ranked.findIndex((r) => r.pharmacy_id === ph.id) + 1 : 0;
+
+      // For PF and NMS, fall back to the latest month with reported activity
+      // (Scottish PF / NMS reporting lags items-dispensed by 1-2 months).
+      let pfRow: Row | undefined;
+      let nmsRow: Row | undefined;
+      for (let i = myRows.length - 1; i >= 0; i--) {
+        if (!pfRow && (myRows[i].pharmacy_first_count || 0) > 0) pfRow = myRows[i];
+        if (!nmsRow && (myRows[i].nms_count || 0) > 0) nmsRow = myRows[i];
+        if (pfRow && nmsRow) break;
+      }
+
       setStats({
         items: mineRow?.items_dispensed ?? 0,
-        pf: mineRow?.pharmacy_first_count ?? 0,
-        nms: mineRow?.nms_count ?? 0,
+        pf: pfRow?.pharmacy_first_count ?? 0,
+        nms: nmsRow?.nms_count ?? 0,
         rank,
         total: latestSnap.length,
         period: labelFor(statY, statM),
+        pfPeriod: pfRow ? labelFor(pfRow.year, pfRow.month) : "",
+        nmsPeriod: nmsRow ? labelFor(nmsRow.year, nmsRow.month) : "",
       });
       setPeerItems(latestSnap.map((r) => r.items_dispensed || 0));
       setPeerPf(latestSnap.map((r) => r.pharmacy_first_count || 0));
@@ -245,8 +258,18 @@ function Dashboard() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label={`Items · ${stats.period || "latest"}`} value={stats.items.toLocaleString()} hint={pharmacy?.name} />
-        <StatCard label="Pharmacy First" value={stats.pf.toLocaleString()} />
-        <StatCard label="NMS" value={stats.nms.toLocaleString()} />
+        <StatCard
+          label="Pharmacy First"
+          value={stats.pf.toLocaleString()}
+          hint={stats.pfPeriod && stats.pfPeriod !== stats.period ? `Latest reported · ${stats.pfPeriod}` : undefined}
+        />
+        {pharmacy?.country?.toLowerCase() !== "scotland" && (
+          <StatCard
+            label="NMS"
+            value={stats.nms.toLocaleString()}
+            hint={stats.nmsPeriod && stats.nmsPeriod !== stats.period ? `Latest reported · ${stats.nmsPeriod}` : undefined}
+          />
+        )}
         <StatCard
           label={`${pharmacy?.country || "Country"} rank`}
           value={stats.rank ? `#${stats.rank}` : "—"}
