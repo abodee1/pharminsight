@@ -358,37 +358,57 @@ function PharmacyProfile() {
   const gbp = (n: number) => "£" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
   const isScotland = (pharmacy.country || "").toLowerCase() === "scotland";
   const showVerified = isScotland;
-  const baseMetrics: { label: string; key: RankKey | "money"; value: number; prior: number; yoy: number; format?: (n: number) => string }[] = latest
+  type MetricDef = {
+    label: string;
+    key: RankKey | "money";
+    field: keyof Row;
+    format?: (n: number) => string;
+  };
+  const buildMetric = (m: MetricDef) => {
+    const found = latestFor(m.field);
+    const row = found?.row ?? latest;
+    const p = found?.prior ?? prior ?? undefined;
+    const y = found?.yoy ?? yoy ?? undefined;
+    return {
+      label: m.label,
+      key: m.key,
+      value: row ? Number(row[m.field]) || 0 : 0,
+      prior: p ? Number(p[m.field]) || 0 : 0,
+      yoy: y ? Number(y[m.field]) || 0 : 0,
+      format: m.format,
+      period: row ? `${MONTHS[row.month - 1]} ${row.year}` : "",
+    };
+  };
+  const baseDefs: MetricDef[] = latest
     ? (isScotland
         ? [
-            { label: "Items dispensed", key: "items_dispensed", value: latest.items_dispensed, prior: prior?.items_dispensed ?? 0, yoy: yoy?.items_dispensed ?? 0 },
-            { label: "Pharmacy First", key: "pharmacy_first_count", value: latest.pharmacy_first_count, prior: prior?.pharmacy_first_count ?? 0, yoy: yoy?.pharmacy_first_count ?? 0 },
+            { label: "Items dispensed", key: "items_dispensed", field: "items_dispensed" },
+            { label: "Pharmacy First", key: "pharmacy_first_count", field: "pharmacy_first_count" },
           ]
         : [
-            { label: "Items dispensed", key: "items_dispensed", value: latest.items_dispensed, prior: prior?.items_dispensed ?? 0, yoy: yoy?.items_dispensed ?? 0 },
-            { label: "EPS items", key: "eps_items", value: latest.eps_items, prior: prior?.eps_items ?? 0, yoy: yoy?.eps_items ?? 0 },
-            { label: "EPS nominations", key: "items_dispensed", value: latest.eps_nominations, prior: prior?.eps_nominations ?? 0, yoy: yoy?.eps_nominations ?? 0 },
-            { label: "NMS", key: "nms_count", value: latest.nms_count, prior: prior?.nms_count ?? 0, yoy: yoy?.nms_count ?? 0 },
-            { label: "Pharmacy First", key: "pharmacy_first_count", value: latest.pharmacy_first_count, prior: prior?.pharmacy_first_count ?? 0, yoy: yoy?.pharmacy_first_count ?? 0 },
-            
+            { label: "Items dispensed", key: "items_dispensed", field: "items_dispensed" },
+            { label: "EPS items", key: "eps_items", field: "eps_items" },
+            { label: "EPS nominations", key: "items_dispensed", field: "eps_nominations" },
+            { label: "NMS", key: "nms_count", field: "nms_count" },
+            { label: "Pharmacy First", key: "pharmacy_first_count", field: "pharmacy_first_count" },
           ])
     : [];
-  const scottishMetrics = isScotland && latest
+  const scottishDefs: MetricDef[] = isScotland && latest
     ? [
-        { label: "MCR registrations", key: "items_dispensed" as RankKey, value: latest.mcr_registrations, prior: prior?.mcr_registrations ?? 0, yoy: yoy?.mcr_registrations ?? 0 },
-        { label: "MCR items", key: "items_dispensed" as RankKey, value: latest.mcr_items, prior: prior?.mcr_items ?? 0, yoy: yoy?.mcr_items ?? 0 },
-        { label: "EHC items", key: "items_dispensed" as RankKey, value: latest.ehc_items, prior: prior?.ehc_items ?? 0, yoy: yoy?.ehc_items ?? 0 },
-        { label: "Methadone items", key: "items_dispensed" as RankKey, value: latest.methadone_items, prior: prior?.methadone_items ?? 0, yoy: yoy?.methadone_items ?? 0 },
-        { label: "Supervised doses", key: "items_dispensed" as RankKey, value: latest.supervised_methadone_doses, prior: prior?.supervised_methadone_doses ?? 0, yoy: yoy?.supervised_methadone_doses ?? 0 },
-        { label: "Smoking cessation", key: "items_dispensed" as RankKey, value: latest.smoking_cessation, prior: prior?.smoking_cessation ?? 0, yoy: yoy?.smoking_cessation ?? 0 },
-        { label: "Smoking cessation £", key: "money" as const, value: Number(latest.smoking_cessation_payment) || 0, prior: Number(prior?.smoking_cessation_payment) || 0, yoy: Number(yoy?.smoking_cessation_payment) || 0, format: gbp },
-        { label: "Pharmacy First £", key: "money" as const, value: Number(latest.pharmacy_first_payment) || 0, prior: Number(prior?.pharmacy_first_payment) || 0, yoy: Number(yoy?.pharmacy_first_payment) || 0, format: gbp },
-        { label: "MCR payment", key: "money" as const, value: Number(latest.mcr_payment) || 0, prior: Number(prior?.mcr_payment) || 0, yoy: Number(yoy?.mcr_payment) || 0, format: gbp },
-        { label: "Gross cost", key: "money" as const, value: Number(latest.gross_cost) || 0, prior: Number(prior?.gross_cost) || 0, yoy: Number(yoy?.gross_cost) || 0, format: gbp },
-        { label: "Final NHS payment", key: "money" as const, value: Number(latest.final_payment) || 0, prior: Number(prior?.final_payment) || 0, yoy: Number(yoy?.final_payment) || 0, format: gbp },
+        { label: "MCR registrations", key: "items_dispensed", field: "mcr_registrations" },
+        { label: "MCR items", key: "items_dispensed", field: "mcr_items" },
+        { label: "EHC items", key: "items_dispensed", field: "ehc_items" },
+        { label: "Methadone items", key: "items_dispensed", field: "methadone_items" },
+        { label: "Supervised doses", key: "items_dispensed", field: "supervised_methadone_doses" },
+        { label: "Smoking cessation", key: "items_dispensed", field: "smoking_cessation" },
+        { label: "Smoking cessation £", key: "money", field: "smoking_cessation_payment", format: gbp },
+        { label: "Pharmacy First £", key: "money", field: "pharmacy_first_payment", format: gbp },
+        { label: "MCR payment", key: "money", field: "mcr_payment", format: gbp },
+        { label: "Gross cost", key: "money", field: "gross_cost", format: gbp },
+        { label: "Final NHS payment", key: "money", field: "final_payment", format: gbp },
       ]
     : [];
-  const metrics = [...baseMetrics, ...scottishMetrics];
+  const metrics = [...baseDefs, ...scottishDefs].map(buildMetric);
 
   const tableRows = [...trimmedRows].slice(-24).reverse();
 
