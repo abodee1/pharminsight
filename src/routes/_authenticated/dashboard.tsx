@@ -334,13 +334,6 @@ function Dashboard() {
           <p className="mt-3 font-semibold text-sm">Benchmarking</p>
           <p className="text-xs text-muted-foreground mt-1">Vs local & national peers</p>
         </Link>
-        <Link to="/insights" className="group rounded-xl bg-card border border-border p-5 shadow-sm hover:border-foreground/40 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-          <div className="h-9 w-9 rounded-lg bg-secondary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-            <Sparkles className="h-4.5 w-4.5" />
-          </div>
-          <p className="mt-3 font-semibold text-sm">Smart Insights</p>
-          <p className="text-xs text-muted-foreground mt-1">SWOT, gaps & commentary</p>
-        </Link>
       </div>
 
 
