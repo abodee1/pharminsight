@@ -22,7 +22,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { Trophy, BarChart2, GitCompare } from "lucide-react";
+import { Trophy, BarChart2, GitCompare, Package, Stethoscope, ClipboardCheck, Medal } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
 
@@ -279,23 +279,35 @@ function Dashboard() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label={`Items · ${stats.period || "latest"}`} value={stats.items.toLocaleString()} hint={pharmacy?.name} />
+        <StatCard
+          label={`Items · ${stats.period || "latest"}`}
+          value={stats.items.toLocaleString()}
+          hint={pharmacy?.name}
+          icon={Package}
+          accent="indigo"
+        />
         <StatCard
           label="Pharmacy First"
           value={stats.pf.toLocaleString()}
-          hint={stats.pfPeriod && stats.pfPeriod !== stats.period ? `Latest reported · ${stats.pfPeriod}` : undefined}
+          hint={stats.pfPeriod && stats.pfPeriod !== stats.period ? `Latest reported · ${stats.pfPeriod}` : stats.pfPeriod || undefined}
+          icon={Stethoscope}
+          accent="emerald"
         />
         {pharmacy?.country?.toLowerCase() !== "scotland" && (
           <StatCard
             label="NMS"
             value={stats.nms.toLocaleString()}
-            hint={stats.nmsPeriod && stats.nmsPeriod !== stats.period ? `Latest reported · ${stats.nmsPeriod}` : undefined}
+            hint={stats.nmsPeriod && stats.nmsPeriod !== stats.period ? `Latest reported · ${stats.nmsPeriod}` : stats.nmsPeriod || undefined}
+            icon={ClipboardCheck}
+            accent="sky"
           />
         )}
         <StatCard
           label={`${pharmacy?.country || "Country"} rank`}
           value={stats.rank ? `#${stats.rank}` : "—"}
-          hint={stats.total ? `of ${stats.total} pharmacies` : undefined}
+          hint={stats.total ? `of ${stats.total.toLocaleString()} pharmacies` : undefined}
+          icon={stats.rank && stats.rank <= 10 ? Trophy : Medal}
+          accent="amber"
         />
       </div>
 
