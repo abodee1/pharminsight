@@ -22,7 +22,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { Trophy, BarChart2, GitCompare, Sparkles } from "lucide-react";
+import { Trophy, BarChart2, GitCompare } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
 
