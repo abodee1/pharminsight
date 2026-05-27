@@ -258,8 +258,18 @@ function Dashboard() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label={`Items · ${stats.period || "latest"}`} value={stats.items.toLocaleString()} hint={pharmacy?.name} />
-        <StatCard label="Pharmacy First" value={stats.pf.toLocaleString()} />
-        <StatCard label="NMS" value={stats.nms.toLocaleString()} />
+        <StatCard
+          label="Pharmacy First"
+          value={stats.pf.toLocaleString()}
+          hint={stats.pfPeriod && stats.pfPeriod !== stats.period ? `Latest reported · ${stats.pfPeriod}` : undefined}
+        />
+        {pharmacy?.country?.toLowerCase() !== "scotland" && (
+          <StatCard
+            label="NMS"
+            value={stats.nms.toLocaleString()}
+            hint={stats.nmsPeriod && stats.nmsPeriod !== stats.period ? `Latest reported · ${stats.nmsPeriod}` : undefined}
+          />
+        )}
         <StatCard
           label={`${pharmacy?.country || "Country"} rank`}
           value={stats.rank ? `#${stats.rank}` : "—"}
