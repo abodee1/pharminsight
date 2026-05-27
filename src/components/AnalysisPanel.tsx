@@ -268,18 +268,34 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
     setAiLoading(true);
     const last3 = rows.slice(Math.max(0, latestIdx - 2), latestIdx + 1);
     const last3Avg = last3.reduce((s, r) => s + r.items_dispensed, 0) / Math.max(1, last3.length);
-    genFn({ data: {
+    const base = {
       pharmacy_name: pharmacy.name, region: pharmacy.region, country: pharmacy.country,
       last3_avg_items: Math.round(last3Avg),
       items_trend: last12.map((r) => r.items_dispensed),
-      nms_last: latest.nms_count, nms_rank: null, nms_total: null,
-      pf_last: latest.pharmacy_first_count, pf_rank: null, pf_total: null,
-      eps_rate: epsRate, eps_nominations_last: latest.eps_nominations,
-    }})
+    };
+    const payload = isScot
+      ? { ...base,
+          mcr_registrations_last: latest.mcr_registrations,
+          mcr_items_last: latest.mcr_items,
+          methadone_items_last: latest.methadone_items,
+          supervised_doses_last: latest.supervised_methadone_doses,
+          ehc_items_last: latest.ehc_items,
+          smoking_cessation_last: latest.smoking_cessation,
+          pharmacy_first_payment_last: Number(latest.pharmacy_first_payment) || 0,
+          mcr_payment_last: Number(latest.mcr_payment) || 0,
+        }
+      : { ...base,
+          nms_last: latest.nms_count,
+          pf_last: latest.pharmacy_first_count,
+          flu_last: latest.flu_vaccinations,
+          eps_rate: epsRate,
+          eps_nominations_last: latest.eps_nominations,
+        };
+    genFn({ data: payload })
       .then((r) => { setAiText(r.text); setAiAt(r.generated_at); })
       .catch((e) => toast.error(e.message || "AI summary failed"))
       .finally(() => setAiLoading(false));
-  }, [latest, rows, latestIdx, last12, epsRate, genFn, pharmacy.name, pharmacy.region, pharmacy.country]);
+  }, [latest, rows, latestIdx, last12, epsRate, genFn, pharmacy.name, pharmacy.region, pharmacy.country, isScot]);
 
   if (!latest) return <div className="p-10 text-center text-sm text-muted-foreground">No dispensing data yet.</div>;
 
