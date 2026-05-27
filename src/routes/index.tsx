@@ -77,7 +77,7 @@ function Landing() {
             {
               icon: Building2,
               title: "Pharmacy Analysis",
-              body: "Drill into any pharmacy: Companies House financials, valuation ranges, red flags and an AI-written performance summary in one click.",
+              body: "Drill into any pharmacy: Companies House financials, valuation ranges, red flags and a performance summary in one click.",
             },
           ].map((f) => (
             <div
