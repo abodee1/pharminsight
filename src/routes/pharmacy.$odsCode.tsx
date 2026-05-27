@@ -14,6 +14,7 @@ import { PharmacySearch } from "@/components/PharmacySearch";
 import { PercentileRail, AnnotatedSparkline, ShareDonut } from "@/components/Infographics";
 import { LocalLandscape } from "@/components/LocalLandscape";
 import { AnalysisPanel } from "@/components/AnalysisPanel";
+import { fetchAll } from "@/lib/fetchAll";
 
 export const Route = createFileRoute("/pharmacy/$odsCode")({ component: PharmacyProfile });
 
@@ -70,6 +71,9 @@ function PharmacyProfile() {
   const [peerDistribution, setPeerDistribution] = useState<{
     items_dispensed: number[]; nms_count: number[]; pharmacy_first_count: number[]; eps_items: number[];
   } | null>(null);
+  const [peerPeriods, setPeerPeriods] = useState<{
+    items_dispensed: string; nms_count: string; pharmacy_first_count: string; eps_items: string;
+  }>({ items_dispensed: "", nms_count: "", pharmacy_first_count: "", eps_items: "" });
   const [analyseOpen, setAnalyseOpen] = useState(false);
 
   useEffect(() => {
@@ -121,17 +125,12 @@ function PharmacyProfile() {
   useEffect(() => {
     (async () => {
       if (rows.length === 0) return;
-      const isScot = (pharmacy?.country || "").toLowerCase() === "scotland";
+      // Use latest row with reported activity for all pharmacies (same logic
+      // everywhere — don't prefer is_actual_payment, which lags 2+ months).
       let latest = rows[rows.length - 1];
-      if (isScot) {
-        for (let i = rows.length - 1; i >= 0; i--) {
-          if (rows[i].is_actual_payment) { latest = rows[i]; break; }
-        }
-      } else {
-        for (let i = rows.length - 1; i >= 0; i--) {
-          const r = rows[i];
-          if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) { latest = r; break; }
-        }
+      for (let i = rows.length - 1; i >= 0; i--) {
+        const r = rows[i];
+        if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) { latest = r; break; }
       }
       const keys: RankKey[] = ["items_dispensed", "nms_count", "pharmacy_first_count", "flu_vaccinations", "eps_items"];
       const out: Partial<Record<RankKey, { rank: number; total: number }>> = {};
@@ -159,18 +158,21 @@ function PharmacyProfile() {
     (async () => {
       if (!pharmacy || rows.length === 0) return;
       if ((pharmacy.country || "").toLowerCase() !== "scotland") { setPfPeerAvg(null); return; }
+      // Find latest month with PF activity for this pharmacy
       let latest = rows[rows.length - 1];
       for (let i = rows.length - 1; i >= 0; i--) {
-        if (rows[i].is_actual_payment) { latest = rows[i]; break; }
+        if ((rows[i].pharmacy_first_count || 0) > 0) { latest = rows[i]; break; }
       }
-      const peers = await supabase
-        .from("pharmacies")
-        .select("id")
-        .eq("country", "Scotland")
-        .eq("region", pharmacy.region ?? "");
-      const peerIds = (peers.data ?? []).map((p) => p.id);
+      const peerRows = await fetchAll<{ id: string }>((from, to) =>
+        supabase
+          .from("pharmacies")
+          .select("id")
+          .eq("country", "Scotland")
+          .eq("region", pharmacy.region ?? "")
+          .range(from, to),
+      );
+      const peerIds = peerRows.map((p) => p.id);
       if (peerIds.length === 0) { setPfPeerAvg(null); return; }
-      // Chunk in 500s to keep URL length sane.
       const sums: Record<string, number> = {};
       let counted = 0;
       for (let i = 0; i < peerIds.length; i += 500) {
@@ -193,45 +195,76 @@ function PharmacyProfile() {
     })();
   }, [rows, pharmacy]);
 
-  // National peer distribution for percentile rails — same country, same month.
+  // National peer distribution for percentile rails. Each metric uses its own
+  // latest reported period — items, PF, NMS and EPS can each lag differently.
   useEffect(() => {
     (async () => {
       if (!pharmacy || rows.length === 0) return;
-      const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
-      let latest = rows[rows.length - 1];
-      if (isScot) {
-        for (let i = rows.length - 1; i >= 0; i--) {
-          if (rows[i].is_actual_payment) { latest = rows[i]; break; }
-        }
-      } else {
-        for (let i = rows.length - 1; i >= 0; i--) {
-          const r = rows[i];
-          if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) { latest = r; break; }
-        }
-      }
-      // Country-scoped peer ids
-      const peers = await supabase
-        .from("pharmacies").select("id").eq("country", pharmacy.country ?? "");
-      const peerIds = (peers.data ?? []).map((p) => p.id);
+      // Paginate to fetch ALL country pharmacies (Scotland 1800+, England 16k+)
+      const peerRows = await fetchAll<{ id: string }>((from, to) =>
+        supabase
+          .from("pharmacies")
+          .select("id")
+          .eq("country", pharmacy.country ?? "")
+          .range(from, to),
+      );
+      const peerIds = peerRows.map((p) => p.id);
       if (!peerIds.length) return;
-      const items: number[] = [];
-      const nms: number[] = [];
-      const pf: number[] = [];
-      const eps: number[] = [];
-      for (let i = 0; i < peerIds.length; i += 800) {
-        const { data } = await supabase
-          .from("dispensing_data")
-          .select("items_dispensed,nms_count,pharmacy_first_count,eps_items")
-          .eq("year", latest.year).eq("month", latest.month)
-          .in("pharmacy_id", peerIds.slice(i, i + 800));
-        for (const r of (data ?? []) as any[]) {
-          items.push(r.items_dispensed || 0);
-          nms.push(r.nms_count || 0);
-          pf.push(r.pharmacy_first_count || 0);
-          eps.push(r.eps_items || 0);
+      const peerIdSet = new Set(peerIds);
+
+      // Determine latest reported period per-metric for THIS pharmacy
+      const latestFor = (key: keyof Row): { y: number; m: number } | null => {
+        for (let i = rows.length - 1; i >= 0; i--) {
+          if ((Number(rows[i][key]) || 0) > 0) return { y: rows[i].year, m: rows[i].month };
         }
-      }
-      setPeerDistribution({ items_dispensed: items, nms_count: nms, pharmacy_first_count: pf, eps_items: eps });
+        return null;
+      };
+      const periods: Record<"items_dispensed" | "nms_count" | "pharmacy_first_count" | "eps_items", { y: number; m: number } | null> = {
+        items_dispensed: latestFor("items_dispensed"),
+        nms_count: latestFor("nms_count"),
+        pharmacy_first_count: latestFor("pharmacy_first_count"),
+        eps_items: latestFor("eps_items"),
+      };
+
+      const fetchPeriod = async (y: number, m: number) => {
+        const all = await fetchAll<{ pharmacy_id: string; items_dispensed: number; nms_count: number; pharmacy_first_count: number; eps_items: number }>((from, to) =>
+          supabase
+            .from("dispensing_data")
+            .select("pharmacy_id,items_dispensed,nms_count,pharmacy_first_count,eps_items")
+            .eq("year", y).eq("month", m)
+            .range(from, to),
+        );
+        return all.filter((r) => peerIdSet.has(r.pharmacy_id));
+      };
+
+      // Cache fetches per (y,m) to avoid duplicate queries when metrics share a period
+      const cache = new Map<string, Awaited<ReturnType<typeof fetchPeriod>>>();
+      const getRows = async (p: { y: number; m: number } | null) => {
+        if (!p) return [];
+        const k = `${p.y}-${p.m}`;
+        if (!cache.has(k)) cache.set(k, await fetchPeriod(p.y, p.m));
+        return cache.get(k) || [];
+      };
+
+      const [itemsRows, nmsRows, pfRows, epsRows] = await Promise.all([
+        getRows(periods.items_dispensed),
+        getRows(periods.nms_count),
+        getRows(periods.pharmacy_first_count),
+        getRows(periods.eps_items),
+      ]);
+
+      setPeerDistribution({
+        items_dispensed: itemsRows.map((r) => r.items_dispensed || 0),
+        nms_count: nmsRows.map((r) => r.nms_count || 0),
+        pharmacy_first_count: pfRows.map((r) => r.pharmacy_first_count || 0),
+        eps_items: epsRows.map((r) => r.eps_items || 0),
+      });
+      setPeerPeriods({
+        items_dispensed: periods.items_dispensed ? `${MONTHS[periods.items_dispensed.m - 1]} ${periods.items_dispensed.y}` : "",
+        nms_count: periods.nms_count ? `${MONTHS[periods.nms_count.m - 1]} ${periods.nms_count.y}` : "",
+        pharmacy_first_count: periods.pharmacy_first_count ? `${MONTHS[periods.pharmacy_first_count.m - 1]} ${periods.pharmacy_first_count.y}` : "",
+        eps_items: periods.eps_items ? `${MONTHS[periods.eps_items.m - 1]} ${periods.eps_items.y}` : "",
+      });
     })();
   }, [rows, pharmacy]);
 
@@ -252,25 +285,41 @@ function PharmacyProfile() {
   };
 
   const isScotlandPharm = (pharmacy?.country || "").toLowerCase() === "scotland";
+  // Latest row with ANY reported activity — used as the headline "as of" date,
+  // chart cut-off, and YoY anchor. Applies to all countries; we no longer
+  // prefer is_actual_payment because Scottish verified payments lag 2 months
+  // behind provisional dispensing data.
   const latestIdx = useMemo(() => {
     if (rows.length === 0) return -1;
-    if (isScotlandPharm) {
-      for (let i = rows.length - 1; i >= 0; i--) if (rows[i].is_actual_payment) return i;
-    }
-    // Skip trailing rows where the headline metric is zero (partial/preview months
-    // sometimes land before the official release fills in).
     for (let i = rows.length - 1; i >= 0; i--) {
       const r = rows[i];
       if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) return i;
     }
     return rows.length - 1;
-  }, [rows, isScotlandPharm]);
+  }, [rows]);
   const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
   const prior = latestIdx > 0 ? rows[latestIdx - 1] : undefined;
   const yoy = useMemo(() => {
     if (!latest) return null;
     return rows.find((r) => r.year === latest.year - 1 && r.month === latest.month) ?? null;
   }, [rows, latest]);
+
+  // Per-metric latest reported row — each metric finds its own most recent
+  // non-zero month so a single laggy field doesn't drag everything to a
+  // months-old period.
+  const latestFor = useMemo(() => {
+    return (key: keyof Row): { row: Row; prior?: Row; yoy?: Row } | null => {
+      for (let i = rows.length - 1; i >= 0; i--) {
+        if ((Number(rows[i][key]) || 0) > 0) {
+          const row = rows[i];
+          const priorR = i > 0 ? rows[i - 1] : undefined;
+          const yoyR = rows.find((r) => r.year === row.year - 1 && r.month === row.month) ?? undefined;
+          return { row, prior: priorR, yoy: yoyR };
+        }
+      }
+      return null;
+    };
+  }, [rows]);
 
   const trimmedRows = useMemo(
     () => (latestIdx >= 0 ? rows.slice(0, latestIdx + 1) : rows),
@@ -309,37 +358,57 @@ function PharmacyProfile() {
   const gbp = (n: number) => "£" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
   const isScotland = (pharmacy.country || "").toLowerCase() === "scotland";
   const showVerified = isScotland;
-  const baseMetrics: { label: string; key: RankKey | "money"; value: number; prior: number; yoy: number; format?: (n: number) => string }[] = latest
+  type MetricDef = {
+    label: string;
+    key: RankKey | "money";
+    field: keyof Row;
+    format?: (n: number) => string;
+  };
+  const buildMetric = (m: MetricDef) => {
+    const found = latestFor(m.field);
+    const row = found?.row ?? latest;
+    const p = found?.prior ?? prior ?? undefined;
+    const y = found?.yoy ?? yoy ?? undefined;
+    return {
+      label: m.label,
+      key: m.key,
+      value: row ? Number(row[m.field]) || 0 : 0,
+      prior: p ? Number(p[m.field]) || 0 : 0,
+      yoy: y ? Number(y[m.field]) || 0 : 0,
+      format: m.format,
+      period: row ? `${MONTHS[row.month - 1]} ${row.year}` : "",
+    };
+  };
+  const baseDefs: MetricDef[] = latest
     ? (isScotland
         ? [
-            { label: "Items dispensed", key: "items_dispensed", value: latest.items_dispensed, prior: prior?.items_dispensed ?? 0, yoy: yoy?.items_dispensed ?? 0 },
-            { label: "Pharmacy First", key: "pharmacy_first_count", value: latest.pharmacy_first_count, prior: prior?.pharmacy_first_count ?? 0, yoy: yoy?.pharmacy_first_count ?? 0 },
+            { label: "Items dispensed", key: "items_dispensed", field: "items_dispensed" },
+            { label: "Pharmacy First", key: "pharmacy_first_count", field: "pharmacy_first_count" },
           ]
         : [
-            { label: "Items dispensed", key: "items_dispensed", value: latest.items_dispensed, prior: prior?.items_dispensed ?? 0, yoy: yoy?.items_dispensed ?? 0 },
-            { label: "EPS items", key: "eps_items", value: latest.eps_items, prior: prior?.eps_items ?? 0, yoy: yoy?.eps_items ?? 0 },
-            { label: "EPS nominations", key: "items_dispensed", value: latest.eps_nominations, prior: prior?.eps_nominations ?? 0, yoy: yoy?.eps_nominations ?? 0 },
-            { label: "NMS", key: "nms_count", value: latest.nms_count, prior: prior?.nms_count ?? 0, yoy: yoy?.nms_count ?? 0 },
-            { label: "Pharmacy First", key: "pharmacy_first_count", value: latest.pharmacy_first_count, prior: prior?.pharmacy_first_count ?? 0, yoy: yoy?.pharmacy_first_count ?? 0 },
-            
+            { label: "Items dispensed", key: "items_dispensed", field: "items_dispensed" },
+            { label: "EPS items", key: "eps_items", field: "eps_items" },
+            { label: "EPS nominations", key: "items_dispensed", field: "eps_nominations" },
+            { label: "NMS", key: "nms_count", field: "nms_count" },
+            { label: "Pharmacy First", key: "pharmacy_first_count", field: "pharmacy_first_count" },
           ])
     : [];
-  const scottishMetrics = isScotland && latest
+  const scottishDefs: MetricDef[] = isScotland && latest
     ? [
-        { label: "MCR registrations", key: "items_dispensed" as RankKey, value: latest.mcr_registrations, prior: prior?.mcr_registrations ?? 0, yoy: yoy?.mcr_registrations ?? 0 },
-        { label: "MCR items", key: "items_dispensed" as RankKey, value: latest.mcr_items, prior: prior?.mcr_items ?? 0, yoy: yoy?.mcr_items ?? 0 },
-        { label: "EHC items", key: "items_dispensed" as RankKey, value: latest.ehc_items, prior: prior?.ehc_items ?? 0, yoy: yoy?.ehc_items ?? 0 },
-        { label: "Methadone items", key: "items_dispensed" as RankKey, value: latest.methadone_items, prior: prior?.methadone_items ?? 0, yoy: yoy?.methadone_items ?? 0 },
-        { label: "Supervised doses", key: "items_dispensed" as RankKey, value: latest.supervised_methadone_doses, prior: prior?.supervised_methadone_doses ?? 0, yoy: yoy?.supervised_methadone_doses ?? 0 },
-        { label: "Smoking cessation", key: "items_dispensed" as RankKey, value: latest.smoking_cessation, prior: prior?.smoking_cessation ?? 0, yoy: yoy?.smoking_cessation ?? 0 },
-        { label: "Smoking cessation £", key: "money" as const, value: Number(latest.smoking_cessation_payment) || 0, prior: Number(prior?.smoking_cessation_payment) || 0, yoy: Number(yoy?.smoking_cessation_payment) || 0, format: gbp },
-        { label: "Pharmacy First £", key: "money" as const, value: Number(latest.pharmacy_first_payment) || 0, prior: Number(prior?.pharmacy_first_payment) || 0, yoy: Number(yoy?.pharmacy_first_payment) || 0, format: gbp },
-        { label: "MCR payment", key: "money" as const, value: Number(latest.mcr_payment) || 0, prior: Number(prior?.mcr_payment) || 0, yoy: Number(yoy?.mcr_payment) || 0, format: gbp },
-        { label: "Gross cost", key: "money" as const, value: Number(latest.gross_cost) || 0, prior: Number(prior?.gross_cost) || 0, yoy: Number(yoy?.gross_cost) || 0, format: gbp },
-        { label: "Final NHS payment", key: "money" as const, value: Number(latest.final_payment) || 0, prior: Number(prior?.final_payment) || 0, yoy: Number(yoy?.final_payment) || 0, format: gbp },
+        { label: "MCR registrations", key: "items_dispensed", field: "mcr_registrations" },
+        { label: "MCR items", key: "items_dispensed", field: "mcr_items" },
+        { label: "EHC items", key: "items_dispensed", field: "ehc_items" },
+        { label: "Methadone items", key: "items_dispensed", field: "methadone_items" },
+        { label: "Supervised doses", key: "items_dispensed", field: "supervised_methadone_doses" },
+        { label: "Smoking cessation", key: "items_dispensed", field: "smoking_cessation" },
+        { label: "Smoking cessation £", key: "money", field: "smoking_cessation_payment", format: gbp },
+        { label: "Pharmacy First £", key: "money", field: "pharmacy_first_payment", format: gbp },
+        { label: "MCR payment", key: "money", field: "mcr_payment", format: gbp },
+        { label: "Gross cost", key: "money", field: "gross_cost", format: gbp },
+        { label: "Final NHS payment", key: "money", field: "final_payment", format: gbp },
       ]
     : [];
-  const metrics = [...baseMetrics, ...scottishMetrics];
+  const metrics = [...baseDefs, ...scottishDefs].map(buildMetric);
 
   const tableRows = [...trimmedRows].slice(-24).reverse();
 
@@ -434,10 +503,10 @@ function PharmacyProfile() {
           <div className="mt-6 flex items-baseline justify-between gap-3 flex-wrap">
             <h2 className="text-sm font-semibold tracking-tight">Headline metrics</h2>
             <p className="text-xs text-muted-foreground italic">
-              All figures are monthly totals for {latest ? `${MONTHS[latest.month - 1]} ${latest.year}` : "the latest reported month"}.
+              All figures are monthly totals. Each card shows its latest reported month.
             </p>
           </div>
-          <div className="mt-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {metrics.map((m) => (
               <MetricCard
                 key={m.label}
@@ -447,7 +516,7 @@ function PharmacyProfile() {
                 yoy={m.yoy}
                 format={m.format}
                 rank={m.key !== "money" ? ranks[m.key as RankKey] : undefined}
-                period={latest ? `${MONTHS[latest.month - 1]} ${latest.year}` : ""}
+                period={m.period}
               />
             ))}
           </div>
@@ -468,47 +537,47 @@ function PharmacyProfile() {
 
           {peerDistribution && latest && (
             <section className="mt-8">
-              <div className="flex items-baseline justify-between mb-3">
+              <div className="flex items-baseline justify-between mb-3 gap-3 flex-wrap">
                 <h2 className="text-sm font-semibold tracking-tight">How this pharmacy ranks in {pharmacy.country}</h2>
                 <p className="text-xs text-muted-foreground italic">
-                  {MONTHS[latest.month - 1]} {latest.year} · {peerDistribution.items_dispensed.length.toLocaleString()} peers
+                  Each rail uses the latest reported month for that metric.
                 </p>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <PercentileRail
-                  label="Items dispensed"
-                  value={latest.items_dispensed}
+                  label={`Items dispensed${peerPeriods.items_dispensed ? ` · ${peerPeriods.items_dispensed}` : ""}`}
+                  value={latestFor("items_dispensed")?.row.items_dispensed ?? latest.items_dispensed}
                   values={peerDistribution.items_dispensed}
                   peerLabel={`${pharmacy.country} avg`}
                   nationalLabel="Highest"
-                  caption="Where this pharmacy's monthly prescription volume sits against every reporting peer in the country. The marker is this pharmacy; ticks show the country average and the top reporter."
+                  caption={`Monthly prescription volume against ${peerDistribution.items_dispensed.length.toLocaleString()} reporting peers.`}
                 />
                 <PercentileRail
-                  label="Pharmacy First consultations"
-                  value={latest.pharmacy_first_count}
+                  label={`Pharmacy First${peerPeriods.pharmacy_first_count ? ` · ${peerPeriods.pharmacy_first_count}` : ""}`}
+                  value={latestFor("pharmacy_first_count")?.row.pharmacy_first_count ?? latest.pharmacy_first_count}
                   values={peerDistribution.pharmacy_first_count}
                   peerLabel={`${pharmacy.country} avg`}
                   nationalLabel="Highest"
-                  caption="Clinical consultations delivered under the Pharmacy First pathway this month, ranked against country peers."
+                  caption={`Clinical consultations under Pharmacy First versus ${peerDistribution.pharmacy_first_count.length.toLocaleString()} country peers.`}
                 />
                 {!isScotland && (
                   <PercentileRail
-                    label="New Medicine Service"
-                    value={latest.nms_count}
+                    label={`New Medicine Service${peerPeriods.nms_count ? ` · ${peerPeriods.nms_count}` : ""}`}
+                    value={latestFor("nms_count")?.row.nms_count ?? latest.nms_count}
                     values={peerDistribution.nms_count}
                     peerLabel={`${pharmacy.country} avg`}
                     nationalLabel="Highest"
-                    caption="NMS interventions completed this month versus other pharmacies in the country."
+                    caption={`NMS interventions versus ${peerDistribution.nms_count.length.toLocaleString()} country peers.`}
                   />
                 )}
                 {!isScotland && (
                   <PercentileRail
-                    label="EPS items"
-                    value={latest.eps_items}
+                    label={`EPS items${peerPeriods.eps_items ? ` · ${peerPeriods.eps_items}` : ""}`}
+                    value={latestFor("eps_items")?.row.eps_items ?? latest.eps_items}
                     values={peerDistribution.eps_items}
                     peerLabel={`${pharmacy.country} avg`}
                     nationalLabel="Highest"
-                    caption="Items dispensed electronically via EPS this month, ranked against country peers."
+                    caption={`Items dispensed via EPS versus ${peerDistribution.eps_items.length.toLocaleString()} country peers.`}
                   />
                 )}
               </div>
@@ -684,15 +753,15 @@ function MetricCard({ label, value, prior, yoy, format, rank, period }: {
       className="group relative w-full text-left [perspective:1000px] focus:outline-none rounded-lg"
       aria-label={`${label}: tap to ${flipped ? "hide" : "show"} description`}
     >
-      <div className={`relative h-full min-h-[8.5rem] transition-transform duration-500 [transform-style:preserve-3d] ${flipped ? "[transform:rotateY(180deg)]" : ""}`}>
-        <div className="absolute inset-0 rounded-lg bg-card border border-border p-4 shadow-sm [backface-visibility:hidden]">
+      <div className={`relative h-full min-h-[9.5rem] transition-transform duration-500 [transform-style:preserve-3d] ${flipped ? "[transform:rotateY(180deg)]" : ""}`}>
+        <div className="absolute inset-0 rounded-lg bg-card border border-border p-4 shadow-sm [backface-visibility:hidden] flex flex-col">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center justify-between gap-2">
             <span className="truncate">{label}</span>
             <span className="text-[9px] opacity-40 group-hover:opacity-100 shrink-0">tap ⓘ</span>
           </p>
-          <p className="mt-1 text-xl font-bold">{fmt(value)}</p>
+          <p className="mt-1.5 text-xl font-bold leading-tight">{fmt(value)}</p>
           {period && (
-            <p className="text-[10px] text-muted-foreground mt-0.5">Monthly · {period}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Monthly · {period}</p>
           )}
           {prior > 0 && (
             <div className={`mt-1 flex items-center gap-1 text-xs ${color}`}>
