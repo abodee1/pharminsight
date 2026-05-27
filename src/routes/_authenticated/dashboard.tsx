@@ -105,12 +105,19 @@ function Dashboard() {
         avg_items: number; avg_pf: number; avg_nms: number; total_items: number;
       }>;
 
-      // Stats period: user's latest confirmed (else latest) row, else endY/endM
+      // Stats period: user's latest row with any reported activity (skip
+      // trailing partial/preview months). This matches the pharmacy profile
+      // and compare pages, so the headline period is the same everywhere.
       let mineRow: Row | undefined;
       if (myRows.length) {
-        mineRow =
-          [...myRows].reverse().find((r) => r.is_actual_payment) ??
-          myRows[myRows.length - 1];
+        for (let i = myRows.length - 1; i >= 0; i--) {
+          const r = myRows[i];
+          if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) {
+            mineRow = r;
+            break;
+          }
+        }
+        if (!mineRow) mineRow = myRows[myRows.length - 1];
       }
       const statY = mineRow?.year ?? endY;
       const statM = mineRow?.month ?? endM;
