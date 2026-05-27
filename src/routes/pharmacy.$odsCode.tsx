@@ -122,17 +122,12 @@ function PharmacyProfile() {
   useEffect(() => {
     (async () => {
       if (rows.length === 0) return;
-      const isScot = (pharmacy?.country || "").toLowerCase() === "scotland";
+      // Use latest row with reported activity for all pharmacies (same logic
+      // everywhere — don't prefer is_actual_payment, which lags 2+ months).
       let latest = rows[rows.length - 1];
-      if (isScot) {
-        for (let i = rows.length - 1; i >= 0; i--) {
-          if (rows[i].is_actual_payment) { latest = rows[i]; break; }
-        }
-      } else {
-        for (let i = rows.length - 1; i >= 0; i--) {
-          const r = rows[i];
-          if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) { latest = r; break; }
-        }
+      for (let i = rows.length - 1; i >= 0; i--) {
+        const r = rows[i];
+        if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) { latest = r; break; }
       }
       const keys: RankKey[] = ["items_dispensed", "nms_count", "pharmacy_first_count", "flu_vaccinations", "eps_items"];
       const out: Partial<Record<RankKey, { rank: number; total: number }>> = {};
@@ -160,18 +155,21 @@ function PharmacyProfile() {
     (async () => {
       if (!pharmacy || rows.length === 0) return;
       if ((pharmacy.country || "").toLowerCase() !== "scotland") { setPfPeerAvg(null); return; }
+      // Find latest month with PF activity for this pharmacy
       let latest = rows[rows.length - 1];
       for (let i = rows.length - 1; i >= 0; i--) {
-        if (rows[i].is_actual_payment) { latest = rows[i]; break; }
+        if ((rows[i].pharmacy_first_count || 0) > 0) { latest = rows[i]; break; }
       }
-      const peers = await supabase
-        .from("pharmacies")
-        .select("id")
-        .eq("country", "Scotland")
-        .eq("region", pharmacy.region ?? "");
-      const peerIds = (peers.data ?? []).map((p) => p.id);
+      const peerRows = await fetchAll<{ id: string }>((from, to) =>
+        supabase
+          .from("pharmacies")
+          .select("id")
+          .eq("country", "Scotland")
+          .eq("region", pharmacy.region ?? "")
+          .range(from, to),
+      );
+      const peerIds = peerRows.map((p) => p.id);
       if (peerIds.length === 0) { setPfPeerAvg(null); return; }
-      // Chunk in 500s to keep URL length sane.
       const sums: Record<string, number> = {};
       let counted = 0;
       for (let i = 0; i < peerIds.length; i += 500) {
@@ -194,45 +192,76 @@ function PharmacyProfile() {
     })();
   }, [rows, pharmacy]);
 
-  // National peer distribution for percentile rails — same country, same month.
+  // National peer distribution for percentile rails. Each metric uses its own
+  // latest reported period — items, PF, NMS and EPS can each lag differently.
   useEffect(() => {
     (async () => {
       if (!pharmacy || rows.length === 0) return;
-      const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
-      let latest = rows[rows.length - 1];
-      if (isScot) {
-        for (let i = rows.length - 1; i >= 0; i--) {
-          if (rows[i].is_actual_payment) { latest = rows[i]; break; }
-        }
-      } else {
-        for (let i = rows.length - 1; i >= 0; i--) {
-          const r = rows[i];
-          if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) { latest = r; break; }
-        }
-      }
-      // Country-scoped peer ids
-      const peers = await supabase
-        .from("pharmacies").select("id").eq("country", pharmacy.country ?? "");
-      const peerIds = (peers.data ?? []).map((p) => p.id);
+      // Paginate to fetch ALL country pharmacies (Scotland 1800+, England 16k+)
+      const peerRows = await fetchAll<{ id: string }>((from, to) =>
+        supabase
+          .from("pharmacies")
+          .select("id")
+          .eq("country", pharmacy.country ?? "")
+          .range(from, to),
+      );
+      const peerIds = peerRows.map((p) => p.id);
       if (!peerIds.length) return;
-      const items: number[] = [];
-      const nms: number[] = [];
-      const pf: number[] = [];
-      const eps: number[] = [];
-      for (let i = 0; i < peerIds.length; i += 800) {
-        const { data } = await supabase
-          .from("dispensing_data")
-          .select("items_dispensed,nms_count,pharmacy_first_count,eps_items")
-          .eq("year", latest.year).eq("month", latest.month)
-          .in("pharmacy_id", peerIds.slice(i, i + 800));
-        for (const r of (data ?? []) as any[]) {
-          items.push(r.items_dispensed || 0);
-          nms.push(r.nms_count || 0);
-          pf.push(r.pharmacy_first_count || 0);
-          eps.push(r.eps_items || 0);
+      const peerIdSet = new Set(peerIds);
+
+      // Determine latest reported period per-metric for THIS pharmacy
+      const latestFor = (key: keyof Row): { y: number; m: number } | null => {
+        for (let i = rows.length - 1; i >= 0; i--) {
+          if ((Number(rows[i][key]) || 0) > 0) return { y: rows[i].year, m: rows[i].month };
         }
-      }
-      setPeerDistribution({ items_dispensed: items, nms_count: nms, pharmacy_first_count: pf, eps_items: eps });
+        return null;
+      };
+      const periods: Record<"items_dispensed" | "nms_count" | "pharmacy_first_count" | "eps_items", { y: number; m: number } | null> = {
+        items_dispensed: latestFor("items_dispensed"),
+        nms_count: latestFor("nms_count"),
+        pharmacy_first_count: latestFor("pharmacy_first_count"),
+        eps_items: latestFor("eps_items"),
+      };
+
+      const fetchPeriod = async (y: number, m: number) => {
+        const all = await fetchAll<{ pharmacy_id: string; items_dispensed: number; nms_count: number; pharmacy_first_count: number; eps_items: number }>((from, to) =>
+          supabase
+            .from("dispensing_data")
+            .select("pharmacy_id,items_dispensed,nms_count,pharmacy_first_count,eps_items")
+            .eq("year", y).eq("month", m)
+            .range(from, to),
+        );
+        return all.filter((r) => peerIdSet.has(r.pharmacy_id));
+      };
+
+      // Cache fetches per (y,m) to avoid duplicate queries when metrics share a period
+      const cache = new Map<string, Awaited<ReturnType<typeof fetchPeriod>>>();
+      const getRows = async (p: { y: number; m: number } | null) => {
+        if (!p) return [];
+        const k = `${p.y}-${p.m}`;
+        if (!cache.has(k)) cache.set(k, await fetchPeriod(p.y, p.m));
+        return cache.get(k) || [];
+      };
+
+      const [itemsRows, nmsRows, pfRows, epsRows] = await Promise.all([
+        getRows(periods.items_dispensed),
+        getRows(periods.nms_count),
+        getRows(periods.pharmacy_first_count),
+        getRows(periods.eps_items),
+      ]);
+
+      setPeerDistribution({
+        items_dispensed: itemsRows.map((r) => r.items_dispensed || 0),
+        nms_count: nmsRows.map((r) => r.nms_count || 0),
+        pharmacy_first_count: pfRows.map((r) => r.pharmacy_first_count || 0),
+        eps_items: epsRows.map((r) => r.eps_items || 0),
+      });
+      setPeerPeriods({
+        items_dispensed: periods.items_dispensed ? `${MONTHS[periods.items_dispensed.m - 1]} ${periods.items_dispensed.y}` : "",
+        nms_count: periods.nms_count ? `${MONTHS[periods.nms_count.m - 1]} ${periods.nms_count.y}` : "",
+        pharmacy_first_count: periods.pharmacy_first_count ? `${MONTHS[periods.pharmacy_first_count.m - 1]} ${periods.pharmacy_first_count.y}` : "",
+        eps_items: periods.eps_items ? `${MONTHS[periods.eps_items.m - 1]} ${periods.eps_items.y}` : "",
+      });
     })();
   }, [rows, pharmacy]);
 
