@@ -71,6 +71,9 @@ function PharmacyProfile() {
   const [peerDistribution, setPeerDistribution] = useState<{
     items_dispensed: number[]; nms_count: number[]; pharmacy_first_count: number[]; eps_items: number[];
   } | null>(null);
+  const [peerPeriods, setPeerPeriods] = useState<{
+    items_dispensed: string; nms_count: string; pharmacy_first_count: string; eps_items: string;
+  }>({ items_dispensed: "", nms_count: "", pharmacy_first_count: "", eps_items: "" });
   const [analyseOpen, setAnalyseOpen] = useState(false);
 
   useEffect(() => {
