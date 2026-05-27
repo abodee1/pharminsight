@@ -127,6 +127,11 @@ function PharmacyProfile() {
         for (let i = rows.length - 1; i >= 0; i--) {
           if (rows[i].is_actual_payment) { latest = rows[i]; break; }
         }
+      } else {
+        for (let i = rows.length - 1; i >= 0; i--) {
+          const r = rows[i];
+          if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) { latest = r; break; }
+        }
       }
       const keys: RankKey[] = ["items_dispensed", "nms_count", "pharmacy_first_count", "flu_vaccinations", "eps_items"];
       const out: Partial<Record<RankKey, { rank: number; total: number }>> = {};
@@ -198,6 +203,11 @@ function PharmacyProfile() {
         for (let i = rows.length - 1; i >= 0; i--) {
           if (rows[i].is_actual_payment) { latest = rows[i]; break; }
         }
+      } else {
+        for (let i = rows.length - 1; i >= 0; i--) {
+          const r = rows[i];
+          if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) { latest = r; break; }
+        }
       }
       // Country-scoped peer ids
       const peers = await supabase
@@ -246,6 +256,12 @@ function PharmacyProfile() {
     if (rows.length === 0) return -1;
     if (isScotlandPharm) {
       for (let i = rows.length - 1; i >= 0; i--) if (rows[i].is_actual_payment) return i;
+    }
+    // Skip trailing rows where the headline metric is zero (partial/preview months
+    // sometimes land before the official release fills in).
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const r = rows[i];
+      if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) return i;
     }
     return rows.length - 1;
   }, [rows, isScotlandPharm]);
