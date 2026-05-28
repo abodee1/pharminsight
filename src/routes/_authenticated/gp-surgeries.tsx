@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -7,11 +7,28 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Search, Stethoscope } from "lucide-react";
+import { Loader2, Search, Stethoscope, BarChart2 } from "lucide-react";
 import { GPPracticeDialog } from "@/components/GPPracticeDialog";
 import { PageHeader } from "@/components/PageHeader";
 
-export const Route = createFileRoute("/_authenticated/gp-surgeries")({
+// Words that appear in Google Maps place names but rarely help discriminate
+// between GP surgeries — we strip them so a search like "The Smith Medical
+// Practice" still matches "Smith Surgery" or "Dr Smith & Partners".
+const STOPWORDS = new Set([
+  "the", "a", "an", "and", "of", "dr", "drs", "doctor", "doctors",
+  "surgery", "surgeries", "practice", "practices", "medical", "centre",
+  "center", "health", "healthcare", "clinic", "group", "partners",
+  "partnership", "&", "ltd", "limited", "nhs", "gp",
+]);
+function tokenize(q: string): string[] {
+  return q
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((t) => !STOPWORDS.has(t) && t.length >= 2);
+}
+
   head: () => ({
     meta: [{ title: "GP Surgeries — PharmInsight" }],
   }),
