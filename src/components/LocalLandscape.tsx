@@ -42,6 +42,8 @@ export function LocalLandscape({ pharmacyName, postcode, address, selfPlaceNameH
   const [pharmacies, setPharmacies] = useState<PlaceResult[]>([]);
   const [doctors, setDoctors] = useState<PlaceResult[]>([]);
   const [matched, setMatched] = useState<Map<string, LinkedPharmacy>>(new Map());
+  const [matchedGPs, setMatchedGPs] = useState<Map<string, LinkedPractice>>(new Map());
+  const [openPractice, setOpenPractice] = useState<{ code: string | null; name?: string; address?: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
