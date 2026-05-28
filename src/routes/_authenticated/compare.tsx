@@ -324,7 +324,6 @@ function Compare() {
       }),
     }));
   }, [trendPeriods, selectedPharms, rows, activeMetrics]);
-  }, [periods, selectedPharms, rows, activeMetrics]);
 
   // Radar: normalise per metric across active pharmacies
   const radar = useMemo(() => {
