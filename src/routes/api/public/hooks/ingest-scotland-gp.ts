@@ -120,7 +120,7 @@ async function processDispenser(item: { id: string; dataset: string; resource_ur
   await streamCsv(item.resource_url, (cells) => {
     if (rowNo++ === 0) {
       const h = buildHeaderIndex(cells);
-      odsIdx = h.find("DispensLocationCode", "DispenserLocationCode");
+      odsIdx = h.find("DispensLocationCode", "DispenserLocationCode", "DispenserLocation", "DispLocationCode");
       nameIdx = h.find("DispensLocationName", "DispenserLocationName");
       hbIdx = h.find("HBName", "HBT", "HB");
       itemsIdx = h.find("NumberOfPaidItems", "NumberOfItems");

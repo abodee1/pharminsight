@@ -14,7 +14,13 @@ const PATIENT_INDEX_URL = "https://digital.nhs.uk/data-and-information/publicati
 // epraccur.csv has no header row — columns are positional per ODS publication.
 // 1=code, 2=name, 10=postcode, 12=status (A=active)
 async function ingestPracticeDirectory() {
-  const res = await fetch(EPRACCUR_URL, { redirect: "follow" });
+  const res = await fetch(EPRACCUR_URL, {
+    redirect: "follow",
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; PharmInsightBot/1.0; +https://pharminsight.lovable.app)",
+      "Accept": "application/zip,application/octet-stream,*/*",
+    },
+  });
   if (!res.ok) throw new Error(`epraccur ${res.status}`);
   const buf = new Uint8Array(await res.arrayBuffer());
   const files = unzipSync(buf, { filter: (f) => f.name.toLowerCase().endsWith(".csv") });
