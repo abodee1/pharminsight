@@ -1,12 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { backfillGpGeocodes } from "@/lib/gpMatch.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/gp-data")({
   component: GpDataAdmin,
 });
+
 
 type Row = { source: string; dataset: string; year: number | null; month: number | null; status: string };
 
@@ -35,6 +38,22 @@ function GpDataAdmin() {
   const [logs, setLogs] = useState<Row[]>([]);
   const [queue, setQueue] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [geocoding, setGeocoding] = useState(false);
+  const runBackfill = useServerFn(backfillGpGeocodes);
+
+  const triggerBackfill = async () => {
+    setGeocoding(true);
+    toast.info("Geocoding GP practices via postcodes.io…");
+    try {
+      const r = await runBackfill({ data: { limit: 5000 } });
+      toast.success(`Geocoded ${r.updated} (missed ${r.missed}). Remaining without coords: ${r.remaining ?? "?"}`);
+    } catch (e: any) {
+      toast.error(`Geocode failed: ${e?.message || e}`);
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
 
   const refresh = async () => {
     setLoading(true);
@@ -73,12 +92,18 @@ function GpDataAdmin() {
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="text-2xl font-semibold">GP Data Coverage</h1>
-        <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-          {loading ? "Loading…" : "Refresh"}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={triggerBackfill} disabled={geocoding}>
+            {geocoding ? "Geocoding…" : "Geocode practices"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+            {loading ? "Loading…" : "Refresh"}
+          </Button>
+        </div>
       </div>
+
       <p className="text-sm text-muted-foreground">
         Green = ingested · Red = failed · Amber = pending · Grey = not yet ingested. Click a grey cell to trigger that series.
       </p>

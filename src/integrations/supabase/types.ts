@@ -393,9 +393,13 @@ export type Database = {
       }
       gp_practices: {
         Row: {
+          address_line: string | null
           country: string | null
           created_at: string
+          google_place_id: string | null
           health_board: string | null
+          lat: number | null
+          lng: number | null
           postcode: string | null
           practice_code: string
           practice_name: string | null
@@ -403,9 +407,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          address_line?: string | null
           country?: string | null
           created_at?: string
+          google_place_id?: string | null
           health_board?: string | null
+          lat?: number | null
+          lng?: number | null
           postcode?: string | null
           practice_code: string
           practice_name?: string | null
@@ -413,9 +421,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          address_line?: string | null
           country?: string | null
           created_at?: string
+          google_place_id?: string | null
           health_board?: string | null
+          lat?: number | null
+          lng?: number | null
           postcode?: string | null
           practice_code?: string
           practice_name?: string | null
@@ -818,6 +830,24 @@ export type Database = {
         Returns: {
           country: string
           total_items: number
+        }[]
+      }
+      gp_practices_near: {
+        Args: {
+          p_lat: number
+          p_limit?: number
+          p_lng: number
+          p_radius_m?: number
+        }
+        Returns: {
+          address_line: string
+          distance_m: number
+          google_place_id: string
+          lat: number
+          lng: number
+          postcode: string
+          practice_code: string
+          practice_name: string
         }[]
       }
       gp_prescribing_add: { Args: { rows: Json }; Returns: number }
