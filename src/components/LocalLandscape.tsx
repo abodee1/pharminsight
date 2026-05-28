@@ -36,6 +36,8 @@ function fmtDist(m: number | null) {
 export function LocalLandscape({ pharmacyName, postcode, address, selfPlaceNameHint }: Props) {
   const geocode = useServerFn(geocodePharmacy);
   const nearby = useServerFn(nearbyPharmaciesAndGPs);
+  const matchGPs = useServerFn(matchGpPractices);
+
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
