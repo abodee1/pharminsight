@@ -130,7 +130,8 @@ function GpDataAdmin() {
     setQueue((q.data as Row[]) ?? []);
     setLoading(false);
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { refresh(); loadCoverage(); }, []);
+
 
   const statusFor = (source: string, y: number, m: number): "success" | "failed" | "pending" | "absent" => {
     // Quarterly series only meaningful at quarter months 1,4,7,10
