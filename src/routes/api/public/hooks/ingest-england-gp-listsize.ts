@@ -47,17 +47,20 @@ async function ingestPracticeDirectory() {
 
 // Discover the latest "All patients by practice" CSV URL from the NHS Digital publications index.
 async function findLatestPatientCsv(): Promise<{ url: string; year: number | null; month: number | null } | null> {
-  const res = await fetch(PATIENT_INDEX_URL);
+  const res = await fetch(PATIENT_INDEX_URL, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; PharmInsightBot/1.0; +https://pharminsight.lovable.app)",
+      "Accept": "text/html,application/xhtml+xml",
+    },
+    redirect: "follow",
+  });
   if (!res.ok) throw new Error(`patient index ${res.status}`);
   const html = await res.text();
-  // Find any link to a .csv that mentions "all" or "practice" patients
   const csvLinks = Array.from(html.matchAll(/href="([^"]+\.csv)"/gi)).map((m) => m[1]);
-  // Heuristic: pick first CSV whose URL mentions gp-reg-pat or all-patients-by-practice
   const target = csvLinks.find((u) => /gp-reg-pat|all[-_ ]?patients?[-_ ]?by[-_ ]?practice/i.test(u))
     ?? csvLinks[0];
   if (!target) return null;
   const url = target.startsWith("http") ? target : new URL(target, "https://digital.nhs.uk").toString();
-  // Extract YYYY-MM or month from filename
   const m = url.match(/(20\d{2})[-_](\d{2})/);
   const year = m ? +m[1] : null;
   const month = m ? +m[2] : null;
