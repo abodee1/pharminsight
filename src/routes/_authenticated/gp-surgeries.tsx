@@ -166,14 +166,16 @@ function GPSurgeriesPage() {
               </TableRow>
             ) : (
               rows.map((r) => (
-                <TableRow
-                  key={r.practice_code}
-                  className="cursor-pointer"
-                  onClick={() => setOpenCode(r.practice_code)}
-                >
-                  <TableCell className="font-medium flex items-center gap-2">
-                    <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
-                    {r.practice_name || "—"}
+                <TableRow key={r.practice_code}>
+                  <TableCell className="font-medium">
+                    <Link
+                      to="/gp-surgeries/$code"
+                      params={{ code: r.practice_code }}
+                      className="inline-flex items-center gap-2 hover:underline"
+                    >
+                      <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
+                      {r.practice_name || "—"}
+                    </Link>
                   </TableCell>
                   <TableCell className="hidden md:table-cell font-mono text-xs">
                     {r.practice_code}
@@ -183,8 +185,17 @@ function GPSurgeriesPage() {
                     {r.health_board || "—"}
                   </TableCell>
                   <TableCell>{r.country || "—"}</TableCell>
+                  <TableCell className="text-right">
+                    <button
+                      onClick={() => setOpenCode(r.practice_code)}
+                      className="text-xs text-muted-foreground hover:text-primary inline-flex items-center gap-1"
+                    >
+                      <BarChart2 className="h-3 w-3" /> Quick view
+                    </button>
+                  </TableCell>
                 </TableRow>
               ))
+
             )}
           </TableBody>
         </Table>
