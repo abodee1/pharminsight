@@ -10,39 +10,83 @@ import {
 const SOURCE = "NHSBSA_LISTSIZE";
 const EPRACCUR_URL = "https://files.digital.nhs.uk/assets/ods/current/epraccur.zip";
 const PATIENT_INDEX_URL = "https://digital.nhs.uk/data-and-information/publications/statistical/patients-registered-at-a-gp-practice";
+// Fallback: OpenPrescribing's mirror of active English GP practices (no auth, CORS-open).
+const OPENPRESCRIBING_URL = "https://openprescribing.net/api/1.0/org_code/?org_type=practice&format=csv";
 
-// epraccur.csv has no header row — columns are positional per ODS publication.
-// 1=code, 2=name, 10=postcode, 12=status (A=active)
-async function ingestPracticeDirectory() {
-  const res = await fetch(EPRACCUR_URL, {
+async function fetchEpraccur(): Promise<Array<{ practice_code: string; practice_name: string; country: string; postcode: string | null; status_code: string }> | null> {
+  try {
+    const res = await fetch(EPRACCUR_URL, {
+      redirect: "follow",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/zip,application/octet-stream,*/*",
+      },
+    });
+    if (!res.ok) {
+      console.warn(`[ingest-england-gp-listsize] epraccur ${res.status}; falling back to OpenPrescribing`);
+      return null;
+    }
+    const buf = new Uint8Array(await res.arrayBuffer());
+    const files = unzipSync(buf, { filter: (f) => f.name.toLowerCase().endsWith(".csv") });
+    const name = Object.keys(files)[0];
+    if (!name) return null;
+    const text = strFromU8(files[name]);
+    const lines = text.split(/\r?\n/);
+    const out: Array<{ practice_code: string; practice_name: string; country: string; postcode: string | null; status_code: string }> = [];
+    for (const line of lines) {
+      if (!line) continue;
+      const cells = line.split(",");
+      const code = (cells[0] ?? "").trim();
+      const status = (cells[12] ?? "").trim();
+      if (!code || status !== "A") continue;
+      out.push({
+        practice_code: code,
+        practice_name: (cells[1] ?? "").trim().replace(/^"|"$/g, ""),
+        country: "England",
+        postcode: (cells[9] ?? "").trim() || null,
+        status_code: status,
+      });
+    }
+    return out;
+  } catch (e) {
+    console.warn("[ingest-england-gp-listsize] epraccur fetch error:", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+async function fetchOpenPrescribing(): Promise<Array<{ practice_code: string; practice_name: string; country: string; postcode: string | null; status_code: string }>> {
+  const res = await fetch(OPENPRESCRIBING_URL, {
     redirect: "follow",
     headers: {
       "User-Agent": "Mozilla/5.0 (compatible; PharmInsightBot/1.0; +https://pharminsight.lovable.app)",
-      "Accept": "application/zip,application/octet-stream,*/*",
+      "Accept": "text/csv,*/*",
     },
   });
-  if (!res.ok) throw new Error(`epraccur ${res.status}`);
-  const buf = new Uint8Array(await res.arrayBuffer());
-  const files = unzipSync(buf, { filter: (f) => f.name.toLowerCase().endsWith(".csv") });
-  const name = Object.keys(files)[0];
-  if (!name) throw new Error("No CSV in epraccur.zip");
-  const text = strFromU8(files[name]);
+  if (!res.ok) throw new Error(`openprescribing ${res.status}`);
+  const text = await res.text();
   const lines = text.split(/\r?\n/);
-  const rows: Array<{ practice_code: string; practice_name: string; country: string; postcode: string | null; status_code: string }> = [];
-  for (const line of lines) {
-    if (!line) continue;
-    const cells = line.split(",");
-    const code = (cells[0] ?? "").trim();
-    const status = (cells[12] ?? "").trim();
-    if (!code || status !== "A") continue;
-    rows.push({
+  const header = lines[0].split(",").map((c) => c.trim().toLowerCase());
+  const codeIdx = header.findIndex((h) => h === "code" || h === "practice_code");
+  const nameIdx = header.findIndex((h) => h === "name" || h === "practice_name");
+  const out: Array<{ practice_code: string; practice_name: string; country: string; postcode: string | null; status_code: string }> = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = lines[i].split(",");
+    const code = (cells[codeIdx] ?? "").trim();
+    if (!code) continue;
+    out.push({
       practice_code: code,
-      practice_name: (cells[1] ?? "").trim().replace(/^"|"$/g, ""),
+      practice_name: nameIdx >= 0 ? (cells[nameIdx] ?? "").trim() : code,
       country: "England",
-      postcode: (cells[9] ?? "").trim() || null,
-      status_code: status,
+      postcode: null,
+      status_code: "A",
     });
   }
+  return out;
+}
+
+async function ingestPracticeDirectory() {
+  const rows = (await fetchEpraccur()) ?? (await fetchOpenPrescribing());
+  if (!rows.length) throw new Error("No practice rows from epraccur or OpenPrescribing");
   for (let i = 0; i < rows.length; i += 500) {
     const { error } = await supabaseAdmin.from("gp_practices")
       .upsert(rows.slice(i, i + 500), { onConflict: "practice_code" });
@@ -50,6 +94,7 @@ async function ingestPracticeDirectory() {
   }
   return rows.length;
 }
+
 
 // Discover the latest "All patients by practice" CSV URL from the NHS Digital publications index.
 async function findLatestPatientCsv(): Promise<{ url: string; year: number | null; month: number | null } | null> {
