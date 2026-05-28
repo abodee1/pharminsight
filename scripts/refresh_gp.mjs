@@ -136,7 +136,7 @@ async function geocode() {
   console.log(`[Geo] done. updated=${updated} missed=${missed}`);
 }
 
-await refreshScotland();
 await refreshEngland();
 await geocode();
+console.log("ALL DONE");
 console.log("ALL DONE");
