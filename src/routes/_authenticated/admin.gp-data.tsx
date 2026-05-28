@@ -92,12 +92,18 @@ function GpDataAdmin() {
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="text-2xl font-semibold">GP Data Coverage</h1>
-        <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-          {loading ? "Loading…" : "Refresh"}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={triggerBackfill} disabled={geocoding}>
+            {geocoding ? "Geocoding…" : "Geocode practices"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+            {loading ? "Loading…" : "Refresh"}
+          </Button>
+        </div>
       </div>
+
       <p className="text-sm text-muted-foreground">
         Green = ingested · Red = failed · Amber = pending · Grey = not yet ingested. Click a grey cell to trigger that series.
       </p>
