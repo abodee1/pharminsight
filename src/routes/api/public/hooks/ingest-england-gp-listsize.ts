@@ -76,9 +76,13 @@ async function discover() {
   if (!skip.has(epraccurKey)) {
     queue.push({ source: SOURCE, dataset: "epraccur", resource_url: epraccurKey, year: today.getUTCFullYear(), month: today.getUTCMonth() + 1 });
   }
-  const latest = await findLatestPatientCsv();
-  if (latest && !skip.has(latest.url)) {
-    queue.push({ source: SOURCE, dataset: "patients-registered", resource_url: latest.url, year: latest.year, month: latest.month });
+  try {
+    const latest = await findLatestPatientCsv();
+    if (latest && !skip.has(latest.url)) {
+      queue.push({ source: SOURCE, dataset: "patients-registered", resource_url: latest.url, year: latest.year, month: latest.month });
+    }
+  } catch (e) {
+    console.warn("[ingest-england-gp-listsize] patient index discovery failed:", e instanceof Error ? e.message : e);
   }
   return enqueue(queue);
 }
