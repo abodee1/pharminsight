@@ -165,7 +165,6 @@ function GpDataAdmin() {
             {refreshingScot ? "Scotland…" : "Refresh Scotland names/postcodes"}
           </Button>
           <Button variant="outline" size="sm" onClick={triggerEngRefresh} disabled={refreshingEng}>
-          <Button variant="outline" size="sm" onClick={triggerEngRefresh} disabled={refreshingEng}>
             {refreshingEng ? "England…" : "Refresh England names/postcodes"}
           </Button>
           <Button variant="outline" size="sm" onClick={triggerBackfill} disabled={geocoding}>
@@ -178,10 +177,36 @@ function GpDataAdmin() {
             {loading ? "Loading…" : "Refresh"}
           </Button>
         </div>
-
-        </div>
-
       </div>
+
+      {coverage && (
+        <div className="border rounded-lg p-4 space-y-3">
+          <div className="flex items-baseline justify-between flex-wrap gap-2">
+            <h2 className="font-medium">Coverage health</h2>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-semibold tabular-nums">{coverage.healthScore}</span>
+              <span className="text-xs text-muted-foreground">/ 100</span>
+            </div>
+          </div>
+          <div className="h-2 rounded bg-muted overflow-hidden">
+            <div
+              className="h-full bg-emerald-500 transition-all"
+              style={{ width: `${coverage.healthScore}%` }}
+            />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+            <CoverageStat label="Has name" pct={coverage.pctName} sub={`${coverage.withName.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
+            <CoverageStat label="Has postcode" pct={coverage.pctPostcode} sub={`${coverage.withPostcode.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
+            <CoverageStat label="Geocoded" pct={coverage.pctLat} sub={`${coverage.withLat.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
+            <CoverageStat label="Matched to a Place" pct={coverage.pctPlace} sub={`${coverage.withPlace.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Scotland: {coverage.scotland.toLocaleString()} practices · England: {coverage.england.toLocaleString()} practices
+          </p>
+        </div>
+      )}
+
+
 
       <p className="text-sm text-muted-foreground">
         Green = ingested · Red = failed · Amber = pending · Grey = not yet ingested. Click a grey cell to trigger that series.
