@@ -38,12 +38,21 @@ function monthsBetween(startY: number, startM: number, endY: number, endM: numbe
 function GpDataAdmin() {
   const [logs, setLogs] = useState<Row[]>([]);
   const [queue, setQueue] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
   const [geocoding, setGeocoding] = useState(false);
   const [refreshingScot, setRefreshingScot] = useState(false);
   const [refreshingEng, setRefreshingEng] = useState(false);
+  const [sweeping, setSweeping] = useState(false);
+  const [coverage, setCoverage] = useState<Awaited<ReturnType<typeof getGpCoverage>> | null>(null);
   const runBackfill = useServerFn(backfillGpGeocodes);
   const runScot = useServerFn(refreshScotlandGpContacts);
+  const runEng = useServerFn(refreshEnglandGpContacts);
+  const runSweep = useServerFn(sweepUnmatchedPractices);
+  const runCoverage = useServerFn(getGpCoverage);
+
+  const loadCoverage = async () => {
+    try { setCoverage(await runCoverage()); } catch { /* ignore */ }
+  };
+
   const runEng = useServerFn(refreshEnglandGpContacts);
 
   const triggerBackfill = async () => {
