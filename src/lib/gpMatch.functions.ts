@@ -379,14 +379,14 @@ export const refreshScotlandGpContacts = createServerFn({ method: "POST" })
 export const refreshEnglandGpContacts = createServerFn({ method: "POST" })
   .handler(async () => {
     // ORD Bulk API: list all English GP practices.
-    // PrimaryRoleId RO76 = GP Practice. Returns name + postcode in summary.
-    let offset = 0;
+    // PrimaryRoleId RO177 = PRESCRIBING COST CENTRE (GP Practice). Offset starts at 1.
+    let offset = 1;
     const limit = 1000;
     let upserted = 0;
     let pages = 0;
     while (true) {
-      const url = `https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations?PrimaryRoleId=RO76&Status=Active&Limit=${limit}&Offset=${offset}`;
-      const res = await fetch(url);
+      const url = `https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations?PrimaryRoleId=RO177&Status=Active&Limit=${limit}&Offset=${offset}`;
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error(`ORD bulk failed [${res.status}] offset=${offset}`);
       const json = (await res.json()) as {
         Organisations?: Array<{ OrgId: string; Name: string; PostCode?: string }>;
