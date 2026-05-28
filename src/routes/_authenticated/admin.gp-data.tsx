@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { backfillGpGeocodes } from "@/lib/gpMatch.functions";
+import { backfillGpGeocodes, refreshScotlandGpContacts, refreshEnglandGpContacts } from "@/lib/gpMatch.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/gp-data")({
   component: GpDataAdmin,
@@ -39,20 +39,51 @@ function GpDataAdmin() {
   const [queue, setQueue] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [geocoding, setGeocoding] = useState(false);
+  const [refreshingScot, setRefreshingScot] = useState(false);
+  const [refreshingEng, setRefreshingEng] = useState(false);
   const runBackfill = useServerFn(backfillGpGeocodes);
+  const runScot = useServerFn(refreshScotlandGpContacts);
+  const runEng = useServerFn(refreshEnglandGpContacts);
 
   const triggerBackfill = async () => {
     setGeocoding(true);
     toast.info("Geocoding GP practices via postcodes.io…");
     try {
       const r = await runBackfill({ data: { limit: 5000 } });
-      toast.success(`Geocoded ${r.updated} (missed ${r.missed}). Remaining without coords: ${r.remaining ?? "?"}`);
+      toast.success(`Geocoded ${r.updated} (missed ${r.missed}). Remaining: ${r.remaining ?? "?"}`);
     } catch (e: any) {
       toast.error(`Geocode failed: ${e?.message || e}`);
     } finally {
       setGeocoding(false);
     }
   };
+
+  const triggerScotRefresh = async () => {
+    setRefreshingScot(true);
+    toast.info("Refreshing Scotland GP contact details…");
+    try {
+      const r = await runScot();
+      toast.success(`Scotland: upserted ${r.upserted} practices from ${r.source}`);
+    } catch (e: any) {
+      toast.error(`Scotland refresh failed: ${e?.message || e}`);
+    } finally {
+      setRefreshingScot(false);
+    }
+  };
+
+  const triggerEngRefresh = async () => {
+    setRefreshingEng(true);
+    toast.info("Refreshing England GP contact details (ORD)…");
+    try {
+      const r = await runEng();
+      toast.success(`England: upserted ${r.upserted} practices across ${r.pages} pages`);
+    } catch (e: any) {
+      toast.error(`England refresh failed: ${e?.message || e}`);
+    } finally {
+      setRefreshingEng(false);
+    }
+  };
+
 
 
   const refresh = async () => {
@@ -94,7 +125,13 @@ function GpDataAdmin() {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="text-2xl font-semibold">GP Data Coverage</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={triggerScotRefresh} disabled={refreshingScot}>
+            {refreshingScot ? "Scotland…" : "Refresh Scotland names/postcodes"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={triggerEngRefresh} disabled={refreshingEng}>
+            {refreshingEng ? "England…" : "Refresh England names/postcodes"}
+          </Button>
           <Button variant="outline" size="sm" onClick={triggerBackfill} disabled={geocoding}>
             {geocoding ? "Geocoding…" : "Geocode practices"}
           </Button>
@@ -102,6 +139,7 @@ function GpDataAdmin() {
             {loading ? "Loading…" : "Refresh"}
           </Button>
         </div>
+
       </div>
 
       <p className="text-sm text-muted-foreground">
