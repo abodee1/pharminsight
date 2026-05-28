@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { geocodePharmacy, nearbyPharmaciesAndGPs, type PlaceResult } from "@/lib/places.functions";
+import { matchGpPractices, type MatchedPractice } from "@/lib/gpMatch.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Stethoscope, Pill, Star, Loader2 } from "lucide-react";
 import { GPPracticeDialog } from "@/components/GPPracticeDialog";
