@@ -39,20 +39,51 @@ function GpDataAdmin() {
   const [queue, setQueue] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [geocoding, setGeocoding] = useState(false);
+  const [refreshingScot, setRefreshingScot] = useState(false);
+  const [refreshingEng, setRefreshingEng] = useState(false);
   const runBackfill = useServerFn(backfillGpGeocodes);
+  const runScot = useServerFn(refreshScotlandGpContacts);
+  const runEng = useServerFn(refreshEnglandGpContacts);
 
   const triggerBackfill = async () => {
     setGeocoding(true);
     toast.info("Geocoding GP practices via postcodes.io…");
     try {
       const r = await runBackfill({ data: { limit: 5000 } });
-      toast.success(`Geocoded ${r.updated} (missed ${r.missed}). Remaining without coords: ${r.remaining ?? "?"}`);
+      toast.success(`Geocoded ${r.updated} (missed ${r.missed}). Remaining: ${r.remaining ?? "?"}`);
     } catch (e: any) {
       toast.error(`Geocode failed: ${e?.message || e}`);
     } finally {
       setGeocoding(false);
     }
   };
+
+  const triggerScotRefresh = async () => {
+    setRefreshingScot(true);
+    toast.info("Refreshing Scotland GP contact details…");
+    try {
+      const r = await runScot();
+      toast.success(`Scotland: upserted ${r.upserted} practices from ${r.source}`);
+    } catch (e: any) {
+      toast.error(`Scotland refresh failed: ${e?.message || e}`);
+    } finally {
+      setRefreshingScot(false);
+    }
+  };
+
+  const triggerEngRefresh = async () => {
+    setRefreshingEng(true);
+    toast.info("Refreshing England GP contact details (ORD)…");
+    try {
+      const r = await runEng();
+      toast.success(`England: upserted ${r.upserted} practices across ${r.pages} pages`);
+    } catch (e: any) {
+      toast.error(`England refresh failed: ${e?.message || e}`);
+    } finally {
+      setRefreshingEng(false);
+    }
+  };
+
 
 
   const refresh = async () => {
