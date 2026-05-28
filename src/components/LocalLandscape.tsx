@@ -107,34 +107,37 @@ export function LocalLandscape({ pharmacyName, postcode, address, selfPlaceNameH
           }
         }
 
-        // Match nearby GP surgeries to gp_practices by postcode
-        const gpPostcodes = Array.from(
-          new Set(n.doctors.map((p) => p.postcode).filter(Boolean) as string[]),
-        );
-        if (gpPostcodes.length) {
-          const compact = gpPostcodes.map((p) => p.replace(/\s+/g, ""));
-          const variants = Array.from(new Set(gpPostcodes.concat(compact)));
-          const { data: gpRows } = await supabase
-            .from("gp_practices")
-            .select("practice_code,practice_name,postcode")
-            .or(variants.map((p) => `postcode.ilike.${p}`).join(","))
-            .limit(200);
-          if (!cancelled && gpRows) {
-            const byPc = new Map<string, LinkedPractice>();
-            for (const row of gpRows as LinkedPractice[]) {
-              const key = (row.postcode || "").toUpperCase().replace(/\s+/g, "");
-              if (key) byPc.set(key, row);
+        // Smart-match nearby GP surgeries to gp_practices (postcode + name tokens + geo).
+        if (n.doctors.length) {
+          try {
+            const { matches } = await matchGPs({
+              data: {
+                places: n.doctors.slice(0, 25).map((d) => ({
+                  id: d.id,
+                  name: d.name,
+                  postcode: d.postcode,
+                  address: d.address,
+                  lat: d.lat,
+                  lng: d.lng,
+                })),
+              },
+            });
+            if (!cancelled) {
+              const linkedGP = new Map<string, LinkedPractice>();
+              for (const m of matches as MatchedPractice[]) {
+                linkedGP.set(m.placeId, {
+                  practice_code: m.practice_code,
+                  practice_name: m.practice_name,
+                  postcode: m.postcode,
+                });
+              }
+              setMatchedGPs(linkedGP);
             }
-            const linkedGP = new Map<string, LinkedPractice>();
-            for (const p of n.doctors) {
-              if (!p.postcode) continue;
-              const k = p.postcode.toUpperCase().replace(/\s+/g, "");
-              const hit = byPc.get(k);
-              if (hit) linkedGP.set(p.id, hit);
-            }
-            setMatchedGPs(linkedGP);
+          } catch {
+            // Non-fatal: nearby GP list still renders without DB links.
           }
         }
+
       } catch (e: any) {
         if (!cancelled) setError(e?.message || "Failed to load local landscape.");
       } finally {
