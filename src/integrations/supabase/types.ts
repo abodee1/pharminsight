@@ -525,42 +525,60 @@ export type Database = {
       }
       ingestion_queue: {
         Row: {
+          chunk_size: number | null
           created_at: string
           dataset: string
           error: string | null
           finished_at: string | null
+          header_line: string | null
           id: string
+          last_completed_chunk: number
+          leftover_bytes: string
           month: number | null
           resource_url: string
           source: string
           started_at: string | null
           status: string
+          total_bytes: number | null
+          total_chunks: number | null
           year: number | null
         }
         Insert: {
+          chunk_size?: number | null
           created_at?: string
           dataset: string
           error?: string | null
           finished_at?: string | null
+          header_line?: string | null
           id?: string
+          last_completed_chunk?: number
+          leftover_bytes?: string
           month?: number | null
           resource_url: string
           source: string
           started_at?: string | null
           status?: string
+          total_bytes?: number | null
+          total_chunks?: number | null
           year?: number | null
         }
         Update: {
+          chunk_size?: number | null
           created_at?: string
           dataset?: string
           error?: string | null
           finished_at?: string | null
+          header_line?: string | null
           id?: string
+          last_completed_chunk?: number
+          leftover_bytes?: string
           month?: number | null
           resource_url?: string
           source?: string
           started_at?: string | null
           status?: string
+          total_bytes?: number | null
+          total_chunks?: number | null
           year?: number | null
         }
         Relationships: []
@@ -802,6 +820,7 @@ export type Database = {
           total_items: number
         }[]
       }
+      gp_prescribing_add: { Args: { rows: Json }; Returns: number }
     }
     Enums: {
       [_ in never]: never
