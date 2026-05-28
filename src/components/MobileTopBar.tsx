@@ -2,8 +2,6 @@ import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   LayoutDashboard, Trophy, BarChart2, GitCompare, Settings,
-import {
-  LayoutDashboard, Trophy, BarChart2, GitCompare, Settings,
   LogOut, Menu, User as UserIcon, Search as SearchIcon,
   Stethoscope, Bookmark, Upload,
 } from "lucide-react";
@@ -22,6 +20,9 @@ export const NAV_LINKS = [
   { to: "/admin/payments-import", label: "Payments Import", icon: Upload },
   { to: "/settings", label: "My Account", icon: Settings },
 ] as const;
+
+export function MobileTopBar() {
+  const [open, setOpen] = useState(false);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const pathname = useRouterState({ select: (r) => r.location.pathname });
