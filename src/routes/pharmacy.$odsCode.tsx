@@ -560,6 +560,8 @@ function PharmacyProfile() {
                 format={m.format}
                 rank={m.key !== "money" ? ranks[m.key as RankKey] : undefined}
                 period={m.period}
+                windowLabel={statWindow === 1 ? "Monthly" : `Last ${statWindow}mo`}
+
               />
             ))}
           </div>
