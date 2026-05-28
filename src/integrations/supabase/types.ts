@@ -530,6 +530,7 @@ export type Database = {
           dataset: string
           error: string | null
           finished_at: string | null
+          header_line: string | null
           id: string
           last_completed_chunk: number
           leftover_bytes: string
@@ -548,6 +549,7 @@ export type Database = {
           dataset: string
           error?: string | null
           finished_at?: string | null
+          header_line?: string | null
           id?: string
           last_completed_chunk?: number
           leftover_bytes?: string
@@ -566,6 +568,7 @@ export type Database = {
           dataset?: string
           error?: string | null
           finished_at?: string | null
+          header_line?: string | null
           id?: string
           last_completed_chunk?: number
           leftover_bytes?: string
