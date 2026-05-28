@@ -372,21 +372,39 @@ function PharmacyProfile() {
     field: keyof Row;
     format?: (n: number) => string;
   };
+  // Build a windowed metric: sum of the trailing N reported months ending at
+  // the metric's most recent non-zero month. Prior = the N months immediately
+  // before that window. YoY = N months ending 12 months earlier.
   const buildMetric = (m: MetricDef) => {
-    const found = latestFor(m.field);
-    const row = found?.row ?? latest;
-    const p = found?.prior ?? prior ?? undefined;
-    const y = found?.yoy ?? yoy ?? undefined;
-    return {
-      label: m.label,
-      key: m.key,
-      value: row ? Number(row[m.field]) || 0 : 0,
-      prior: p ? Number(p[m.field]) || 0 : 0,
-      yoy: y ? Number(y[m.field]) || 0 : 0,
-      format: m.format,
-      period: row ? `${MONTHS[row.month - 1]} ${row.year}` : "",
+    const N = statWindow;
+    // Find anchor index = last row where this field has activity
+    let anchor = -1;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if ((Number(rows[i][m.field]) || 0) > 0) { anchor = i; break; }
+    }
+    if (anchor === -1) {
+      return { label: m.label, key: m.key, value: 0, prior: 0, yoy: 0, format: m.format, period: "" };
+    }
+    const sumRange = (lo: number, hi: number) => {
+      let s = 0;
+      for (let i = Math.max(0, lo); i <= Math.min(rows.length - 1, hi); i++) {
+        s += Number(rows[i][m.field]) || 0;
+      }
+      return s;
     };
+    const value = sumRange(anchor - N + 1, anchor);
+    const priorVal = sumRange(anchor - 2 * N + 1, anchor - N);
+    // YoY window: shift anchor back ~12 months
+    const yoyAnchor = anchor - 12;
+    const yoyVal = yoyAnchor >= 0 ? sumRange(yoyAnchor - N + 1, yoyAnchor) : 0;
+    const from = rows[Math.max(0, anchor - N + 1)];
+    const to = rows[anchor];
+    const period = N === 1
+      ? `${MONTHS[to.month - 1]} ${to.year}`
+      : `${MONTHS[from.month - 1]} ${String(from.year).slice(2)} – ${MONTHS[to.month - 1]} ${String(to.year).slice(2)}`;
+    return { label: m.label, key: m.key, value, prior: priorVal, yoy: yoyVal, format: m.format, period };
   };
+
   const baseDefs: MetricDef[] = latest
     ? (isScotland
         ? [
