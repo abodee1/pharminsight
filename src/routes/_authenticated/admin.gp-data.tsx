@@ -38,6 +38,7 @@ function monthsBetween(startY: number, startM: number, endY: number, endM: numbe
 function GpDataAdmin() {
   const [logs, setLogs] = useState<Row[]>([]);
   const [queue, setQueue] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(true);
   const [geocoding, setGeocoding] = useState(false);
   const [refreshingScot, setRefreshingScot] = useState(false);
   const [refreshingEng, setRefreshingEng] = useState(false);
@@ -53,7 +54,30 @@ function GpDataAdmin() {
     try { setCoverage(await runCoverage()); } catch { /* ignore */ }
   };
 
-  const runEng = useServerFn(refreshEnglandGpContacts);
+  const triggerSweep = async () => {
+    setSweeping(true);
+    toast.info("Sweeping unmatched practices via Google Places…");
+    try {
+      let offset = 0;
+      let totalMatched = 0;
+      let totalScanned = 0;
+      // Run a few batches per click so admin sees real progress without blocking long.
+      for (let i = 0; i < 5; i++) {
+        const r = await runSweep({ data: { limit: 100, offset, radiusM: 300 } });
+        totalMatched += r.matched;
+        totalScanned += r.scanned;
+        offset = r.nextOffset;
+        if (r.scanned < 100) break;
+      }
+      toast.success(`Swept ${totalScanned} · matched ${totalMatched}`);
+      loadCoverage();
+    } catch (e: any) {
+      toast.error(`Sweep failed: ${e?.message || e}`);
+    } finally {
+      setSweeping(false);
+    }
+  };
+
 
   const triggerBackfill = async () => {
     setGeocoding(true);
