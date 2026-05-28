@@ -88,7 +88,7 @@ function GPSurgeriesPage() {
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
       <PageHeader
         title="GP Surgeries"
-        description="Browse every GP practice in our dataset. Click a surgery to see prescribing activity and registered patients."
+        subtitle="Browse every GP practice in our dataset. Click a surgery to see prescribing activity and registered patients."
       />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
