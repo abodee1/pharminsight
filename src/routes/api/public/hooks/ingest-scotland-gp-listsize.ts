@@ -37,7 +37,7 @@ async function processOne() {
   if (!item) return null;
   await markProcessing(item.id);
   try {
-    let codeIdx = -1, nameIdx = -1, hbIdx = -1, patIdx = -1, dateIdx = -1;
+    let codeIdx = -1, nameIdx = -1, hbIdx = -1, patIdx = -1, dateIdx = -1, sexIdx = -1;
     const practices = new Map<string, { code: string; name: string; hb: string | null }>();
     const sizes = new Map<string, { code: string; date: string; patients: number }>();
     let rowNo = 0;
@@ -47,11 +47,20 @@ async function processOne() {
         codeIdx = h.find("PracticeCode", "GPPracticeCode");
         nameIdx = h.find("PracticeName", "GPPracticeName");
         hbIdx = h.find("HBName", "HBT", "HB");
-        patIdx = h.find("NumberOfPatients", "Patients", "PracticeListSize");
+        // "AllAges" is the canonical column in the agesex CSVs (with a Sex=All row);
+        // fall back to legacy column names where present.
+        patIdx = h.find("AllAges", "NumberOfPatients", "Patients", "PracticeListSize");
+        sexIdx = h.find("Sex");
         dateIdx = h.find("Date", "ExtractDate", "QuarterEnding");
         return;
       }
       if (codeIdx < 0) return;
+      // When a Sex column is present, only sum the pre-aggregated "All" row to
+      // avoid double counting (Male + Female + All would triple the list size).
+      if (sexIdx >= 0) {
+        const sex = (cells[sexIdx] ?? "").trim();
+        if (sex && sex.toLowerCase() !== "all") return;
+      }
       const code = (cells[codeIdx] ?? "").trim();
       if (!code) return;
       const date = dateIdx >= 0 ? parseDate((cells[dateIdx] ?? "").trim()) : null;
