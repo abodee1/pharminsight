@@ -337,8 +337,8 @@ export const refreshScotlandGpContacts = createServerFn({ method: "POST" })
     const rows: Array<{
       practice_code: string; practice_name: string; postcode: string | null;
       address_line: string | null; health_board: string | null; country: string;
-      data_source: string;
     }> = [];
+
     for (let i = 1; i < lines.length; i++) {
       const c = splitCsvLine(lines[i]);
       const code = (c[iCode] ?? "").trim();
