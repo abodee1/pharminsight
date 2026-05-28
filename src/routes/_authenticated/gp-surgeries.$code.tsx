@@ -88,6 +88,21 @@ function GPPracticePage() {
   const itemsPerPatient = trailing && latestList?.registered_patients
     ? trailing.items / latestList.registered_patients
     : null;
+  const costPerItem = trailing && trailing.items
+    ? trailing.nic / trailing.items
+    : null;
+  const spendPerPatient = trailing && latestList?.registered_patients
+    ? trailing.nic / latestList.registered_patients
+    : null;
+
+  // Trend on registered patient list over the last ~year (4 quarterly points).
+  const listTrend = useMemo(() => {
+    if (listSizes.length < 2) return null;
+    const latest = listSizes[listSizes.length - 1].registered_patients;
+    const prior = listSizes[Math.max(0, listSizes.length - 5)].registered_patients;
+    if (!prior) return null;
+    return ((latest - prior) / prior) * 100;
+  }, [listSizes]);
 
   if (loading) return <div className="p-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 inline animate-spin mr-2" />Loading practice analytics…</div>;
   if (!practice) return (
@@ -98,14 +113,20 @@ function GPPracticePage() {
     </div>
   );
 
+  // Pretty-case the all-caps NHS source names (e.g. "PRIORY MEDICAL GROUP" → "Priory Medical Group").
+  const prettyName = (practice.practice_name || practice.practice_code).replace(
+    /\w\S*/g,
+    (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
+  );
+
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
       <Link to="/gp-surgeries" className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground mb-3">
         <ArrowLeft className="h-4 w-4" /> All surgeries
       </Link>
       <PageHeader
-        title={practice.practice_name || practice.practice_code}
-        subtitle={[practice.practice_code, practice.postcode, practice.health_board, practice.country].filter(Boolean).join(" · ")}
+        title={prettyName}
+        subtitle={[practice.postcode, practice.health_board, practice.country].filter(Boolean).join(" · ")}
         showBack={false}
       />
 
@@ -129,11 +150,13 @@ function GPPracticePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <Stat icon={FileText} label={`Items · last ${win}mo`} value={trailing ? Math.round(trailing.items).toLocaleString() : "—"} delta={trailing ? pctDelta(trailing.items, trailing.itemsPrior) : null} yoy={trailing ? pctDelta(trailing.items, trailing.itemsYoY) : null} />
         <Stat icon={PoundSterling} label={`NIC £ · last ${win}mo`} value={trailing ? "£" + Math.round(trailing.nic).toLocaleString() : "—"} delta={trailing ? pctDelta(trailing.nic, trailing.nicPrior) : null} yoy={trailing ? pctDelta(trailing.nic, trailing.nicYoY) : null} />
-        <Stat icon={Users} label="Registered patients" value={latestList ? latestList.registered_patients.toLocaleString() : "—"} sub={latestList ? `as of ${latestList.list_size_date}` : undefined} />
+        <Stat icon={Users} label="Registered patients" value={latestList && latestList.registered_patients ? latestList.registered_patients.toLocaleString() : "—"} sub={latestList && latestList.registered_patients ? `as of ${latestList.list_size_date}` : undefined} delta={listTrend} />
         <Stat icon={TrendingUp} label="Items per patient" value={itemsPerPatient ? itemsPerPatient.toFixed(1) : "—"} sub={itemsPerPatient ? `over last ${win}mo` : undefined} />
+        <Stat icon={PoundSterling} label="Avg cost / item" value={costPerItem ? "£" + costPerItem.toFixed(2) : "—"} sub={costPerItem ? `over last ${win}mo` : undefined} />
+        <Stat icon={PoundSterling} label="Spend / patient" value={spendPerPatient ? "£" + spendPerPatient.toFixed(0) : "—"} sub={spendPerPatient ? `over last ${win}mo` : undefined} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
