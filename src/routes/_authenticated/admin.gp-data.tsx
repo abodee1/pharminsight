@@ -38,6 +38,22 @@ function GpDataAdmin() {
   const [logs, setLogs] = useState<Row[]>([]);
   const [queue, setQueue] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [geocoding, setGeocoding] = useState(false);
+  const runBackfill = useServerFn(backfillGpGeocodes);
+
+  const triggerBackfill = async () => {
+    setGeocoding(true);
+    toast.info("Geocoding GP practices via postcodes.io…");
+    try {
+      const r = await runBackfill({ data: { limit: 5000 } });
+      toast.success(`Geocoded ${r.updated} (missed ${r.missed}). Remaining without coords: ${r.remaining ?? "?"}`);
+    } catch (e: any) {
+      toast.error(`Geocode failed: ${e?.message || e}`);
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
 
   const refresh = async () => {
     setLoading(true);
