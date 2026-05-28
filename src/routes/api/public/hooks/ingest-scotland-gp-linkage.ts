@@ -33,18 +33,19 @@ async function processOne() {
   if (!item) return null;
   await markProcessing(item.id);
   try {
-    let practiceIdx = -1, pharmIdx = -1, itemsIdx = -1, qIdx = -1, yIdx = -1;
+    let practiceIdx = -1, pharmIdx = -1, itemsIdx = -1, qIdx = -1, yIdx = -1, pdmIdx = -1;
     type Agg = { practice: string; ods: string; year: number; month: number; items: number };
     const agg = new Map<string, Agg>();
     let rowNo = 0;
     await streamCsv(item.resource_url, (cells) => {
       if (rowNo++ === 0) {
         const h = buildHeaderIndex(cells);
-        practiceIdx = h.find("PracticeCode", "GPPracticeCode");
-        pharmIdx = h.find("DispensLocationCode", "DispenserLocationCode");
+        practiceIdx = h.find("PracticeCode", "GPPracticeCode", "PrescriberLocation", "GPPractice");
+        pharmIdx = h.find("DispensLocationCode", "DispenserLocationCode", "DispenserLocation", "DispLocationCode");
         itemsIdx = h.find("NumberOfItems", "NumberOfPaidItems");
         qIdx = h.find("Quarter");
         yIdx = h.find("Year");
+        pdmIdx = h.find("PaidDateMonth");
         return;
       }
       if (practiceIdx < 0 || pharmIdx < 0) return;
@@ -52,6 +53,10 @@ async function processOne() {
       const ods = (cells[pharmIdx] ?? "").trim();
       if (!practice || !ods) return;
       let year = item.year ?? 0, month = item.month ?? 0;
+      if (pdmIdx >= 0) {
+        const s = (cells[pdmIdx] ?? "").trim();
+        if (/^\d{6}$/.test(s)) { year = +s.slice(0, 4); month = +s.slice(4, 6); }
+      }
       if (yIdx >= 0) {
         const ys = (cells[yIdx] ?? "").trim();
         if (/^\d{4}$/.test(ys)) year = +ys;
@@ -67,7 +72,7 @@ async function processOne() {
       if (!c) { c = { practice, ods, year, month, items: 0 }; agg.set(key, c); }
       if (itemsIdx >= 0) c.items += num(cells[itemsIdx]);
     });
-    if (practiceIdx < 0) throw new Error("No PracticeCode column");
+    if (practiceIdx < 0) throw new Error("No PracticeCode/PrescriberLocation column");
     if (rowNo <= 1) throw new Error("Empty CSV");
 
     const rows = Array.from(agg.values()).map((a) => ({
