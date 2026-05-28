@@ -97,6 +97,9 @@ export const matchGpPractices = createServerFn({ method: "POST" })
     for (const row of (cached as Candidate[] | null) ?? []) {
       if (row.google_place_id) cachedByPid.set(row.google_place_id, row);
     }
+    // Practice codes that are already claimed by another google_place_id —
+    // never let a different place re-claim them in this batch.
+    const claimedCodes = new Set<string>();
     for (const p of places) {
       const hit = cachedByPid.get(p.id);
       if (hit) {
@@ -108,6 +111,7 @@ export const matchGpPractices = createServerFn({ method: "POST" })
           confidence: "cached",
           score: 1,
         });
+        claimedCodes.add(hit.practice_code);
       }
     }
 
@@ -132,70 +136,77 @@ export const matchGpPractices = createServerFn({ method: "POST" })
       }
     }
 
-    const updates: Array<{ practice_code: string; google_place_id: string }> = [];
+    // 3. Score every place × candidate. We collect a flat list of scored pairs
+    //    and then assign greedily (highest score first), ensuring each practice
+    //    code is consumed at most once per batch — this prevents two nearby
+    //    surgeries (e.g. Park Road vs Priory) from linking to the same record.
+    type Pair = { placeId: string; row: Candidate; score: number; conf: MatchedPractice["confidence"] };
+    const pairs: Pair[] = [];
 
     for (const p of uncached) {
-      const candidates: Candidate[] = [];
+      const candMap = new Map<string, Candidate>();
 
-      // Postcode candidates
       if (p.postcode) {
-        const k = normPc(p.postcode);
-        candidates.push(...(byPc.get(k) ?? []));
+        for (const c of byPc.get(normPc(p.postcode)) ?? []) candMap.set(c.practice_code, c);
       }
-
-      // Geo candidates (within 400m)
       if (p.lat != null && p.lng != null) {
         const { data: nearRows } = await supabaseAdmin
           .rpc("gp_practices_near", { p_lat: p.lat, p_lng: p.lng, p_radius_m: 400, p_limit: 15 });
-        for (const r of (nearRows as Candidate[] | null) ?? []) {
-          if (!candidates.find((c) => c.practice_code === r.practice_code)) {
-            candidates.push(r);
-          }
-        }
+        for (const r of (nearRows as Candidate[] | null) ?? []) candMap.set(r.practice_code, r);
       }
 
-      if (candidates.length === 0) continue;
+      for (const c of candMap.values()) {
+        // Skip candidates already mapped to a *different* Google place — that
+        // pairing is locked in by the DB and stealing it would corrupt the cache.
+        if (c.google_place_id && c.google_place_id !== p.id) continue;
+        if (claimedCodes.has(c.practice_code)) continue;
 
-      // Score every candidate.
-      let best: { row: Candidate; score: number; conf: MatchedPractice["confidence"] } | null = null;
-      for (const c of candidates) {
-        const samePc = normPc(c.postcode) === normPc(p.postcode || "") && !!p.postcode;
+        const samePc = !!p.postcode && normPc(c.postcode) === normPc(p.postcode);
         const ns = nameScore(p.name, c.practice_name);
         const addrNs = p.address ? nameScore(p.address, c.address_line) : 0;
         let dist = Infinity;
         if (p.lat != null && p.lng != null && c.lat != null && c.lng != null) {
           dist = haversineM({ lat: p.lat, lng: p.lng }, { lat: c.lat, lng: c.lng });
         }
-        // Composite score in [0,1]
         const distScore = dist === Infinity ? 0 : Math.max(0, 1 - dist / 400);
+        // Require *some* name overlap when there's no postcode and no geo signal —
+        // otherwise a generic postcode bucket alone can pair anything with anything.
+        const hasSignal = ns > 0 || samePc || dist !== Infinity;
+        if (!hasSignal) continue;
         const score =
           ns * 0.55 +
           (samePc ? 0.25 : 0) +
           distScore * 0.15 +
           addrNs * 0.05;
-        if (!best || score > best.score) {
-          const conf: MatchedPractice["confidence"] =
-            score >= 0.6 ? "high" : score >= 0.35 ? "medium" : "low";
-          best = { row: c, score, conf };
-        }
-      }
-
-      if (best && best.score >= 0.35) {
-        matches.set(p.id, {
-          placeId: p.id,
-          practice_code: best.row.practice_code,
-          practice_name: best.row.practice_name,
-          postcode: best.row.postcode,
-          confidence: best.conf,
-          score: Number(best.score.toFixed(3)),
-        });
-        if (best.conf !== "low" && best.row.google_place_id !== p.id) {
-          updates.push({ practice_code: best.row.practice_code, google_place_id: p.id });
-        }
+        const conf: MatchedPractice["confidence"] =
+          score >= 0.6 ? "high" : score >= 0.35 ? "medium" : "low";
+        pairs.push({ placeId: p.id, row: c, score, conf });
       }
     }
 
-    // Persist cache writes (best-effort, ignore unique-violation race).
+    // Greedy assignment: best score first, one practice per place + one place per practice.
+    pairs.sort((a, b) => b.score - a.score);
+    const updates: Array<{ practice_code: string; google_place_id: string }> = [];
+    for (const pair of pairs) {
+      if (matches.has(pair.placeId)) continue;
+      if (claimedCodes.has(pair.row.practice_code)) continue;
+      if (pair.score < 0.35) continue; // confidence floor
+      matches.set(pair.placeId, {
+        placeId: pair.placeId,
+        practice_code: pair.row.practice_code,
+        practice_name: pair.row.practice_name,
+        postcode: pair.row.postcode,
+        confidence: pair.conf,
+        score: Number(pair.score.toFixed(3)),
+      });
+      claimedCodes.add(pair.row.practice_code);
+      if (pair.conf !== "low" && pair.row.google_place_id !== pair.placeId) {
+        updates.push({ practice_code: pair.row.practice_code, google_place_id: pair.placeId });
+      }
+    }
+
+    // Persist cache writes (only when the slot is still empty — avoids overwriting
+    // an existing mapping if another request raced us).
     for (const u of updates) {
       await supabaseAdmin
         .from("gp_practices")
