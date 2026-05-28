@@ -29,11 +29,13 @@ function tokenize(q: string): string[] {
     .filter((t) => !STOPWORDS.has(t) && t.length >= 2);
 }
 
+export const Route = createFileRoute("/_authenticated/gp-surgeries")({
   head: () => ({
     meta: [{ title: "GP Surgeries — PharmInsight" }],
   }),
   component: GPSurgeriesPage,
 });
+
 
 type Row = {
   practice_code: string;
