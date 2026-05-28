@@ -105,7 +105,8 @@ export function GPPracticeDialog({ open, onOpenChange, practiceCode, fallbackNam
                       <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} width={50} />
                       <Tooltip />
-                      <Line type="monotone" dataKey="items" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="items" stroke="var(--primary)" strokeWidth={2} dot={false} />
+
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
