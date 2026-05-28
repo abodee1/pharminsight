@@ -235,26 +235,47 @@ export function LocalLandscape({ pharmacyName, postcode, address, selfPlaceNameH
             {dList.length === 0 && (
               <li className="text-sm text-muted-foreground">No GP surgeries within 1 mile.</li>
             )}
-            {dList.map((p) => (
-              <li key={p.id} className="border border-border/60 rounded-md p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="font-medium text-sm">{p.name}</p>
-                  <span className="text-xs text-muted-foreground shrink-0 flex items-center gap-1">
-                    <MapPin className="h-3 w-3" /> {fmtDist(p._d)}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">{p.address}</p>
-                {p.rating != null && (
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                    <Star className="h-3 w-3 fill-current" /> {p.rating.toFixed(1)}
-                    {p.userRatingCount ? ` · ${p.userRatingCount} reviews` : ""}
-                  </p>
-                )}
-              </li>
-            ))}
+            {dList.map((p) => {
+              const link = matchedGPs.get(p.id);
+              return (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenPractice({ code: link?.practice_code ?? null, name: p.name, address: p.address })}
+                    className="w-full text-left border border-border/60 rounded-md p-3 hover:bg-secondary/40 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-medium text-sm">{p.name}</p>
+                      <span className="text-xs text-muted-foreground shrink-0 flex items-center gap-1">
+                        <MapPin className="h-3 w-3" /> {fmtDist(p._d)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{p.address}</p>
+                    {p.rating != null && (
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-current" /> {p.rating.toFixed(1)}
+                        {p.userRatingCount ? ` · ${p.userRatingCount} reviews` : ""}
+                        {link && <span className="ml-2 text-primary font-medium">In our data →</span>}
+                      </p>
+                    )}
+                    {p.rating == null && link && (
+                      <p className="text-xs text-primary font-medium mt-1">In our data →</p>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </div>
+
+      <GPPracticeDialog
+        open={!!openPractice}
+        onOpenChange={(o) => !o && setOpenPractice(null)}
+        practiceCode={openPractice?.code ?? null}
+        fallbackName={openPractice?.name}
+        fallbackAddress={openPractice?.address}
+      />
     </section>
   );
 }
