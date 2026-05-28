@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { placesNearby } from "@/lib/places.server";
+
 
 // ---------- Name normalisation ----------
 const STOPWORDS = new Set([
