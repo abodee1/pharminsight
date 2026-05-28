@@ -194,6 +194,7 @@ function Compare() {
   const [pharms, setPharms] = useState<Pharm[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [trendWindow, setTrendWindow] = useState<1 | 3 | 6 | 12>(12);
   const [, setLoading] = useState(false);
 
   // Preload the user's primary pharmacy as the first selection.
@@ -303,12 +304,15 @@ function Compare() {
     });
     return out;
   }, [selectedPharms, rows]);
-
-  // Trend data — one chart per active metric
+  // Trend data — one chart per active metric, windowed to last N months
+  const trendPeriods = useMemo(
+    () => periods.slice(-trendWindow),
+    [periods, trendWindow],
+  );
   const trendByMetric = useMemo(() => {
     return activeMetrics.map((mt) => ({
       metric: mt,
-      data: periods.map((p) => {
+      data: trendPeriods.map((p) => {
         const [y, m] = p.split("-").map(Number);
         const point: Record<string, any> = { label: `${MONTHS[m - 1]} ${String(y).slice(2)}` };
         selectedPharms.forEach((ph) => {
@@ -319,7 +323,7 @@ function Compare() {
         return point;
       }),
     }));
-  }, [periods, selectedPharms, rows, activeMetrics]);
+  }, [trendPeriods, selectedPharms, rows, activeMetrics]);
 
   // Radar: normalise per metric across active pharmacies
   const radar = useMemo(() => {
@@ -636,9 +640,28 @@ function Compare() {
 
               {/* Trend small multiples — one chart per active metric */}
               <div className="rounded-xl bg-card border border-border p-6 shadow-sm mb-6">
-                <div className="flex items-baseline justify-between mb-4">
-                  <h2 className="text-sm font-semibold">24-month trend by service</h2>
-                  <div className="flex flex-wrap items-center gap-3 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <h2 className="text-sm font-semibold">
+                    {trendWindow === 1 ? "Latest month" : `${trendWindow}-month trend`} by service
+                  </h2>
+                  <div className="inline-flex rounded-md border border-border bg-secondary/40 p-0.5">
+                    {([1, 3, 6, 12] as const).map((w) => (
+                      <button
+                        key={w}
+                        type="button"
+                        onClick={() => setTrendWindow(w)}
+                        className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                          trendWindow === w
+                            ? "bg-card text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                        aria-pressed={trendWindow === w}
+                      >
+                        {w}M
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 text-xs w-full md:w-auto">
                     {selectedPharms.map((ph) => (
                       <span key={ph.id} className="inline-flex items-center gap-1.5">
                         <span className="h-2 w-3 rounded-sm" style={{ background: colorFor(ph.id) }} />
