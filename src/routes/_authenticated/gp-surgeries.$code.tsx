@@ -101,14 +101,14 @@ function GPPracticePage() {
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
       <Link to="/gp-surgeries" className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground mb-3">
+        <ArrowLeft className="h-4 w-4" /> All surgeries
+      </Link>
       <PageHeader
         title={practice.practice_name || practice.practice_code}
         subtitle={[practice.practice_code, practice.postcode, practice.health_board, practice.country].filter(Boolean).join(" · ")}
-        backTo="/dashboard"
-        backLabel="Dashboard"
+        showBack={false}
       />
 
-      />
 
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
         <p className="text-xs text-muted-foreground italic">
