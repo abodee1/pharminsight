@@ -149,6 +149,8 @@ function GPSurgeriesPage() {
               <TableHead className="hidden sm:table-cell">Postcode</TableHead>
               <TableHead className="hidden lg:table-cell">Health board / region</TableHead>
               <TableHead>Country</TableHead>
+              <TableHead className="text-right w-24"></TableHead>
+
             </TableRow>
           </TableHeader>
           <TableBody>
