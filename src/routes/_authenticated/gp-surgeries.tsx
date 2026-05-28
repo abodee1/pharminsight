@@ -75,15 +75,23 @@ function GPSurgeriesPage() {
         .select("practice_code,practice_name,country,health_board,postcode", { count: "exact" });
       if (country !== "all") q = q.eq("country", country);
       if (debounced) {
-        const pattern = `%${debounced}%`;
+        const raw = debounced.trim();
+        // Whole-string OR across name / code / postcode for short queries
+        const whole = `%${raw}%`;
         q = q.or(
           [
-            `practice_name.ilike.${pattern}`,
-            `practice_code.ilike.${pattern}`,
-            `postcode.ilike.${pattern}`,
+            `practice_name.ilike.${whole}`,
+            `practice_code.ilike.${whole}`,
+            `postcode.ilike.${whole.replace(/\s+/g, "")}`,
           ].join(","),
         );
+        // AND-chain a token-wise ilike on practice_name so Google-Maps-style
+        // names like "The Smith Medical Practice" still find "Smith Surgery".
+        for (const tok of tokenize(raw)) {
+          q = q.ilike("practice_name", `%${tok}%`);
+        }
       }
+
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
       const { data, count } = await q
