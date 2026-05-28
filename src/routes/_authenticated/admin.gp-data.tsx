@@ -254,12 +254,3 @@ function GpDataAdmin() {
   );
 }
 
-function CoverageStat({ label, pct, sub }: { label: string; pct: number; sub: string }) {
-  return (
-    <div className="border rounded-md p-2">
-      <div className="text-muted-foreground uppercase tracking-wide text-[10px]">{label}</div>
-      <div className="text-base font-semibold tabular-nums">{pct}%</div>
-      <div className="text-muted-foreground">{sub}</div>
-    </div>
-  );
-}
