@@ -165,14 +165,20 @@ function GpDataAdmin() {
             {refreshingScot ? "Scotland…" : "Refresh Scotland names/postcodes"}
           </Button>
           <Button variant="outline" size="sm" onClick={triggerEngRefresh} disabled={refreshingEng}>
+          <Button variant="outline" size="sm" onClick={triggerEngRefresh} disabled={refreshingEng}>
             {refreshingEng ? "England…" : "Refresh England names/postcodes"}
           </Button>
           <Button variant="outline" size="sm" onClick={triggerBackfill} disabled={geocoding}>
             {geocoding ? "Geocoding…" : "Geocode practices"}
           </Button>
+          <Button variant="outline" size="sm" onClick={triggerSweep} disabled={sweeping}>
+            {sweeping ? "Sweeping…" : "Sweep → Google Places"}
+          </Button>
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
             {loading ? "Loading…" : "Refresh"}
           </Button>
+        </div>
+
         </div>
 
       </div>
