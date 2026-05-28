@@ -81,6 +81,8 @@ function PharmacyProfile() {
     items_dispensed: string; nms_count: string; pharmacy_first_count: string; eps_items: string;
   }>({ items_dispensed: "", nms_count: "", pharmacy_first_count: "", eps_items: "" });
   const [analyseOpen, setAnalyseOpen] = useState(false);
+  const [statWindow, setStatWindow] = useState<WindowKey>(12);
+
 
   useEffect(() => {
     (async () => {
