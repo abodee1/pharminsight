@@ -2,7 +2,10 @@ import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   LayoutDashboard, Trophy, BarChart2, GitCompare, Settings,
+import {
+  LayoutDashboard, Trophy, BarChart2, GitCompare, Settings,
   LogOut, Menu, User as UserIcon, Search as SearchIcon,
+  Stethoscope, Bookmark, Upload,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -14,12 +17,12 @@ export const NAV_LINKS = [
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy },
   { to: "/benchmarking", label: "Benchmarking", icon: BarChart2 },
   { to: "/compare", label: "Compare", icon: GitCompare },
-
+  { to: "/gp-surgeries", label: "GP Surgeries", icon: Stethoscope },
+  { to: "/my-analyses", label: "My Analyses", icon: Bookmark },
+  { to: "/admin/payments-import", label: "Payments Import", icon: Upload },
   { to: "/settings", label: "My Account", icon: Settings },
 ] as const;
 
-export function MobileTopBar() {
-  const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const { profile, user, signOut } = useAuth();
