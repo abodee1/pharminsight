@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { geocodePharmacy, nearbyPharmaciesAndGPs, type PlaceResult } from "@/lib/places.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Stethoscope, Pill, Star, Loader2 } from "lucide-react";
+import { GPPracticeDialog } from "@/components/GPPracticeDialog";
 
 type Props = {
   pharmacyName: string;
@@ -13,6 +14,7 @@ type Props = {
 };
 
 type LinkedPharmacy = { id: string; ods_code: string; name: string; postcode: string | null };
+type LinkedPractice = { practice_code: string; practice_name: string | null; postcode: string | null };
 
 function distanceMeters(a: { lat: number; lng: number }, b: { lat: number | null; lng: number | null }) {
   if (b.lat == null || b.lng == null) return null;
