@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { backfillGpGeocodes } from "@/lib/gpMatch.functions";
+import { backfillGpGeocodes, refreshScotlandGpContacts, refreshEnglandGpContacts } from "@/lib/gpMatch.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/gp-data")({
   component: GpDataAdmin,
