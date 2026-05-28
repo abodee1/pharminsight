@@ -805,12 +805,14 @@ function metricStyle(label: string): { icon: LucideIcon; accent: MetricAccent } 
   return { icon: Activity, accent: "slate" };
 }
 
-function MetricCard({ label, value, prior, yoy, format, rank, period }: {
+function MetricCard({ label, value, prior, yoy, format, rank, period, windowLabel }: {
   label: string; value: number; prior: number; yoy: number;
   format?: (n: number) => string;
   rank?: { rank: number; total: number };
   period?: string;
+  windowLabel?: string;
 }) {
+
   const [flipped, setFlipped] = useState(false);
   const fmt = format ?? ((n: number) => n.toLocaleString());
   const delta = prior ? ((value - prior) / prior) * 100 : 0;
