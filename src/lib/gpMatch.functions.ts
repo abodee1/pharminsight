@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { placesNearby } from "@/lib/places.server";
+
 
 // ---------- Name normalisation ----------
 const STOPWORDS = new Set([
@@ -425,5 +427,154 @@ export const refreshEnglandGpContacts = createServerFn({ method: "POST" })
       if (pages > 30) break; // safety cap
     }
     return { upserted, pages };
+  });
+
+/**
+ * Sweep unmatched, geocoded practices: for each one, ask Google Places for
+ * nearby "doctor" results around its lat/lng, then claim the best match by
+ * name overlap + proximity. Persists the winning google_place_id back to
+ * gp_practices. Designed to be re-runnable — pass an offset to paginate.
+ */
+export const sweepUnmatchedPractices = createServerFn({ method: "POST" })
+  .inputValidator((input: { limit?: number; offset?: number; radiusM?: number }) =>
+    z.object({
+      limit: z.number().min(1).max(500).optional(),
+      offset: z.number().min(0).max(50000).optional(),
+      radiusM: z.number().min(50).max(1500).optional(),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const limit = data.limit ?? 100;
+    const offset = data.offset ?? 0;
+    const radiusM = data.radiusM ?? 300;
+
+    const { data: rows, error } = await supabaseAdmin
+      .from("gp_practices")
+      .select("practice_code,practice_name,postcode,lat,lng")
+      .is("google_place_id", null)
+      .not("lat", "is", null)
+      .not("lng", "is", null)
+      .order("practice_code")
+      .range(offset, offset + limit - 1);
+    if (error) throw new Error(error.message);
+    const list = (rows ?? []) as Array<{
+      practice_code: string; practice_name: string | null; postcode: string | null;
+      lat: number | null; lng: number | null;
+    }>;
+
+    let matched = 0;
+    let noCandidate = 0;
+    let lowScore = 0;
+    let placeTaken = 0;
+    let apiErrors = 0;
+
+    for (const r of list) {
+      if (r.lat == null || r.lng == null) { noCandidate++; continue; }
+      let places: Awaited<ReturnType<typeof placesNearby>> = [];
+      try {
+        places = await placesNearby(r.lat, r.lng, "doctor", radiusM, 8);
+      } catch {
+        apiErrors++;
+        continue;
+      }
+      if (!places.length) { noCandidate++; continue; }
+
+      // Score each place against this specific practice.
+      let best: { placeId: string; score: number } | null = null;
+      for (const p of places) {
+        const ns = nameScore(p.name, r.practice_name);
+        const samePc = !!p.postcode && !!r.postcode && normPc(p.postcode) === normPc(r.postcode);
+        let dist = Infinity;
+        if (p.lat != null && p.lng != null) {
+          dist = haversineM({ lat: r.lat, lng: r.lng }, { lat: p.lat, lng: p.lng });
+        }
+        const distScore = dist === Infinity ? 0 : Math.max(0, 1 - dist / radiusM);
+        // Require some real signal — generic "doctor" alone isn't enough.
+        if (ns < 0.2 && !samePc && dist > 150) continue;
+        const score = ns * 0.6 + (samePc ? 0.25 : 0) + distScore * 0.15;
+        if (!best || score > best.score) best = { placeId: p.id, score };
+      }
+
+      if (!best || best.score < 0.4) { lowScore++; continue; }
+
+      // Don't steal a place_id already locked to another practice.
+      const { data: existing } = await supabaseAdmin
+        .from("gp_practices")
+        .select("practice_code")
+        .eq("google_place_id", best.placeId)
+        .maybeSingle();
+      if (existing && existing.practice_code !== r.practice_code) {
+        placeTaken++;
+        continue;
+      }
+
+      const { error: upErr } = await supabaseAdmin
+        .from("gp_practices")
+        .update({ google_place_id: best.placeId })
+        .eq("practice_code", r.practice_code)
+        .is("google_place_id", null);
+      if (!upErr) matched++;
+    }
+
+    const { count: remaining } = await supabaseAdmin
+      .from("gp_practices")
+      .select("practice_code", { count: "exact", head: true })
+      .is("google_place_id", null)
+      .not("lat", "is", null);
+
+    return {
+      scanned: list.length,
+      matched,
+      noCandidate,
+      lowScore,
+      placeTaken,
+      apiErrors,
+      nextOffset: offset + list.length,
+      remaining: remaining ?? null,
+    };
+  });
+
+/**
+ * Coverage health snapshot for the admin dashboard.
+ */
+export const getGpCoverage = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const head = { count: "exact" as const, head: true };
+    const [total, withName, withPostcode, withLat, withPlace, scotTotal, engTotal] = await Promise.all([
+      supabaseAdmin.from("gp_practices").select("practice_code", head),
+      supabaseAdmin.from("gp_practices").select("practice_code", head).not("practice_name", "is", null),
+      supabaseAdmin.from("gp_practices").select("practice_code", head).not("postcode", "is", null),
+      supabaseAdmin.from("gp_practices").select("practice_code", head).not("lat", "is", null),
+      supabaseAdmin.from("gp_practices").select("practice_code", head).not("google_place_id", "is", null),
+      supabaseAdmin.from("gp_practices").select("practice_code", head).eq("country", "Scotland"),
+      supabaseAdmin.from("gp_practices").select("practice_code", head).eq("country", "England"),
+    ]);
+
+    const n = (x: { count: number | null }) => x.count ?? 0;
+    const t = n(total) || 1;
+    const pct = (x: number) => Math.round((x / t) * 1000) / 10;
+
+    // Health score = weighted blend of the things matching depends on.
+    const score = Math.round(
+      n(withName) / t * 20 +
+      n(withPostcode) / t * 20 +
+      n(withLat) / t * 30 +
+      n(withPlace) / t * 30,
+    );
+
+    return {
+      total: n(total),
+      withName: n(withName),
+      withPostcode: n(withPostcode),
+      withLat: n(withLat),
+      withPlace: n(withPlace),
+      scotland: n(scotTotal),
+      england: n(engTotal),
+      pctName: pct(n(withName)),
+      pctPostcode: pct(n(withPostcode)),
+      pctLat: pct(n(withLat)),
+      pctPlace: pct(n(withPlace)),
+      healthScore: Math.min(100, Math.max(0, score)),
+    };
   });
 
