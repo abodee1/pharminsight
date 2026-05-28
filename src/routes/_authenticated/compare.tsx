@@ -304,12 +304,15 @@ function Compare() {
     });
     return out;
   }, [selectedPharms, rows]);
-
-  // Trend data — one chart per active metric
+  // Trend data — one chart per active metric, windowed to last N months
+  const trendPeriods = useMemo(
+    () => periods.slice(-trendWindow),
+    [periods, trendWindow],
+  );
   const trendByMetric = useMemo(() => {
     return activeMetrics.map((mt) => ({
       metric: mt,
-      data: periods.map((p) => {
+      data: trendPeriods.map((p) => {
         const [y, m] = p.split("-").map(Number);
         const point: Record<string, any> = { label: `${MONTHS[m - 1]} ${String(y).slice(2)}` };
         selectedPharms.forEach((ph) => {
@@ -320,6 +323,7 @@ function Compare() {
         return point;
       }),
     }));
+  }, [trendPeriods, selectedPharms, rows, activeMetrics]);
   }, [periods, selectedPharms, rows, activeMetrics]);
 
   // Radar: normalise per metric across active pharmacies
