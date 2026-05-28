@@ -5,7 +5,7 @@ const GATEWAY = "https://connector-gateway.lovable.dev/google_maps";
 
 function headers(extra: Record<string, string> = {}) {
   const lov = process.env.LOVABLE_API_KEY;
-  const gm = process.env.GOOGLE_MAPS_API_KEY;
+  const gm = process.env.GOOGLE_MAPS_API_KEY_1 || process.env.GOOGLE_MAPS_API_KEY;
   if (!lov) throw new Error("LOVABLE_API_KEY is not configured");
   if (!gm) throw new Error("GOOGLE_MAPS_API_KEY is not configured");
   return {
