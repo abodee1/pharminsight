@@ -64,7 +64,7 @@ async function refreshScotland() {
 
 async function refreshEngland() {
   console.log("[England] fetching ORD…");
-  let offset = 0, limit = 1000, upserted = 0, pages = 0;
+  let offset = 1, limit = 1000, upserted = 0, pages = 0;
   while (true) {
     const url = `https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations?PrimaryRoleId=RO76&Status=Active&Limit=${limit}&Offset=${offset}`;
     const res = await fetch(url, { headers: { Accept: "application/json" } });
