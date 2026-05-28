@@ -61,17 +61,19 @@ export function GPPracticeDialog({ open, onOpenChange, practiceCode, fallbackNam
     items: Number(r.total_items) || 0,
   }));
 
+  const rawName = practice?.practice_name || fallbackName || "";
+  const prettyName = rawName ? rawName.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()) : "GP practice";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Stethoscope className="h-5 w-5" />
-            {practice?.practice_name || fallbackName || "GP practice"}
+            {prettyName}
           </DialogTitle>
           <DialogDescription>
-            {practiceCode ? <span className="font-mono">{practiceCode}</span> : null}
-            {practice?.postcode ? <span> · {practice.postcode}</span> : fallbackAddress ? <span> · {fallbackAddress}</span> : null}
+            {practice?.postcode ? <span>{practice.postcode}</span> : fallbackAddress ? <span>{fallbackAddress}</span> : null}
             {practice?.country ? <span> · {practice.country}</span> : null}
           </DialogDescription>
         </DialogHeader>
