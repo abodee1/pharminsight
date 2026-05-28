@@ -22,6 +22,7 @@ import { Route as AuthenticatedGpSurgeriesRouteImport } from './routes/_authenti
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCompareRouteImport } from './routes/_authenticated/compare'
 import { Route as AuthenticatedBenchmarkingRouteImport } from './routes/_authenticated/benchmarking'
+import { Route as AuthenticatedGpSurgeriesCodeRouteImport } from './routes/_authenticated/gp-surgeries.$code'
 import { Route as AuthenticatedAdminPaymentsImportRouteImport } from './routes/_authenticated/admin.payments-import'
 import { Route as AuthenticatedAdminGpDataRouteImport } from './routes/_authenticated/admin.gp-data'
 import { Route as AuthenticatedAcquisitionOdsCodeRouteImport } from './routes/_authenticated/acquisition.$odsCode'
@@ -102,6 +103,12 @@ const AuthenticatedBenchmarkingRoute =
     path: '/benchmarking',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedGpSurgeriesCodeRoute =
+  AuthenticatedGpSurgeriesCodeRouteImport.update({
+    id: '/$code',
+    path: '/$code',
+    getParentRoute: () => AuthenticatedGpSurgeriesRoute,
+  } as any)
 const AuthenticatedAdminPaymentsImportRoute =
   AuthenticatedAdminPaymentsImportRouteImport.update({
     id: '/admin/payments-import',
@@ -181,7 +188,7 @@ export interface FileRoutesByFullPath {
   '/benchmarking': typeof AuthenticatedBenchmarkingRoute
   '/compare': typeof AuthenticatedCompareRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/gp-surgeries': typeof AuthenticatedGpSurgeriesRoute
+  '/gp-surgeries': typeof AuthenticatedGpSurgeriesRouteWithChildren
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/my-analyses': typeof AuthenticatedMyAnalysesRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -190,6 +197,7 @@ export interface FileRoutesByFullPath {
   '/acquisition/$odsCode': typeof AuthenticatedAcquisitionOdsCodeRoute
   '/admin/gp-data': typeof AuthenticatedAdminGpDataRoute
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
+  '/gp-surgeries/$code': typeof AuthenticatedGpSurgeriesCodeRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-england-gp': typeof ApiPublicHooksIngestEnglandGpRoute
   '/api/public/hooks/ingest-england-gp-listsize': typeof ApiPublicHooksIngestEnglandGpListsizeRoute
@@ -207,7 +215,7 @@ export interface FileRoutesByTo {
   '/benchmarking': typeof AuthenticatedBenchmarkingRoute
   '/compare': typeof AuthenticatedCompareRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/gp-surgeries': typeof AuthenticatedGpSurgeriesRoute
+  '/gp-surgeries': typeof AuthenticatedGpSurgeriesRouteWithChildren
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/my-analyses': typeof AuthenticatedMyAnalysesRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -216,6 +224,7 @@ export interface FileRoutesByTo {
   '/acquisition/$odsCode': typeof AuthenticatedAcquisitionOdsCodeRoute
   '/admin/gp-data': typeof AuthenticatedAdminGpDataRoute
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
+  '/gp-surgeries/$code': typeof AuthenticatedGpSurgeriesCodeRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-england-gp': typeof ApiPublicHooksIngestEnglandGpRoute
   '/api/public/hooks/ingest-england-gp-listsize': typeof ApiPublicHooksIngestEnglandGpListsizeRoute
@@ -235,7 +244,7 @@ export interface FileRoutesById {
   '/_authenticated/benchmarking': typeof AuthenticatedBenchmarkingRoute
   '/_authenticated/compare': typeof AuthenticatedCompareRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/gp-surgeries': typeof AuthenticatedGpSurgeriesRoute
+  '/_authenticated/gp-surgeries': typeof AuthenticatedGpSurgeriesRouteWithChildren
   '/_authenticated/leaderboards': typeof AuthenticatedLeaderboardsRoute
   '/_authenticated/my-analyses': typeof AuthenticatedMyAnalysesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -244,6 +253,7 @@ export interface FileRoutesById {
   '/_authenticated/acquisition/$odsCode': typeof AuthenticatedAcquisitionOdsCodeRoute
   '/_authenticated/admin/gp-data': typeof AuthenticatedAdminGpDataRoute
   '/_authenticated/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
+  '/_authenticated/gp-surgeries/$code': typeof AuthenticatedGpSurgeriesCodeRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-england-gp': typeof ApiPublicHooksIngestEnglandGpRoute
   '/api/public/hooks/ingest-england-gp-listsize': typeof ApiPublicHooksIngestEnglandGpListsizeRoute
@@ -272,6 +282,7 @@ export interface FileRouteTypes {
     | '/acquisition/$odsCode'
     | '/admin/gp-data'
     | '/admin/payments-import'
+    | '/gp-surgeries/$code'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-england-gp'
     | '/api/public/hooks/ingest-england-gp-listsize'
@@ -298,6 +309,7 @@ export interface FileRouteTypes {
     | '/acquisition/$odsCode'
     | '/admin/gp-data'
     | '/admin/payments-import'
+    | '/gp-surgeries/$code'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-england-gp'
     | '/api/public/hooks/ingest-england-gp-listsize'
@@ -325,6 +337,7 @@ export interface FileRouteTypes {
     | '/_authenticated/acquisition/$odsCode'
     | '/_authenticated/admin/gp-data'
     | '/_authenticated/admin/payments-import'
+    | '/_authenticated/gp-surgeries/$code'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-england-gp'
     | '/api/public/hooks/ingest-england-gp-listsize'
@@ -446,6 +459,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBenchmarkingRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/gp-surgeries/$code': {
+      id: '/_authenticated/gp-surgeries/$code'
+      path: '/$code'
+      fullPath: '/gp-surgeries/$code'
+      preLoaderRoute: typeof AuthenticatedGpSurgeriesCodeRouteImport
+      parentRoute: typeof AuthenticatedGpSurgeriesRoute
+    }
     '/_authenticated/admin/payments-import': {
       id: '/_authenticated/admin/payments-import'
       path: '/admin/payments-import'
@@ -533,11 +553,25 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedGpSurgeriesRouteChildren {
+  AuthenticatedGpSurgeriesCodeRoute: typeof AuthenticatedGpSurgeriesCodeRoute
+}
+
+const AuthenticatedGpSurgeriesRouteChildren: AuthenticatedGpSurgeriesRouteChildren =
+  {
+    AuthenticatedGpSurgeriesCodeRoute: AuthenticatedGpSurgeriesCodeRoute,
+  }
+
+const AuthenticatedGpSurgeriesRouteWithChildren =
+  AuthenticatedGpSurgeriesRoute._addFileChildren(
+    AuthenticatedGpSurgeriesRouteChildren,
+  )
+
 interface AuthenticatedRouteChildren {
   AuthenticatedBenchmarkingRoute: typeof AuthenticatedBenchmarkingRoute
   AuthenticatedCompareRoute: typeof AuthenticatedCompareRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedGpSurgeriesRoute: typeof AuthenticatedGpSurgeriesRoute
+  AuthenticatedGpSurgeriesRoute: typeof AuthenticatedGpSurgeriesRouteWithChildren
   AuthenticatedLeaderboardsRoute: typeof AuthenticatedLeaderboardsRoute
   AuthenticatedMyAnalysesRoute: typeof AuthenticatedMyAnalysesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -551,7 +585,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBenchmarkingRoute: AuthenticatedBenchmarkingRoute,
   AuthenticatedCompareRoute: AuthenticatedCompareRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedGpSurgeriesRoute: AuthenticatedGpSurgeriesRoute,
+  AuthenticatedGpSurgeriesRoute: AuthenticatedGpSurgeriesRouteWithChildren,
   AuthenticatedLeaderboardsRoute: AuthenticatedLeaderboardsRoute,
   AuthenticatedMyAnalysesRoute: AuthenticatedMyAnalysesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,

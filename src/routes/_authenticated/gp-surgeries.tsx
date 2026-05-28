@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -7,9 +7,27 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Search, Stethoscope } from "lucide-react";
+import { Loader2, Search, Stethoscope, BarChart2 } from "lucide-react";
 import { GPPracticeDialog } from "@/components/GPPracticeDialog";
 import { PageHeader } from "@/components/PageHeader";
+
+// Words that appear in Google Maps place names but rarely help discriminate
+// between GP surgeries — we strip them so a search like "The Smith Medical
+// Practice" still matches "Smith Surgery" or "Dr Smith & Partners".
+const STOPWORDS = new Set([
+  "the", "a", "an", "and", "of", "dr", "drs", "doctor", "doctors",
+  "surgery", "surgeries", "practice", "practices", "medical", "centre",
+  "center", "health", "healthcare", "clinic", "group", "partners",
+  "partnership", "&", "ltd", "limited", "nhs", "gp",
+]);
+function tokenize(q: string): string[] {
+  return q
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((t) => !STOPWORDS.has(t) && t.length >= 2);
+}
 
 export const Route = createFileRoute("/_authenticated/gp-surgeries")({
   head: () => ({
@@ -17,6 +35,7 @@ export const Route = createFileRoute("/_authenticated/gp-surgeries")({
   }),
   component: GPSurgeriesPage,
 });
+
 
 type Row = {
   practice_code: string;
@@ -56,15 +75,23 @@ function GPSurgeriesPage() {
         .select("practice_code,practice_name,country,health_board,postcode", { count: "exact" });
       if (country !== "all") q = q.eq("country", country);
       if (debounced) {
-        const pattern = `%${debounced}%`;
+        const raw = debounced.trim();
+        // Whole-string OR across name / code / postcode for short queries
+        const whole = `%${raw}%`;
         q = q.or(
           [
-            `practice_name.ilike.${pattern}`,
-            `practice_code.ilike.${pattern}`,
-            `postcode.ilike.${pattern}`,
+            `practice_name.ilike.${whole}`,
+            `practice_code.ilike.${whole}`,
+            `postcode.ilike.${whole.replace(/\s+/g, "")}`,
           ].join(","),
         );
+        // AND-chain a token-wise ilike on practice_name so Google-Maps-style
+        // names like "The Smith Medical Practice" still find "Smith Surgery".
+        for (const tok of tokenize(raw)) {
+          q = q.ilike("practice_name", `%${tok}%`);
+        }
       }
+
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
       const { data, count } = await q
@@ -122,31 +149,35 @@ function GPSurgeriesPage() {
               <TableHead className="hidden sm:table-cell">Postcode</TableHead>
               <TableHead className="hidden lg:table-cell">Health board / region</TableHead>
               <TableHead>Country</TableHead>
+              <TableHead className="text-right w-24"></TableHead>
+
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin inline mr-2" /> Loading surgeries…
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
                   No surgeries match your search.
                 </TableCell>
               </TableRow>
             ) : (
               rows.map((r) => (
-                <TableRow
-                  key={r.practice_code}
-                  className="cursor-pointer"
-                  onClick={() => setOpenCode(r.practice_code)}
-                >
-                  <TableCell className="font-medium flex items-center gap-2">
-                    <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
-                    {r.practice_name || "—"}
+                <TableRow key={r.practice_code}>
+                  <TableCell className="font-medium">
+                    <Link
+                      to="/gp-surgeries/$code"
+                      params={{ code: r.practice_code }}
+                      className="inline-flex items-center gap-2 hover:underline"
+                    >
+                      <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
+                      {r.practice_name || "—"}
+                    </Link>
                   </TableCell>
                   <TableCell className="hidden md:table-cell font-mono text-xs">
                     {r.practice_code}
@@ -156,8 +187,17 @@ function GPSurgeriesPage() {
                     {r.health_board || "—"}
                   </TableCell>
                   <TableCell>{r.country || "—"}</TableCell>
+                  <TableCell className="text-right">
+                    <button
+                      onClick={() => setOpenCode(r.practice_code)}
+                      className="text-xs text-muted-foreground hover:text-primary inline-flex items-center gap-1"
+                    >
+                      <BarChart2 className="h-3 w-3" /> Quick view
+                    </button>
+                  </TableCell>
                 </TableRow>
               ))
+
             )}
           </TableBody>
         </Table>

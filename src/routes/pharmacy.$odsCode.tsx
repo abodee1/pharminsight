@@ -15,8 +15,12 @@ import { PharmacySearch } from "@/components/PharmacySearch";
 import { PercentileRail, AnnotatedSparkline, ShareDonut } from "@/components/Infographics";
 import { LocalLandscape } from "@/components/LocalLandscape";
 import { AnalysisPanel } from "@/components/AnalysisPanel";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetchAll } from "@/lib/fetchAll";
 import { cn } from "@/lib/utils";
+
+type WindowKey = 1 | 3 | 6 | 12;
+
 
 export const Route = createFileRoute("/pharmacy/$odsCode")({ component: PharmacyProfile });
 
@@ -77,6 +81,8 @@ function PharmacyProfile() {
     items_dispensed: string; nms_count: string; pharmacy_first_count: string; eps_items: string;
   }>({ items_dispensed: "", nms_count: "", pharmacy_first_count: "", eps_items: "" });
   const [analyseOpen, setAnalyseOpen] = useState(false);
+  const [statWindow, setStatWindow] = useState<WindowKey>(12);
+
 
   useEffect(() => {
     (async () => {
@@ -366,21 +372,39 @@ function PharmacyProfile() {
     field: keyof Row;
     format?: (n: number) => string;
   };
+  // Build a windowed metric: sum of the trailing N reported months ending at
+  // the metric's most recent non-zero month. Prior = the N months immediately
+  // before that window. YoY = N months ending 12 months earlier.
   const buildMetric = (m: MetricDef) => {
-    const found = latestFor(m.field);
-    const row = found?.row ?? latest;
-    const p = found?.prior ?? prior ?? undefined;
-    const y = found?.yoy ?? yoy ?? undefined;
-    return {
-      label: m.label,
-      key: m.key,
-      value: row ? Number(row[m.field]) || 0 : 0,
-      prior: p ? Number(p[m.field]) || 0 : 0,
-      yoy: y ? Number(y[m.field]) || 0 : 0,
-      format: m.format,
-      period: row ? `${MONTHS[row.month - 1]} ${row.year}` : "",
+    const N = statWindow;
+    // Find anchor index = last row where this field has activity
+    let anchor = -1;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if ((Number(rows[i][m.field]) || 0) > 0) { anchor = i; break; }
+    }
+    if (anchor === -1) {
+      return { label: m.label, key: m.key, value: 0, prior: 0, yoy: 0, format: m.format, period: "" };
+    }
+    const sumRange = (lo: number, hi: number) => {
+      let s = 0;
+      for (let i = Math.max(0, lo); i <= Math.min(rows.length - 1, hi); i++) {
+        s += Number(rows[i][m.field]) || 0;
+      }
+      return s;
     };
+    const value = sumRange(anchor - N + 1, anchor);
+    const priorVal = sumRange(anchor - 2 * N + 1, anchor - N);
+    // YoY window: shift anchor back ~12 months
+    const yoyAnchor = anchor - 12;
+    const yoyVal = yoyAnchor >= 0 ? sumRange(yoyAnchor - N + 1, yoyAnchor) : 0;
+    const from = rows[Math.max(0, anchor - N + 1)];
+    const to = rows[anchor];
+    const period = N === 1
+      ? `${MONTHS[to.month - 1]} ${to.year}`
+      : `${MONTHS[from.month - 1]} ${String(from.year).slice(2)} – ${MONTHS[to.month - 1]} ${String(to.year).slice(2)}`;
+    return { label: m.label, key: m.key, value, prior: priorVal, yoy: yoyVal, format: m.format, period };
   };
+
   const baseDefs: MetricDef[] = latest
     ? (isScotland
         ? [
@@ -503,11 +527,28 @@ function PharmacyProfile() {
       ) : (
         <>
           <div className="mt-6 flex items-baseline justify-between gap-3 flex-wrap">
-            <h2 className="text-sm font-semibold tracking-tight">Headline metrics</h2>
-            <p className="text-xs text-muted-foreground italic">
-              All figures are monthly totals. Each card shows its latest reported month.
-            </p>
+            <div>
+              <h2 className="text-sm font-semibold tracking-tight">Headline metrics</h2>
+              <p className="text-xs text-muted-foreground italic mt-0.5">
+                {statWindow === 1
+                  ? "Each card shows the latest reported month."
+                  : `Trailing ${statWindow}-month totals ending at each metric's most recent reported month.`}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Window</span>
+              <Select value={String(statWindow)} onValueChange={(v) => setStatWindow(Number(v) as WindowKey)}>
+                <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 month</SelectItem>
+                  <SelectItem value="3">3 months</SelectItem>
+                  <SelectItem value="6">6 months</SelectItem>
+                  <SelectItem value="12">12 months</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {metrics.map((m) => (
               <MetricCard
@@ -519,6 +560,8 @@ function PharmacyProfile() {
                 format={m.format}
                 rank={m.key !== "money" ? ranks[m.key as RankKey] : undefined}
                 period={m.period}
+                windowLabel={statWindow === 1 ? "Monthly" : `Last ${statWindow}mo`}
+
               />
             ))}
           </div>
@@ -762,12 +805,14 @@ function metricStyle(label: string): { icon: LucideIcon; accent: MetricAccent } 
   return { icon: Activity, accent: "slate" };
 }
 
-function MetricCard({ label, value, prior, yoy, format, rank, period }: {
+function MetricCard({ label, value, prior, yoy, format, rank, period, windowLabel }: {
   label: string; value: number; prior: number; yoy: number;
   format?: (n: number) => string;
   rank?: { rank: number; total: number };
   period?: string;
+  windowLabel?: string;
 }) {
+
   const [flipped, setFlipped] = useState(false);
   const fmt = format ?? ((n: number) => n.toLocaleString());
   const delta = prior ? ((value - prior) / prior) * 100 : 0;
@@ -808,8 +853,9 @@ function MetricCard({ label, value, prior, yoy, format, rank, period }: {
           </p>
 
           {period && (
-            <p className="relative mt-1.5 text-[10px] text-muted-foreground">Monthly · {period}</p>
+            <p className="relative mt-1.5 text-[10px] text-muted-foreground">{windowLabel ?? "Monthly"} · {period}</p>
           )}
+
 
           <div className="relative mt-auto pt-2 flex flex-wrap items-center gap-1.5">
             {prior > 0 && (
