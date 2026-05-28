@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { geocodePharmacy, nearbyPharmaciesAndGPs, type PlaceResult } from "@/lib/places.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Stethoscope, Pill, Star, Loader2 } from "lucide-react";
+import { GPPracticeDialog } from "@/components/GPPracticeDialog";
 
 type Props = {
   pharmacyName: string;
@@ -13,6 +14,7 @@ type Props = {
 };
 
 type LinkedPharmacy = { id: string; ods_code: string; name: string; postcode: string | null };
+type LinkedPractice = { practice_code: string; practice_name: string | null; postcode: string | null };
 
 function distanceMeters(a: { lat: number; lng: number }, b: { lat: number | null; lng: number | null }) {
   if (b.lat == null || b.lng == null) return null;
@@ -40,6 +42,8 @@ export function LocalLandscape({ pharmacyName, postcode, address, selfPlaceNameH
   const [pharmacies, setPharmacies] = useState<PlaceResult[]>([]);
   const [doctors, setDoctors] = useState<PlaceResult[]>([]);
   const [matched, setMatched] = useState<Map<string, LinkedPharmacy>>(new Map());
+  const [matchedGPs, setMatchedGPs] = useState<Map<string, LinkedPractice>>(new Map());
+  const [openPractice, setOpenPractice] = useState<{ code: string | null; name?: string; address?: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,6 +101,35 @@ export function LocalLandscape({ pharmacyName, postcode, address, selfPlaceNameH
               if (hit) linked.set(p.id, hit);
             }
             setMatched(linked);
+          }
+        }
+
+        // Match nearby GP surgeries to gp_practices by postcode
+        const gpPostcodes = Array.from(
+          new Set(n.doctors.map((p) => p.postcode).filter(Boolean) as string[]),
+        );
+        if (gpPostcodes.length) {
+          const compact = gpPostcodes.map((p) => p.replace(/\s+/g, ""));
+          const variants = Array.from(new Set(gpPostcodes.concat(compact)));
+          const { data: gpRows } = await supabase
+            .from("gp_practices")
+            .select("practice_code,practice_name,postcode")
+            .or(variants.map((p) => `postcode.ilike.${p}`).join(","))
+            .limit(200);
+          if (!cancelled && gpRows) {
+            const byPc = new Map<string, LinkedPractice>();
+            for (const row of gpRows as LinkedPractice[]) {
+              const key = (row.postcode || "").toUpperCase().replace(/\s+/g, "");
+              if (key) byPc.set(key, row);
+            }
+            const linkedGP = new Map<string, LinkedPractice>();
+            for (const p of n.doctors) {
+              if (!p.postcode) continue;
+              const k = p.postcode.toUpperCase().replace(/\s+/g, "");
+              const hit = byPc.get(k);
+              if (hit) linkedGP.set(p.id, hit);
+            }
+            setMatchedGPs(linkedGP);
           }
         }
       } catch (e: any) {
@@ -202,26 +235,47 @@ export function LocalLandscape({ pharmacyName, postcode, address, selfPlaceNameH
             {dList.length === 0 && (
               <li className="text-sm text-muted-foreground">No GP surgeries within 1 mile.</li>
             )}
-            {dList.map((p) => (
-              <li key={p.id} className="border border-border/60 rounded-md p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="font-medium text-sm">{p.name}</p>
-                  <span className="text-xs text-muted-foreground shrink-0 flex items-center gap-1">
-                    <MapPin className="h-3 w-3" /> {fmtDist(p._d)}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">{p.address}</p>
-                {p.rating != null && (
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                    <Star className="h-3 w-3 fill-current" /> {p.rating.toFixed(1)}
-                    {p.userRatingCount ? ` · ${p.userRatingCount} reviews` : ""}
-                  </p>
-                )}
-              </li>
-            ))}
+            {dList.map((p) => {
+              const link = matchedGPs.get(p.id);
+              return (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenPractice({ code: link?.practice_code ?? null, name: p.name, address: p.address })}
+                    className="w-full text-left border border-border/60 rounded-md p-3 hover:bg-secondary/40 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-medium text-sm">{p.name}</p>
+                      <span className="text-xs text-muted-foreground shrink-0 flex items-center gap-1">
+                        <MapPin className="h-3 w-3" /> {fmtDist(p._d)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{p.address}</p>
+                    {p.rating != null && (
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-current" /> {p.rating.toFixed(1)}
+                        {p.userRatingCount ? ` · ${p.userRatingCount} reviews` : ""}
+                        {link && <span className="ml-2 text-primary font-medium">In our data →</span>}
+                      </p>
+                    )}
+                    {p.rating == null && link && (
+                      <p className="text-xs text-primary font-medium mt-1">In our data →</p>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </div>
+
+      <GPPracticeDialog
+        open={!!openPractice}
+        onOpenChange={(o) => !o && setOpenPractice(null)}
+        practiceCode={openPractice?.code ?? null}
+        fallbackName={openPractice?.name}
+        fallbackAddress={openPractice?.address}
+      />
     </section>
   );
 }
