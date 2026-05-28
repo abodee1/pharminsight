@@ -355,7 +355,7 @@ export const refreshScotlandGpContacts = createServerFn({ method: "POST" })
         address_line: address || null,
         health_board: iHB >= 0 ? ((c[iHB] ?? "").trim() || null) : null,
         country: "Scotland",
-        data_source: `PHS:${csvs[0].name}`,
+
       });
     }
 
@@ -398,7 +398,7 @@ export const refreshEnglandGpContacts = createServerFn({ method: "POST" })
         practice_name: o.Name,
         postcode: o.PostCode || null,
         country: "England",
-        data_source: "ORD:RO76",
+
       }));
       for (let i = 0; i < rows.length; i += 500) {
         const slice = rows.slice(i, i + 500);
