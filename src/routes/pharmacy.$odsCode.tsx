@@ -853,8 +853,9 @@ function MetricCard({ label, value, prior, yoy, format, rank, period, windowLabe
           </p>
 
           {period && (
-            <p className="relative mt-1.5 text-[10px] text-muted-foreground">Monthly · {period}</p>
+            <p className="relative mt-1.5 text-[10px] text-muted-foreground">{windowLabel ?? "Monthly"} · {period}</p>
           )}
+
 
           <div className="relative mt-auto pt-2 flex flex-wrap items-center gap-1.5">
             {prior > 0 && (
