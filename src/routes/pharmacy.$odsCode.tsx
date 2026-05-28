@@ -527,11 +527,28 @@ function PharmacyProfile() {
       ) : (
         <>
           <div className="mt-6 flex items-baseline justify-between gap-3 flex-wrap">
-            <h2 className="text-sm font-semibold tracking-tight">Headline metrics</h2>
-            <p className="text-xs text-muted-foreground italic">
-              All figures are monthly totals. Each card shows its latest reported month.
-            </p>
+            <div>
+              <h2 className="text-sm font-semibold tracking-tight">Headline metrics</h2>
+              <p className="text-xs text-muted-foreground italic mt-0.5">
+                {statWindow === 1
+                  ? "Each card shows the latest reported month."
+                  : `Trailing ${statWindow}-month totals ending at each metric's most recent reported month.`}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Window</span>
+              <Select value={String(statWindow)} onValueChange={(v) => setStatWindow(Number(v) as WindowKey)}>
+                <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 month</SelectItem>
+                  <SelectItem value="3">3 months</SelectItem>
+                  <SelectItem value="6">6 months</SelectItem>
+                  <SelectItem value="12">12 months</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {metrics.map((m) => (
               <MetricCard
