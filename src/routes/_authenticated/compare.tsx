@@ -194,6 +194,7 @@ function Compare() {
   const [pharms, setPharms] = useState<Pharm[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [trendWindow, setTrendWindow] = useState<1 | 3 | 6 | 12>(12);
   const [, setLoading] = useState(false);
 
   // Preload the user's primary pharmacy as the first selection.
