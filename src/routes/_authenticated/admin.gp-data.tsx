@@ -35,6 +35,17 @@ function monthsBetween(startY: number, startM: number, endY: number, endM: numbe
   return out;
 }
 
+function CoverageStat({ label, pct, sub }: { label: string; pct: number; sub: string }) {
+  return (
+    <div className="border rounded-md p-2">
+      <div className="text-muted-foreground uppercase tracking-wide text-[10px]">{label}</div>
+      <div className="text-base font-semibold tabular-nums">{pct}%</div>
+      <div className="text-muted-foreground">{sub}</div>
+    </div>
+  );
+}
+
+
 function GpDataAdmin() {
   const [logs, setLogs] = useState<Row[]>([]);
   const [queue, setQueue] = useState<Row[]>([]);
@@ -254,12 +265,3 @@ function GpDataAdmin() {
   );
 }
 
-function CoverageStat({ label, pct, sub }: { label: string; pct: number; sub: string }) {
-  return (
-    <div className="border rounded-md p-2">
-      <div className="text-muted-foreground uppercase tracking-wide text-[10px]">{label}</div>
-      <div className="text-base font-semibold tabular-nums">{pct}%</div>
-      <div className="text-muted-foreground">{sub}</div>
-    </div>
-  );
-}
