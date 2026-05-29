@@ -857,6 +857,7 @@ export type Database = {
         }[]
       }
       gp_prescribing_add: { Args: { rows: Json }; Returns: number }
+      public_landing_data: { Args: never; Returns: Json }
     }
     Enums: {
       [_ in never]: never
