@@ -114,12 +114,14 @@ function GPPracticePage() {
       <Link to="/gp-surgeries" className="mt-4 inline-flex items-center gap-1 text-sm text-primary hover:underline"><ArrowLeft className="h-4 w-4" /> All surgeries</Link>
     </div>
   );
-
-  // Pretty-case the all-caps NHS source names (e.g. "PRIORY MEDICAL GROUP" → "Priory Medical Group").
-  const prettyName = (practice.practice_name || practice.practice_code).replace(
-    /\w\S*/g,
-    (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
-  );
+  // Prefer the Google-verified name when present; otherwise pretty-case the NHS source name.
+  const prettyName = practice.google_name
+    || (practice.practice_name || practice.practice_code).replace(
+      /\w\S*/g,
+      (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
+    );
+  const subtitleParts = [practice.postcode, practice.health_board, practice.country].filter(Boolean) as string[];
+  if (practice.name_verified_at) subtitleParts.push("✓ Verified by Google Maps");
 
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
@@ -128,6 +130,9 @@ function GPPracticePage() {
       </Link>
       <PageHeader
         title={prettyName}
+        subtitle={subtitleParts.join(" · ")}
+        showBack={false}
+
         subtitle={[practice.postcode, practice.health_board, practice.country].filter(Boolean).join(" · ")}
         showBack={false}
       />
