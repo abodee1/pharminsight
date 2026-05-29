@@ -44,7 +44,7 @@ export function GPPracticeDialog({ open, onOpenChange, practiceCode, fallbackNam
       setLoading(true);
       try {
         const [{ data: prac }, { data: presc }, { data: ls }] = await Promise.all([
-          supabase.from("gp_practices").select("practice_code,practice_name,country,health_board,postcode").eq("practice_code", practiceCode).maybeSingle(),
+          supabase.from("gp_practices").select("practice_code,practice_name,google_name,name_verified_at,country,health_board,postcode").eq("practice_code", practiceCode).maybeSingle(),
           supabase.from("gp_prescribing").select("year,month,total_items,total_nic,is_provisional").eq("practice_code", practiceCode).order("year", { ascending: false }).order("month", { ascending: false }).limit(24),
           supabase.from("gp_list_sizes").select("list_size_date,registered_patients").eq("practice_code", practiceCode).order("list_size_date", { ascending: false }).limit(1).maybeSingle(),
         ]);
