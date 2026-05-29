@@ -310,20 +310,40 @@ function Compare() {
     [periods, trendWindow],
   );
   const trendByMetric = useMemo(() => {
-    return activeMetrics.map((mt) => ({
-      metric: mt,
-      data: trendPeriods.map((p) => {
+    return activeMetrics.map((mt) => {
+      // Build raw values per pharmacy across the window
+      const raw = trendPeriods.map((p) => {
         const [y, m] = p.split("-").map(Number);
-        const point: Record<string, any> = { label: `${MONTHS[m - 1]} ${String(y).slice(2)}` };
+        const row: Record<string, { y: number; m: number; vals: Record<string, number | null> }> = {};
+        const vals: Record<string, number | null> = {};
         selectedPharms.forEach((ph) => {
-          if (!appliesToCountry(mt.applies, ph.country)) return;
-          const row = rows.find((r) => r.pharmacy_id === ph.id && r.year === y && r.month === m);
-          point[ph.id] = mt.compute(row);
+          if (!appliesToCountry(mt.applies, ph.country)) { vals[ph.id] = null; return; }
+          const r = rows.find((rr) => rr.pharmacy_id === ph.id && rr.year === y && rr.month === m);
+          vals[ph.id] = r ? mt.compute(r) : 0;
         });
+        return { y, m, vals, label: `${MONTHS[m - 1]} ${String(y).slice(2)}` };
+      });
+      // Per-pharmacy trim: turn trailing zeros into null so lagging metrics
+      // (Pharmacy First, NMS, etc.) don't get dragged to the x-axis.
+      selectedPharms.forEach((ph) => {
+        let lastIdx = -1;
+        for (let i = raw.length - 1; i >= 0; i--) {
+          const v = raw[i].vals[ph.id];
+          if (typeof v === "number" && v > 0) { lastIdx = i; break; }
+        }
+        for (let i = 0; i < raw.length; i++) {
+          if (i > lastIdx) raw[i].vals[ph.id] = null;
+        }
+      });
+      const data = raw.map((r) => {
+        const point: Record<string, any> = { label: r.label };
+        selectedPharms.forEach((ph) => { point[ph.id] = r.vals[ph.id]; });
         return point;
-      }),
-    }));
+      });
+      return { metric: mt, data };
+    });
   }, [trendPeriods, selectedPharms, rows, activeMetrics]);
+
 
   // Radar: normalise per metric across active pharmacies
   const radar = useMemo(() => {
@@ -705,7 +725,9 @@ function Compare() {
                                   strokeWidth={2}
                                   dot={false}
                                   activeDot={{ r: 4 }}
+                                  connectNulls={false}
                                 />
+
                               ))}
                           </LineChart>
                         </ResponsiveContainer>
