@@ -184,6 +184,12 @@ function Dashboard() {
         if (pfRow && nmsRow) break;
       }
 
+      // Country avg items for the same period (delta)
+      const countryAvgItems = aggMap.get(statKey)?.avg_items ?? 0;
+      const itemsDelta = countryAvgItems > 0 && mineRow
+        ? Math.round(((mineRow.items_dispensed - countryAvgItems) / countryAvgItems) * 100)
+        : 0;
+
       setStats({
         items: mineRow?.items_dispensed ?? 0,
         pf: pfRow?.pharmacy_first_count ?? 0,
@@ -192,6 +198,12 @@ function Dashboard() {
         period: labelFor(statY, statM),
         pfPeriod: pfRow ? labelFor(pfRow.year, pfRow.month) : "",
         nmsPeriod: nmsRow ? labelFor(nmsRow.year, nmsRow.month) : "",
+        finalPayment: Number(mineRow?.final_payment) || 0,
+        grossCost: Number(mineRow?.gross_cost) || 0,
+        mcrPayment: Number(mineRow?.mcr_payment) || 0,
+        smkPayment: Number(mineRow?.smoking_cessation_payment) || 0,
+        itemsDelta,
+        pfShareOfPeers: 0, // computed below once peerPf is known
       });
       setPeerItems(latestSnap.map((r) => r.items_dispensed || 0));
 
