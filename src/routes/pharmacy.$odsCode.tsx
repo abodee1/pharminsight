@@ -669,6 +669,10 @@ function PharmacyProfile() {
               />
             </section>
           )}
+          <section className="mt-6">
+            <GpPrescribingCard pharmacyOds={pharmacy.ods_code} />
+          </section>
+
 
           <LocalLandscape
             pharmacyName={pharmacy.name}
