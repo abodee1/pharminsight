@@ -53,13 +53,16 @@ function GpDataAdmin() {
   const [loading, setLoading] = useState(true);
   const [geocoding, setGeocoding] = useState(false);
   const [refreshingScot, setRefreshingScot] = useState(false);
-  const [refreshingEng, setRefreshingEng] = useState(false);
   const [sweeping, setSweeping] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [coverage, setCoverage] = useState<Awaited<ReturnType<typeof getGpCoverage>> | null>(null);
   const runBackfill = useServerFn(backfillGpGeocodes);
   const runScot = useServerFn(refreshScotlandGpContacts);
   const runEng = useServerFn(refreshEnglandGpContacts);
   const runSweep = useServerFn(sweepUnmatchedPractices);
+  const runVerify = useServerFn(refreshVerifiedNames);
+  const runCoverage = useServerFn(getGpCoverage);
+
   const runCoverage = useServerFn(getGpCoverage);
 
   const loadCoverage = async () => {
