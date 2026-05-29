@@ -252,7 +252,6 @@ export function GpPrescribingCard({
     </div>
   );
 }
-}
 
 
 
