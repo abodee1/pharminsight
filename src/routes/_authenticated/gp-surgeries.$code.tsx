@@ -16,7 +16,8 @@ export const Route = createFileRoute("/_authenticated/gp-surgeries/$code")({
 });
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-type Practice = { practice_code: string; practice_name: string | null; country: string | null; health_board: string | null; postcode: string | null };
+type Practice = { practice_code: string; practice_name: string | null; google_name: string | null; name_verified_at: string | null; country: string | null; health_board: string | null; postcode: string | null };
+
 type Prescribing = { year: number; month: number; total_items: number; total_nic: number; is_provisional: boolean };
 type ListSize = { list_size_date: string; registered_patients: number };
 
