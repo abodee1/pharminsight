@@ -601,6 +601,24 @@ export type Database = {
         }
         Relationships: []
       }
+      landing_cache: {
+        Row: {
+          id: number
+          payload: Json
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          payload: Json
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          payload?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pharmacies: {
         Row: {
           address: string | null
@@ -858,6 +876,8 @@ export type Database = {
       }
       gp_prescribing_add: { Args: { rows: Json }; Returns: number }
       public_landing_data: { Args: never; Returns: Json }
+      public_landing_data_compute: { Args: never; Returns: Json }
+      refresh_landing_cache: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
