@@ -35,12 +35,12 @@ function GPPracticePage() {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      const [{ data: prac }, { data: presc }, { data: ls }] = await Promise.all([
         supabase.from("gp_practices").select("practice_code,practice_name,google_name,name_verified_at,country,health_board,postcode").eq("practice_code", code).maybeSingle(),
-
-        supabase.from("gp_practices").select("practice_code,practice_name,country,health_board,postcode").eq("practice_code", code).maybeSingle(),
         supabase.from("gp_prescribing").select("year,month,total_items,total_nic,is_provisional").eq("practice_code", code).order("year").order("month"),
         supabase.from("gp_list_sizes").select("list_size_date,registered_patients").eq("practice_code", code).order("list_size_date"),
       ]);
+
       if (cancelled) return;
       setPractice((prac as Practice) ?? null);
       setPrescribing((presc as Prescribing[]) ?? []);
