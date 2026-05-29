@@ -210,9 +210,13 @@ function GpDataAdmin() {
           <Button variant="outline" size="sm" onClick={triggerSweep} disabled={sweeping}>
             {sweeping ? "Sweeping…" : "Sweep → Google Places"}
           </Button>
+          <Button variant="outline" size="sm" onClick={triggerVerify} disabled={verifying}>
+            {verifying ? "Verifying…" : "Refresh verified names"}
+          </Button>
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
             {loading ? "Loading…" : "Refresh"}
           </Button>
+
         </div>
       </div>
 
