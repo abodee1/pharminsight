@@ -74,9 +74,9 @@ function GPSurgeriesPage() {
     (async () => {
       setLoading(true);
       let q = supabase
+        .from("gp_practices")
         .select("practice_code,practice_name,google_name,name_verified_at,country,health_board,postcode", { count: "exact" });
 
-        .select("practice_code,practice_name,country,health_board,postcode", { count: "exact" });
       if (country !== "all") q = q.eq("country", country);
       if (debounced) {
         const raw = debounced.trim();
