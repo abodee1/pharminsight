@@ -52,7 +52,7 @@ function Dashboard() {
   const [stats, setStats] = useState({
     items: 0, pf: 0, nms: 0, rank: 0, total: 0,
     period: "", pfPeriod: "", nmsPeriod: "",
-    finalPayment: 0, grossCost: 0, mcrPayment: 0, smkPayment: 0,
+    finalPayment: 0, grossCost: 0, mcrPayment: 0, smkPayment: 0, payPeriod: "",
     itemsDelta: 0, // % vs country avg for the same month
     pfShareOfPeers: 0, // percentile 0..100 of PF vs peers
   });
@@ -175,13 +175,14 @@ function Dashboard() {
       );
       const rank = ph ? ranked.findIndex((r) => r.pharmacy_id === ph.id) + 1 : 0;
 
-      // PF / NMS often lag — find latest non-zero reported rows
-      let pfRow: Row | undefined; let nmsRow: Row | undefined;
+      // PF / NMS / Payments often lag — find latest non-zero reported rows
+      let pfRow: Row | undefined; let nmsRow: Row | undefined; let payRow: Row | undefined;
       const sortedMy = [...myRows].sort((a, b) => b.year * 12 + b.month - (a.year * 12 + a.month));
       for (const r of sortedMy) {
         if (!pfRow && (r.pharmacy_first_count || 0) > 0) pfRow = r;
         if (!nmsRow && (r.nms_count || 0) > 0) nmsRow = r;
-        if (pfRow && nmsRow) break;
+        if (!payRow && (Number(r.final_payment) || 0) > 0) payRow = r;
+        if (pfRow && nmsRow && payRow) break;
       }
 
       // Country avg items for the same period (delta)
@@ -198,10 +199,11 @@ function Dashboard() {
         period: labelFor(statY, statM),
         pfPeriod: pfRow ? labelFor(pfRow.year, pfRow.month) : "",
         nmsPeriod: nmsRow ? labelFor(nmsRow.year, nmsRow.month) : "",
-        finalPayment: Number(mineRow?.final_payment) || 0,
-        grossCost: Number(mineRow?.gross_cost) || 0,
-        mcrPayment: Number(mineRow?.mcr_payment) || 0,
-        smkPayment: Number(mineRow?.smoking_cessation_payment) || 0,
+        finalPayment: Number(payRow?.final_payment) || 0,
+        grossCost: Number(payRow?.gross_cost ?? mineRow?.gross_cost) || 0,
+        mcrPayment: Number(payRow?.mcr_payment) || 0,
+        smkPayment: Number(payRow?.smoking_cessation_payment) || 0,
+        payPeriod: payRow ? labelFor(payRow.year, payRow.month) : "",
         itemsDelta,
         pfShareOfPeers: 0, // computed below once peerPf is known
       });
@@ -223,7 +225,7 @@ function Dashboard() {
         setPeerPfPeriod(labelFor(pfY, pfM));
       }
 
-      const source: Row[] = mineRow ? [mineRow] : latestSnap;
+      const source: Row[] = payRow ? [payRow] : mineRow ? [mineRow] : latestSnap;
       const sum = (k: keyof Row) =>
         source.reduce((a, r) => a + (Number(r[k]) || 0), 0);
       const pf = sum("pharmacy_first_payment");
@@ -344,9 +346,9 @@ function Dashboard() {
       {pharmacy && (
         <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
-            label={`NHS revenue · ${stats.period || "latest"}`}
+            label={`NHS revenue · ${stats.payPeriod || stats.period || "latest"}`}
             value={money(stats.finalPayment)}
-            hint="Final payment after adjustments"
+            hint={stats.payPeriod && stats.payPeriod !== stats.period ? `Latest reported · ${stats.payPeriod}` : "Final payment after adjustments"}
             icon={PoundSterling}
             accent="emerald"
           />

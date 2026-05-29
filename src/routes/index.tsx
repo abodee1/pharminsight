@@ -8,6 +8,7 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/")({
   component: Landing,
@@ -100,6 +101,7 @@ function Landing() {
 }
 
 function SiteHeader() {
+  const { user, loading } = useAuth();
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur">
       <div className="mx-auto max-w-7xl px-6 py-3 flex items-center justify-between">
@@ -110,10 +112,18 @@ function SiteHeader() {
           <span className="text-lg font-bold tracking-tight text-foreground">Pharmacy8</span>
         </Link>
         <div className="flex items-center gap-2">
-          <Link to="/login" className="text-sm font-medium text-foreground hover:text-primary px-3 py-2">Sign in</Link>
-          <Link to="/register" className="inline-flex items-center gap-1 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90">
-            Get started <ArrowUpRight className="h-3.5 w-3.5" />
-          </Link>
+          {loading ? null : user ? (
+            <Link to="/dashboard" className="inline-flex items-center gap-1 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90">
+              Open dashboard <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+          ) : (
+            <>
+              <Link to="/login" className="text-sm font-medium text-foreground hover:text-primary px-3 py-2">Sign in</Link>
+              <Link to="/register" className="inline-flex items-center gap-1 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90">
+                Get started <ArrowUpRight className="h-3.5 w-3.5" />
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>
