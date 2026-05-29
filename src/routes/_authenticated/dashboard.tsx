@@ -449,10 +449,10 @@ function Dashboard() {
       )}
 
       <div className="mt-6 grid md:grid-cols-2 gap-4">
-        {pfPoints.length >= 6 && (
+        {itemsPoints.length >= 6 && (
           <AnnotatedSparkline
-            label={pharmacy ? "Pharmacy First — 12-month arc" : "Pharmacy First — national arc"}
-            points={pfPoints.slice(-12).map((p) => ({ period: p.label, value: p.value }))}
+            label={pharmacy ? "Items dispensed — 12-month arc" : "Items dispensed — national arc"}
+            points={itemsPoints.slice(-12).map((p) => ({ period: p.label, value: p.value }))}
             caption="Peak and trough months across the trailing year."
           />
         )}
@@ -467,7 +467,7 @@ function Dashboard() {
       </div>
 
       {peerItems.length > 8 && (
-        <div className="mt-6">
+        <div className="mt-6 grid md:grid-cols-2 gap-4">
           <DistributionStrip
             label={`How ${pharmacy?.country || "the country"} dispenses — ${stats.period}`}
             values={peerItems}
@@ -475,6 +475,15 @@ function Dashboard() {
             highlightLabel={pharmacy?.name}
             caption="Each bar is a band of pharmacies grouped by monthly items dispensed."
           />
+          {peerPf.length > 8 && (
+            <DistributionStrip
+              label={`Pharmacy First spread — ${peerPfPeriod || stats.period}`}
+              values={peerPf}
+              highlightValue={pharmacy ? stats.pf : undefined}
+              highlightLabel={pharmacy?.name}
+              caption="Walk-in clinical consultations distributed across reporting peers."
+            />
+          )}
         </div>
       )}
 
