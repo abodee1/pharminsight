@@ -44,7 +44,7 @@ export function GPPracticeDialog({ open, onOpenChange, practiceCode, fallbackNam
       setLoading(true);
       try {
         const [{ data: prac }, { data: presc }, { data: ls }] = await Promise.all([
-          supabase.from("gp_practices").select("practice_code,practice_name,country,health_board,postcode").eq("practice_code", practiceCode).maybeSingle(),
+          supabase.from("gp_practices").select("practice_code,practice_name,google_name,name_verified_at,country,health_board,postcode").eq("practice_code", practiceCode).maybeSingle(),
           supabase.from("gp_prescribing").select("year,month,total_items,total_nic,is_provisional").eq("practice_code", practiceCode).order("year", { ascending: false }).order("month", { ascending: false }).limit(24),
           supabase.from("gp_list_sizes").select("list_size_date,registered_patients").eq("practice_code", practiceCode).order("list_size_date", { ascending: false }).limit(1).maybeSingle(),
         ]);
@@ -64,16 +64,22 @@ export function GPPracticeDialog({ open, onOpenChange, practiceCode, fallbackNam
     items: Number(r.total_items) || 0,
   }));
 
-  const rawName = practice?.practice_name || fallbackName || "";
+  const rawName = practice?.google_name || practice?.practice_name || fallbackName || "";
   const prettyName = rawName ? rawName.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()) : "GP practice";
+  const isVerified = !!practice?.google_name && !!practice?.name_verified_at;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
             <Stethoscope className="h-5 w-5" />
-            {prettyName}
+            <span>{prettyName}</span>
+            {isVerified && (
+              <span className="text-[10px] font-medium uppercase tracking-wide text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded px-1.5 py-0.5">
+                ✓ Verified
+              </span>
+            )}
           </DialogTitle>
           <DialogDescription>
             {practice?.postcode ? <span>{practice.postcode}</span> : fallbackAddress ? <span>{fallbackAddress}</span> : null}
