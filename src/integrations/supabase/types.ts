@@ -396,10 +396,12 @@ export type Database = {
           address_line: string | null
           country: string | null
           created_at: string
+          google_name: string | null
           google_place_id: string | null
           health_board: string | null
           lat: number | null
           lng: number | null
+          name_verified_at: string | null
           postcode: string | null
           practice_code: string
           practice_name: string | null
@@ -410,10 +412,12 @@ export type Database = {
           address_line?: string | null
           country?: string | null
           created_at?: string
+          google_name?: string | null
           google_place_id?: string | null
           health_board?: string | null
           lat?: number | null
           lng?: number | null
+          name_verified_at?: string | null
           postcode?: string | null
           practice_code: string
           practice_name?: string | null
@@ -424,10 +428,12 @@ export type Database = {
           address_line?: string | null
           country?: string | null
           created_at?: string
+          google_name?: string | null
           google_place_id?: string | null
           health_board?: string | null
           lat?: number | null
           lng?: number | null
+          name_verified_at?: string | null
           postcode?: string | null
           practice_code?: string
           practice_name?: string | null
