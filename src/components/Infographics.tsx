@@ -226,7 +226,7 @@ export function GpPrescribingCard({
     : 0;
 
   return (
-    <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+    <div className="space-y-3">
       <TrendCard
         title={title}
         subtitle={loading ? "Loading…" : `${avgGps} GP practices · ${totalItems.toLocaleString()} items over ${win}M`}
@@ -237,7 +237,7 @@ export function GpPrescribingCard({
         formatValue={(n) => n.toLocaleString()}
       />
       {topGps.length > 0 && (
-        <div className="mt-4">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Top GP feeders (all-time)</p>
           <ul className="space-y-1.5 text-xs">
             {topGps.map((g) => (
@@ -251,6 +251,7 @@ export function GpPrescribingCard({
       )}
     </div>
   );
+}
 }
 
 
