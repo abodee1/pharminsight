@@ -318,6 +318,16 @@ function Benchmarking() {
             })}
           </div>
 
+          {/* Local GP prescribing — items dispensed against scripts from linked GPs */}
+          {pharmacy.ods_code && (
+            <section className="mb-10">
+              <h2 className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
+                GP practice activity
+              </h2>
+              <GpPrescribingCard pharmacyOds={pharmacy.ods_code} />
+            </section>
+          )}
+
           {/* Grouped breakdown */}
           {(["volume", "service", "revenue", "ratio"] as const).map((g) => {
             const items = analysis.grouped[g];
