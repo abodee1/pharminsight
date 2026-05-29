@@ -1,5 +1,6 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
+  Home,
   LayoutDashboard,
   Trophy,
   BarChart2,
@@ -14,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { PharmacySearch } from "./PharmacySearch";
 
 const links = [
+  { to: "/", label: "Home", icon: Home },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy },
   { to: "/benchmarking", label: "Benchmarking", icon: BarChart2 },
