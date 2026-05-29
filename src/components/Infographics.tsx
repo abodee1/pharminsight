@@ -1,7 +1,259 @@
 // Editorial / FT-style infographic primitives.
 // Built on top of semantic tokens (no hard-coded colors).
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+} from "recharts";
+import { supabase } from "@/integrations/supabase/client";
+
+export type PeriodWindow = 1 | 3 | 6 | 12;
+export const PERIOD_OPTIONS: PeriodWindow[] = [1, 3, 6, 12];
+
+/* ----------------------------------------------------------------
+ * PeriodPills
+ * 1M / 3M / 6M / 12M selector pills, used to scope every chart.
+ * ---------------------------------------------------------------- */
+export function PeriodPills({
+  value,
+  onChange,
+  options = PERIOD_OPTIONS,
+  className = "",
+}: {
+  value: PeriodWindow;
+  onChange: (v: PeriodWindow) => void;
+  options?: PeriodWindow[];
+  className?: string;
+}) {
+  return (
+    <div className={`inline-flex items-center gap-1 rounded-md border border-border bg-secondary/40 p-0.5 ${className}`}>
+      {options.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => onChange(opt)}
+          className={[
+            "px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+            value === opt
+              ? "bg-foreground text-background"
+              : "text-muted-foreground hover:text-foreground",
+          ].join(" ")}
+        >
+          {opt}M
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------
+ * TrendCard
+ * Compact line chart with title, headline value, delta vs prior
+ * window, an embedded PeriodPills selector and optional comparison
+ * series. Use this everywhere instead of bespoke chart blocks.
+ * ---------------------------------------------------------------- */
+export function TrendCard({
+  title,
+  subtitle,
+  caption,
+  points, // last 12 months, oldest -> newest
+  window,
+  onWindowChange,
+  formatValue = (n: number) => Math.round(n).toLocaleString(),
+  comparisonLabel,
+  primaryLabel = "You",
+  options = PERIOD_OPTIONS,
+  height = 220,
+}: {
+  title: string;
+  subtitle?: string;
+  caption?: string;
+  points: { label: string; value: number; comparison?: number }[];
+  window: PeriodWindow;
+  onWindowChange: (v: PeriodWindow) => void;
+  formatValue?: (n: number) => string;
+  comparisonLabel?: string;
+  primaryLabel?: string;
+  options?: PeriodWindow[];
+  height?: number;
+}) {
+  const sliced = points.slice(-window);
+  const latest = sliced[sliced.length - 1]?.value ?? 0;
+  const first = sliced[0]?.value ?? 0;
+  const delta = first > 0 ? Math.round(((latest - first) / first) * 100) : 0;
+  const tone = delta > 0 ? "text-emerald-700" : delta < 0 ? "text-rose-700" : "text-muted-foreground";
+  const hasData = sliced.some((p) => p.value > 0);
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold tracking-tight truncate">{title}</h3>
+          {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
+        </div>
+        <PeriodPills value={window} onChange={onWindowChange} options={options} />
+      </div>
+
+      <div className="flex items-baseline justify-between gap-3 mb-2">
+        <p className="text-2xl font-semibold tabular-nums">{formatValue(latest)}</p>
+        {hasData && sliced.length > 1 && (
+          <p className={`text-xs font-semibold ${tone}`}>
+            {delta >= 0 ? "+" : ""}{delta}% vs {window}M ago
+          </p>
+        )}
+      </div>
+
+      <div style={{ height }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={sliced} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+            <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+            <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
+            <YAxis tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" width={48} />
+            <Tooltip
+              contentStyle={{
+                background: "var(--card)", border: "1px solid var(--border)",
+                borderRadius: 6, fontSize: 12,
+              }}
+              formatter={(v: number) => formatValue(v)}
+            />
+            {comparisonLabel && <Legend wrapperStyle={{ fontSize: 11 }} />}
+            <Line
+              type="monotone" dataKey="value" name={primaryLabel}
+              stroke="var(--cmp-1, var(--chart-1))" strokeWidth={2} dot={false}
+              isAnimationActive={false}
+            />
+            {comparisonLabel && (
+              <Line
+                type="monotone" dataKey="comparison" name={comparisonLabel}
+                stroke="var(--cmp-2, var(--chart-2))" strokeWidth={2} dot={false}
+                strokeDasharray="4 4" isAnimationActive={false}
+              />
+            )}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      {caption && <p className="mt-3 text-xs italic text-muted-foreground border-t border-border pt-2">{caption}</p>}
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------
+ * GpPrescribingCard
+ * Items prescribed by GPs whose patients use this pharmacy (linkage
+ * data). Self-loading by pharmacy ODS code, with a period selector.
+ * ---------------------------------------------------------------- */
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+export function GpPrescribingCard({
+  pharmacyOds,
+  defaultWindow = 12,
+  title = "GP scripts feeding this pharmacy",
+}: {
+  pharmacyOds: string | null | undefined;
+  defaultWindow?: PeriodWindow;
+  title?: string;
+}) {
+  const [win, setWin] = useState<PeriodWindow>(defaultWindow);
+  const [rows, setRows] = useState<
+    { year: number; month: number; items: number; gp_count: number }[]
+  >([]);
+  const [topGps, setTopGps] = useState<{ code: string; items: number }[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!pharmacyOds) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("gp_pharmacy_linkage")
+        .select("year,month,practice_code,items_dispensed")
+        .eq("pharmacy_ods_code", pharmacyOds)
+        .order("year", { ascending: false })
+        .order("month", { ascending: false })
+        .limit(5000);
+      if (cancelled) return;
+      if (error || !data) {
+        setRows([]); setTopGps([]); setLoading(false); return;
+      }
+      const byMonth = new Map<string, { year: number; month: number; items: number; gps: Set<string> }>();
+      const byGp = new Map<string, number>();
+      for (const r of data) {
+        const k = `${r.year}-${r.month}`;
+        const cur = byMonth.get(k) || { year: r.year, month: r.month, items: 0, gps: new Set<string>() };
+        cur.items += Number(r.items_dispensed) || 0;
+        cur.gps.add(r.practice_code);
+        byMonth.set(k, cur);
+        byGp.set(r.practice_code, (byGp.get(r.practice_code) || 0) + (Number(r.items_dispensed) || 0));
+      }
+      const sorted = [...byMonth.values()]
+        .sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month))
+        .map((v) => ({ year: v.year, month: v.month, items: v.items, gp_count: v.gps.size }));
+      const top = [...byGp.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([code, items]) => ({ code, items }));
+      setRows(sorted);
+      setTopGps(top);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [pharmacyOds]);
+
+  const points = useMemo(
+    () => rows.slice(-12).map((r) => ({
+      label: `${MONTHS[r.month - 1]} ${String(r.year).slice(2)}`,
+      value: r.items,
+    })),
+    [rows],
+  );
+
+  if (!pharmacyOds) return null;
+  if (!loading && !rows.length) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <p className="mt-3 text-xs text-muted-foreground">No GP linkage data reported for this pharmacy yet.</p>
+      </div>
+    );
+  }
+
+  const sliced = rows.slice(-win);
+  const totalItems = sliced.reduce((a, r) => a + r.items, 0);
+  const avgGps = sliced.length
+    ? Math.round(sliced.reduce((a, r) => a + r.gp_count, 0) / sliced.length)
+    : 0;
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <TrendCard
+        title={title}
+        subtitle={loading ? "Loading…" : `${avgGps} GP practices · ${totalItems.toLocaleString()} items over ${win}M`}
+        caption="From official England, Scotland and NI linkage data — items dispensed against scripts issued by each GP practice."
+        points={points}
+        window={win}
+        onWindowChange={setWin}
+        formatValue={(n) => n.toLocaleString()}
+      />
+      {topGps.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Top GP feeders (all-time)</p>
+          <ul className="space-y-1.5 text-xs">
+            {topGps.map((g) => (
+              <li key={g.code} className="flex items-center justify-between gap-2 border-b border-border last:border-b-0 pb-1.5 last:pb-0">
+                <span className="font-mono">{g.code}</span>
+                <span className="tabular-nums">{g.items.toLocaleString()} items</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 
 const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 
