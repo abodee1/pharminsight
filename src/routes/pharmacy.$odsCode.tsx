@@ -12,7 +12,7 @@ import {
 import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X, ShieldCheck, Sparkles, Package, Stethoscope, ClipboardCheck, FileText, PoundSterling, Cigarette, Pill, Syringe, HeartPulse, Activity } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PharmacySearch } from "@/components/PharmacySearch";
-import { PercentileRail, AnnotatedSparkline, ShareDonut } from "@/components/Infographics";
+import { PercentileRail, AnnotatedSparkline, ShareDonut, GpPrescribingCard } from "@/components/Infographics";
 import { LocalLandscape } from "@/components/LocalLandscape";
 import { AnalysisPanel } from "@/components/AnalysisPanel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
