@@ -203,6 +203,7 @@ function Dashboard() {
         grossCost: Number(payRow?.gross_cost ?? mineRow?.gross_cost) || 0,
         mcrPayment: Number(payRow?.mcr_payment) || 0,
         smkPayment: Number(payRow?.smoking_cessation_payment) || 0,
+        payPeriod: payRow ? labelFor(payRow.year, payRow.month) : "",
         itemsDelta,
         pfShareOfPeers: 0, // computed below once peerPf is known
       });
