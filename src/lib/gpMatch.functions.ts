@@ -480,7 +480,7 @@ export const sweepUnmatchedPractices = createServerFn({ method: "POST" })
       if (!places.length) { noCandidate++; continue; }
 
       // Score each place against this specific practice.
-      let best: { placeId: string; score: number } | null = null;
+      let best: { placeId: string; placeName: string; score: number } | null = null;
       for (const p of places) {
         const ns = nameScore(p.name, r.practice_name);
         const samePc = !!p.postcode && !!r.postcode && normPc(p.postcode) === normPc(r.postcode);
@@ -492,7 +492,7 @@ export const sweepUnmatchedPractices = createServerFn({ method: "POST" })
         // Require some real signal — generic "doctor" alone isn't enough.
         if (ns < 0.2 && !samePc && dist > 150) continue;
         const score = ns * 0.6 + (samePc ? 0.25 : 0) + distScore * 0.15;
-        if (!best || score > best.score) best = { placeId: p.id, score };
+        if (!best || score > best.score) best = { placeId: p.id, placeName: p.name, score };
       }
 
       if (!best || best.score < 0.4) { lowScore++; continue; }
@@ -510,7 +510,11 @@ export const sweepUnmatchedPractices = createServerFn({ method: "POST" })
 
       const { error: upErr } = await supabaseAdmin
         .from("gp_practices")
-        .update({ google_place_id: best.placeId })
+        .update({
+          google_place_id: best.placeId,
+          google_name: best.placeName || null,
+          name_verified_at: new Date().toISOString(),
+        })
         .eq("practice_code", r.practice_code)
         .is("google_place_id", null);
       if (!upErr) matched++;
@@ -535,17 +539,87 @@ export const sweepUnmatchedPractices = createServerFn({ method: "POST" })
   });
 
 /**
+ * For practices that already have a google_place_id but no captured
+ * google_name (legacy matches), fetch the place name from Google and
+ * stamp it onto the row so the "Verified by Google Maps" badge can
+ * surface the verified label.
+ */
+export const refreshVerifiedNames = createServerFn({ method: "POST" })
+  .inputValidator((input: { limit?: number; offset?: number }) =>
+    z.object({
+      limit: z.number().min(1).max(500).optional(),
+      offset: z.number().min(0).max(50000).optional(),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const limit = data.limit ?? 100;
+    const offset = data.offset ?? 0;
+
+    const { data: rows, error } = await supabaseAdmin
+      .from("gp_practices")
+      .select("practice_code,google_place_id,lat,lng")
+      .not("google_place_id", "is", null)
+      .is("google_name", null)
+      .order("practice_code")
+      .range(offset, offset + limit - 1);
+    if (error) throw new Error(error.message);
+    const list = (rows ?? []) as Array<{
+      practice_code: string; google_place_id: string | null;
+      lat: number | null; lng: number | null;
+    }>;
+
+    let refreshed = 0;
+    let apiErrors = 0;
+
+    for (const r of list) {
+      if (!r.google_place_id || r.lat == null || r.lng == null) continue;
+      try {
+        // Re-fetch nearby and pick the place matching our cached place_id —
+        // gives us the canonical Google name without needing a place-details call.
+        const places = await placesNearby(r.lat, r.lng, "doctor", 600, 20);
+        const hit = places.find((p) => p.id === r.google_place_id);
+        if (!hit) continue;
+        const { error: upErr } = await supabaseAdmin
+          .from("gp_practices")
+          .update({
+            google_name: hit.name || null,
+            name_verified_at: new Date().toISOString(),
+          })
+          .eq("practice_code", r.practice_code);
+        if (!upErr) refreshed++;
+      } catch {
+        apiErrors++;
+      }
+    }
+
+    const { count: remaining } = await supabaseAdmin
+      .from("gp_practices")
+      .select("practice_code", { count: "exact", head: true })
+      .not("google_place_id", "is", null)
+      .is("google_name", null);
+
+    return {
+      scanned: list.length,
+      refreshed,
+      apiErrors,
+      nextOffset: offset + list.length,
+      remaining: remaining ?? null,
+    };
+  });
+
+/**
  * Coverage health snapshot for the admin dashboard.
  */
 export const getGpCoverage = createServerFn({ method: "GET" })
   .handler(async () => {
     const head = { count: "exact" as const, head: true };
-    const [total, withName, withPostcode, withLat, withPlace, scotTotal, engTotal] = await Promise.all([
+    const [total, withName, withPostcode, withLat, withPlace, withVerified, scotTotal, engTotal] = await Promise.all([
       supabaseAdmin.from("gp_practices").select("practice_code", head),
       supabaseAdmin.from("gp_practices").select("practice_code", head).not("practice_name", "is", null),
       supabaseAdmin.from("gp_practices").select("practice_code", head).not("postcode", "is", null),
       supabaseAdmin.from("gp_practices").select("practice_code", head).not("lat", "is", null),
       supabaseAdmin.from("gp_practices").select("practice_code", head).not("google_place_id", "is", null),
+      supabaseAdmin.from("gp_practices").select("practice_code", head).not("google_name", "is", null),
       supabaseAdmin.from("gp_practices").select("practice_code", head).eq("country", "Scotland"),
       supabaseAdmin.from("gp_practices").select("practice_code", head).eq("country", "England"),
     ]);
@@ -554,12 +628,12 @@ export const getGpCoverage = createServerFn({ method: "GET" })
     const t = n(total) || 1;
     const pct = (x: number) => Math.round((x / t) * 1000) / 10;
 
-    // Health score = weighted blend of the things matching depends on.
     const score = Math.round(
-      n(withName) / t * 20 +
-      n(withPostcode) / t * 20 +
-      n(withLat) / t * 30 +
-      n(withPlace) / t * 30,
+      n(withName) / t * 15 +
+      n(withPostcode) / t * 15 +
+      n(withLat) / t * 25 +
+      n(withPlace) / t * 20 +
+      n(withVerified) / t * 25,
     );
 
     return {
@@ -568,12 +642,14 @@ export const getGpCoverage = createServerFn({ method: "GET" })
       withPostcode: n(withPostcode),
       withLat: n(withLat),
       withPlace: n(withPlace),
+      withVerified: n(withVerified),
       scotland: n(scotTotal),
       england: n(engTotal),
       pctName: pct(n(withName)),
       pctPostcode: pct(n(withPostcode)),
       pctLat: pct(n(withLat)),
       pctPlace: pct(n(withPlace)),
+      pctVerified: pct(n(withVerified)),
       healthScore: Math.min(100, Math.max(0, score)),
     };
   });

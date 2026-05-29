@@ -40,10 +40,13 @@ export const Route = createFileRoute("/_authenticated/gp-surgeries")({
 type Row = {
   practice_code: string;
   practice_name: string | null;
+  google_name: string | null;
+  name_verified_at: string | null;
   country: string | null;
   health_board: string | null;
   postcode: string | null;
 };
+
 
 const PAGE_SIZE = 50;
 
@@ -72,7 +75,8 @@ function GPSurgeriesPage() {
       setLoading(true);
       let q = supabase
         .from("gp_practices")
-        .select("practice_code,practice_name,country,health_board,postcode", { count: "exact" });
+        .select("practice_code,practice_name,google_name,name_verified_at,country,health_board,postcode", { count: "exact" });
+
       if (country !== "all") q = q.eq("country", country);
       if (debounced) {
         const raw = debounced.trim();
@@ -176,9 +180,18 @@ function GPSurgeriesPage() {
                       className="inline-flex items-center gap-2 hover:underline"
                     >
                       <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
-                      {r.practice_name || "—"}
+                      <span>{r.google_name || r.practice_name || "—"}</span>
+                      {r.name_verified_at && (
+                        <span
+                          title="Verified against Google Maps"
+                          className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-700 bg-emerald-100 border border-emerald-200 rounded px-1.5 py-0.5"
+                        >
+                          ✓ Verified
+                        </span>
+                      )}
                     </Link>
                   </TableCell>
+
                   <TableCell className="hidden md:table-cell font-mono text-xs">
                     {r.practice_code}
                   </TableCell>

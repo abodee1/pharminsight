@@ -4,7 +4,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { backfillGpGeocodes, refreshScotlandGpContacts, refreshEnglandGpContacts, sweepUnmatchedPractices, getGpCoverage } from "@/lib/gpMatch.functions";
+import { backfillGpGeocodes, refreshScotlandGpContacts, refreshEnglandGpContacts, sweepUnmatchedPractices, refreshVerifiedNames, getGpCoverage } from "@/lib/gpMatch.functions";
+
 
 
 export const Route = createFileRoute("/_authenticated/admin/gp-data")({
@@ -54,12 +55,15 @@ function GpDataAdmin() {
   const [refreshingScot, setRefreshingScot] = useState(false);
   const [refreshingEng, setRefreshingEng] = useState(false);
   const [sweeping, setSweeping] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [coverage, setCoverage] = useState<Awaited<ReturnType<typeof getGpCoverage>> | null>(null);
   const runBackfill = useServerFn(backfillGpGeocodes);
   const runScot = useServerFn(refreshScotlandGpContacts);
   const runEng = useServerFn(refreshEnglandGpContacts);
   const runSweep = useServerFn(sweepUnmatchedPractices);
+  const runVerify = useServerFn(refreshVerifiedNames);
   const runCoverage = useServerFn(getGpCoverage);
+
 
   const loadCoverage = async () => {
     try { setCoverage(await runCoverage()); } catch { /* ignore */ }
@@ -129,6 +133,28 @@ function GpDataAdmin() {
     }
   };
 
+  const triggerVerify = async () => {
+    setVerifying(true);
+    toast.info("Refreshing Google-verified names for already-matched practices…");
+    try {
+      let offset = 0;
+      let totalRefreshed = 0;
+      let totalScanned = 0;
+      for (let i = 0; i < 5; i++) {
+        const r = await runVerify({ data: { limit: 100, offset } });
+        totalRefreshed += r.refreshed;
+        totalScanned += r.scanned;
+        offset = r.nextOffset;
+        if (r.scanned < 100) break;
+      }
+      toast.success(`Verified names: refreshed ${totalRefreshed} of ${totalScanned} scanned`);
+      loadCoverage();
+    } catch (e: any) {
+      toast.error(`Verify failed: ${e?.message || e}`);
+    } finally {
+      setVerifying(false);
+    }
+  };
 
 
   const refresh = async () => {
@@ -184,9 +210,13 @@ function GpDataAdmin() {
           <Button variant="outline" size="sm" onClick={triggerSweep} disabled={sweeping}>
             {sweeping ? "Sweeping…" : "Sweep → Google Places"}
           </Button>
+          <Button variant="outline" size="sm" onClick={triggerVerify} disabled={verifying}>
+            {verifying ? "Verifying…" : "Refresh verified names"}
+          </Button>
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
             {loading ? "Loading…" : "Refresh"}
           </Button>
+
         </div>
       </div>
 
@@ -205,12 +235,14 @@ function GpDataAdmin() {
               style={{ width: `${coverage.healthScore}%` }}
             />
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
             <CoverageStat label="Has name" pct={coverage.pctName} sub={`${coverage.withName.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
             <CoverageStat label="Has postcode" pct={coverage.pctPostcode} sub={`${coverage.withPostcode.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
             <CoverageStat label="Geocoded" pct={coverage.pctLat} sub={`${coverage.withLat.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
             <CoverageStat label="Matched to a Place" pct={coverage.pctPlace} sub={`${coverage.withPlace.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
+            <CoverageStat label="Google-verified name" pct={coverage.pctVerified} sub={`${coverage.withVerified.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
           </div>
+
           <p className="text-xs text-muted-foreground">
             Scotland: {coverage.scotland.toLocaleString()} practices · England: {coverage.england.toLocaleString()} practices
           </p>
