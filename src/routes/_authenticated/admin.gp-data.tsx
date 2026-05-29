@@ -235,12 +235,14 @@ function GpDataAdmin() {
               style={{ width: `${coverage.healthScore}%` }}
             />
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
             <CoverageStat label="Has name" pct={coverage.pctName} sub={`${coverage.withName.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
             <CoverageStat label="Has postcode" pct={coverage.pctPostcode} sub={`${coverage.withPostcode.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
             <CoverageStat label="Geocoded" pct={coverage.pctLat} sub={`${coverage.withLat.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
             <CoverageStat label="Matched to a Place" pct={coverage.pctPlace} sub={`${coverage.withPlace.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
+            <CoverageStat label="Google-verified name" pct={coverage.pctVerified} sub={`${coverage.withVerified.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
           </div>
+
           <p className="text-xs text-muted-foreground">
             Scotland: {coverage.scotland.toLocaleString()} practices · England: {coverage.england.toLocaleString()} practices
           </p>
