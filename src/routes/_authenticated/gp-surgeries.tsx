@@ -40,10 +40,13 @@ export const Route = createFileRoute("/_authenticated/gp-surgeries")({
 type Row = {
   practice_code: string;
   practice_name: string | null;
+  google_name: string | null;
+  name_verified_at: string | null;
   country: string | null;
   health_board: string | null;
   postcode: string | null;
 };
+
 
 const PAGE_SIZE = 50;
 
