@@ -346,9 +346,9 @@ function Dashboard() {
       {pharmacy && (
         <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
-            label={`NHS revenue · ${stats.period || "latest"}`}
+            label={`NHS revenue · ${stats.payPeriod || stats.period || "latest"}`}
             value={money(stats.finalPayment)}
-            hint="Final payment after adjustments"
+            hint={stats.payPeriod && stats.payPeriod !== stats.period ? `Latest reported · ${stats.payPeriod}` : "Final payment after adjustments"}
             icon={PoundSterling}
             accent="emerald"
           />
