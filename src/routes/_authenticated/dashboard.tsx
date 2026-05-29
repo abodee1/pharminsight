@@ -175,13 +175,14 @@ function Dashboard() {
       );
       const rank = ph ? ranked.findIndex((r) => r.pharmacy_id === ph.id) + 1 : 0;
 
-      // PF / NMS often lag — find latest non-zero reported rows
-      let pfRow: Row | undefined; let nmsRow: Row | undefined;
+      // PF / NMS / Payments often lag — find latest non-zero reported rows
+      let pfRow: Row | undefined; let nmsRow: Row | undefined; let payRow: Row | undefined;
       const sortedMy = [...myRows].sort((a, b) => b.year * 12 + b.month - (a.year * 12 + a.month));
       for (const r of sortedMy) {
         if (!pfRow && (r.pharmacy_first_count || 0) > 0) pfRow = r;
         if (!nmsRow && (r.nms_count || 0) > 0) nmsRow = r;
-        if (pfRow && nmsRow) break;
+        if (!payRow && (Number(r.final_payment) || 0) > 0) payRow = r;
+        if (pfRow && nmsRow && payRow) break;
       }
 
       // Country avg items for the same period (delta)
@@ -198,10 +199,10 @@ function Dashboard() {
         period: labelFor(statY, statM),
         pfPeriod: pfRow ? labelFor(pfRow.year, pfRow.month) : "",
         nmsPeriod: nmsRow ? labelFor(nmsRow.year, nmsRow.month) : "",
-        finalPayment: Number(mineRow?.final_payment) || 0,
-        grossCost: Number(mineRow?.gross_cost) || 0,
-        mcrPayment: Number(mineRow?.mcr_payment) || 0,
-        smkPayment: Number(mineRow?.smoking_cessation_payment) || 0,
+        finalPayment: Number(payRow?.final_payment) || 0,
+        grossCost: Number(payRow?.gross_cost ?? mineRow?.gross_cost) || 0,
+        mcrPayment: Number(payRow?.mcr_payment) || 0,
+        smkPayment: Number(payRow?.smoking_cessation_payment) || 0,
         itemsDelta,
         pfShareOfPeers: 0, // computed below once peerPf is known
       });
