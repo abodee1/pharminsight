@@ -224,7 +224,7 @@ function Dashboard() {
         setPeerPfPeriod(labelFor(pfY, pfM));
       }
 
-      const source: Row[] = mineRow ? [mineRow] : latestSnap;
+      const source: Row[] = payRow ? [payRow] : mineRow ? [mineRow] : latestSnap;
       const sum = (k: keyof Row) =>
         source.reduce((a, r) => a + (Number(r[k]) || 0), 0);
       const pf = sum("pharmacy_first_payment");
