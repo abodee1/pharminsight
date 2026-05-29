@@ -18,6 +18,7 @@ import {
 
 import {
   Trophy, BarChart2, GitCompare, Package, Stethoscope, ClipboardCheck, Medal,
+  PoundSterling, Wallet, TrendingUp, TrendingDown, Cigarette,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
@@ -51,6 +52,9 @@ function Dashboard() {
   const [stats, setStats] = useState({
     items: 0, pf: 0, nms: 0, rank: 0, total: 0,
     period: "", pfPeriod: "", nmsPeriod: "",
+    finalPayment: 0, grossCost: 0, mcrPayment: 0, smkPayment: 0,
+    itemsDelta: 0, // % vs country avg for the same month
+    pfShareOfPeers: 0, // percentile 0..100 of PF vs peers
   });
   const [peerItems, setPeerItems] = useState<number[]>([]);
   const [peerPf, setPeerPf] = useState<number[]>([]);
@@ -180,6 +184,12 @@ function Dashboard() {
         if (pfRow && nmsRow) break;
       }
 
+      // Country avg items for the same period (delta)
+      const countryAvgItems = aggMap.get(statKey)?.avg_items ?? 0;
+      const itemsDelta = countryAvgItems > 0 && mineRow
+        ? Math.round(((mineRow.items_dispensed - countryAvgItems) / countryAvgItems) * 100)
+        : 0;
+
       setStats({
         items: mineRow?.items_dispensed ?? 0,
         pf: pfRow?.pharmacy_first_count ?? 0,
@@ -188,6 +198,12 @@ function Dashboard() {
         period: labelFor(statY, statM),
         pfPeriod: pfRow ? labelFor(pfRow.year, pfRow.month) : "",
         nmsPeriod: nmsRow ? labelFor(nmsRow.year, nmsRow.month) : "",
+        finalPayment: Number(mineRow?.final_payment) || 0,
+        grossCost: Number(mineRow?.gross_cost) || 0,
+        mcrPayment: Number(mineRow?.mcr_payment) || 0,
+        smkPayment: Number(mineRow?.smoking_cessation_payment) || 0,
+        itemsDelta,
+        pfShareOfPeers: 0, // computed below once peerPf is known
       });
       setPeerItems(latestSnap.map((r) => r.items_dispensed || 0));
 
@@ -325,6 +341,39 @@ function Dashboard() {
         />
       </div>
 
+      {pharmacy && (
+        <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            label={`NHS revenue · ${stats.period || "latest"}`}
+            value={money(stats.finalPayment)}
+            hint="Final payment after adjustments"
+            icon={PoundSterling}
+            accent="emerald"
+          />
+          <StatCard
+            label="Gross drug cost"
+            value={money(stats.grossCost)}
+            hint="Reimbursable spend"
+            icon={Wallet}
+            accent="indigo"
+          />
+          <StatCard
+            label="vs country avg"
+            value={`${stats.itemsDelta >= 0 ? "+" : ""}${stats.itemsDelta}%`}
+            hint={`Items vs ${pharmacy.country || "national"} mean`}
+            icon={stats.itemsDelta >= 0 ? TrendingUp : TrendingDown}
+            accent={stats.itemsDelta >= 0 ? "emerald" : "amber"}
+          />
+          <StatCard
+            label="Smoking cessation"
+            value={money(stats.smkPayment)}
+            hint={stats.mcrPayment > 0 ? `MCR ${money(stats.mcrPayment)}` : undefined}
+            icon={Cigarette}
+            accent="sky"
+          />
+        </div>
+      )}
+
       {/* Primary trend — items dispensed, with adjustable window + country comparison */}
       <div className="mt-6">
         {itemsPoints.length > 0 ? (
@@ -400,10 +449,10 @@ function Dashboard() {
       )}
 
       <div className="mt-6 grid md:grid-cols-2 gap-4">
-        {pfPoints.length >= 6 && (
+        {itemsPoints.length >= 6 && (
           <AnnotatedSparkline
-            label={pharmacy ? "Pharmacy First — 12-month arc" : "Pharmacy First — national arc"}
-            points={pfPoints.slice(-12).map((p) => ({ period: p.label, value: p.value }))}
+            label={pharmacy ? "Items dispensed — 12-month arc" : "Items dispensed — national arc"}
+            points={itemsPoints.slice(-12).map((p) => ({ period: p.label, value: p.value }))}
             caption="Peak and trough months across the trailing year."
           />
         )}
@@ -418,7 +467,7 @@ function Dashboard() {
       </div>
 
       {peerItems.length > 8 && (
-        <div className="mt-6">
+        <div className="mt-6 grid md:grid-cols-2 gap-4">
           <DistributionStrip
             label={`How ${pharmacy?.country || "the country"} dispenses — ${stats.period}`}
             values={peerItems}
@@ -426,6 +475,15 @@ function Dashboard() {
             highlightLabel={pharmacy?.name}
             caption="Each bar is a band of pharmacies grouped by monthly items dispensed."
           />
+          {peerPf.length > 8 && (
+            <DistributionStrip
+              label={`Pharmacy First spread — ${peerPfPeriod || stats.period}`}
+              values={peerPf}
+              highlightValue={pharmacy ? stats.pf : undefined}
+              highlightLabel={pharmacy?.name}
+              caption="Walk-in clinical consultations distributed across reporting peers."
+            />
+          )}
         </div>
       )}
 
