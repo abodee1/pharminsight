@@ -171,6 +171,8 @@ function GPSurgeriesPage() {
                 </TableCell>
               </TableRow>
             ) : (
+              rows.map((r) => (
+                <TableRow key={r.practice_code}>
                   <TableCell className="font-medium">
                     <Link
                       to="/gp-surgeries/$code"
@@ -190,7 +192,6 @@ function GPSurgeriesPage() {
                     </Link>
                   </TableCell>
 
-                  </TableCell>
                   <TableCell className="hidden md:table-cell font-mono text-xs">
                     {r.practice_code}
                   </TableCell>
