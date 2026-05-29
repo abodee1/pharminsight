@@ -132,10 +132,8 @@ function GPPracticePage() {
         title={prettyName}
         subtitle={subtitleParts.join(" · ")}
         showBack={false}
-
-        subtitle={[practice.postcode, practice.health_board, practice.country].filter(Boolean).join(" · ")}
-        showBack={false}
       />
+
 
 
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
