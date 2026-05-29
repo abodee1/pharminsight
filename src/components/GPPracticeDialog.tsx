@@ -64,8 +64,9 @@ export function GPPracticeDialog({ open, onOpenChange, practiceCode, fallbackNam
     items: Number(r.total_items) || 0,
   }));
 
-  const rawName = practice?.practice_name || fallbackName || "";
+  const rawName = practice?.google_name || practice?.practice_name || fallbackName || "";
   const prettyName = rawName ? rawName.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()) : "GP practice";
+  const isVerified = !!practice?.google_name && !!practice?.name_verified_at;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
