@@ -78,11 +78,40 @@ export function TrendCard({
   height?: number;
 }) {
   const sliced = points.slice(-window);
-  const latest = sliced[sliced.length - 1]?.value ?? 0;
-  const first = sliced[0]?.value ?? 0;
-  const delta = first > 0 ? Math.round(((latest - first) / first) * 100) : 0;
+
+  // Trailing zero handling — many NHS metrics (Pharmacy First, NMS, MCR)
+  // are published with a lag, so the most recent months arrive as 0 before
+  // the real figure lands. Treat trailing zeros as "not reported yet" so
+  // the headline, delta and line don't get dragged to zero.
+  let lastReportedIdx = -1;
+  for (let i = sliced.length - 1; i >= 0; i--) {
+    if ((sliced[i]?.value ?? 0) > 0) { lastReportedIdx = i; break; }
+  }
+  let firstReportedIdx = -1;
+  for (let i = 0; i < sliced.length; i++) {
+    if ((sliced[i]?.value ?? 0) > 0) { firstReportedIdx = i; break; }
+  }
+  const hasData = lastReportedIdx >= 0;
+  const latest = hasData ? sliced[lastReportedIdx].value : 0;
+  const first = firstReportedIdx >= 0 ? sliced[firstReportedIdx].value : 0;
+  const canDelta = hasData && firstReportedIdx >= 0 && lastReportedIdx > firstReportedIdx && first > 0;
+  const delta = canDelta ? Math.round(((latest - first) / first) * 100) : 0;
   const tone = delta > 0 ? "text-emerald-700" : delta < 0 ? "text-rose-700" : "text-muted-foreground";
-  const hasData = sliced.some((p) => p.value > 0);
+  const trailingLag = hasData && lastReportedIdx < sliced.length - 1;
+  const latestLabel = hasData ? sliced[lastReportedIdx].label : null;
+
+  // For the chart: convert trailing zeros to null so the line stops at the
+  // last reported month instead of crashing to the x-axis. Same for the
+  // comparison series independently.
+  let cmpLastIdx = -1;
+  for (let i = sliced.length - 1; i >= 0; i--) {
+    if ((sliced[i]?.comparison ?? 0) > 0) { cmpLastIdx = i; break; }
+  }
+  const chartData = sliced.map((p, i) => ({
+    label: p.label,
+    value: i <= lastReportedIdx ? p.value : null,
+    comparison: i <= cmpLastIdx ? p.comparison ?? null : null,
+  }));
 
   return (
     <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
@@ -96,16 +125,21 @@ export function TrendCard({
 
       <div className="flex items-baseline justify-between gap-3 mb-2">
         <p className="text-2xl font-semibold tabular-nums">{formatValue(latest)}</p>
-        {hasData && sliced.length > 1 && (
+        {canDelta && (
           <p className={`text-xs font-semibold ${tone}`}>
-            {delta >= 0 ? "+" : ""}{delta}% vs {window}M ago
+            {delta >= 0 ? "+" : ""}{delta}% over reported window
           </p>
         )}
       </div>
+      {trailingLag && latestLabel && (
+        <p className="text-[11px] text-muted-foreground -mt-1 mb-2">
+          Latest reported · {latestLabel} (later months awaiting publication)
+        </p>
+      )}
 
       <div style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={sliced} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+          <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
             <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
             <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
             <YAxis tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" width={48} />
@@ -120,13 +154,13 @@ export function TrendCard({
             <Line
               type="monotone" dataKey="value" name={primaryLabel}
               stroke="var(--cmp-1, var(--chart-1))" strokeWidth={2} dot={false}
-              isAnimationActive={false}
+              isAnimationActive={false} connectNulls={false}
             />
             {comparisonLabel && (
               <Line
                 type="monotone" dataKey="comparison" name={comparisonLabel}
                 stroke="var(--cmp-2, var(--chart-2))" strokeWidth={2} dot={false}
-                strokeDasharray="4 4" isAnimationActive={false}
+                strokeDasharray="4 4" isAnimationActive={false} connectNulls={false}
               />
             )}
           </LineChart>
@@ -136,6 +170,8 @@ export function TrendCard({
       {caption && <p className="mt-3 text-xs italic text-muted-foreground border-t border-border pt-2">{caption}</p>}
     </div>
   );
+}
+
 }
 
 /* ----------------------------------------------------------------
