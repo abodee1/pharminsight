@@ -341,6 +341,39 @@ function Dashboard() {
         />
       </div>
 
+      {pharmacy && (
+        <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            label={`NHS revenue · ${stats.period || "latest"}`}
+            value={money(stats.finalPayment)}
+            hint="Final payment after adjustments"
+            icon={PoundSterling}
+            accent="emerald"
+          />
+          <StatCard
+            label="Gross drug cost"
+            value={money(stats.grossCost)}
+            hint="Reimbursable spend"
+            icon={Wallet}
+            accent="indigo"
+          />
+          <StatCard
+            label="vs country avg"
+            value={`${stats.itemsDelta >= 0 ? "+" : ""}${stats.itemsDelta}%`}
+            hint={`Items vs ${pharmacy.country || "national"} mean`}
+            icon={stats.itemsDelta >= 0 ? TrendingUp : TrendingDown}
+            accent={stats.itemsDelta >= 0 ? "emerald" : "amber"}
+          />
+          <StatCard
+            label="Smoking cessation"
+            value={money(stats.smkPayment)}
+            hint={stats.mcrPayment > 0 ? `MCR ${money(stats.mcrPayment)}` : undefined}
+            icon={Cigarette}
+            accent="sky"
+          />
+        </div>
+      )}
+
       {/* Primary trend — items dispensed, with adjustable window + country comparison */}
       <div className="mt-6">
         {itemsPoints.length > 0 ? (
