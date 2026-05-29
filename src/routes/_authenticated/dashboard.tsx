@@ -18,6 +18,7 @@ import {
 
 import {
   Trophy, BarChart2, GitCompare, Package, Stethoscope, ClipboardCheck, Medal,
+  PoundSterling, Wallet, TrendingUp, TrendingDown, Activity, Cigarette,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
