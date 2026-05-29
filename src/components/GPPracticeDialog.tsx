@@ -72,9 +72,14 @@ export function GPPracticeDialog({ open, onOpenChange, practiceCode, fallbackNam
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
             <Stethoscope className="h-5 w-5" />
-            {prettyName}
+            <span>{prettyName}</span>
+            {isVerified && (
+              <span className="text-[10px] font-medium uppercase tracking-wide text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded px-1.5 py-0.5">
+                ✓ Verified
+              </span>
+            )}
           </DialogTitle>
           <DialogDescription>
             {practice?.postcode ? <span>{practice.postcode}</span> : fallbackAddress ? <span>{fallbackAddress}</span> : null}
