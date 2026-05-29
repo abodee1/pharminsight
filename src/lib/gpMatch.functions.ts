@@ -604,22 +604,16 @@ export const refreshVerifiedNames = createServerFn({ method: "POST" })
       apiErrors,
       nextOffset: offset + list.length,
       remaining: remaining ?? null,
-    };
-  });
-
-
-/**
- * Coverage health snapshot for the admin dashboard.
- */
 export const getGpCoverage = createServerFn({ method: "GET" })
   .handler(async () => {
     const head = { count: "exact" as const, head: true };
-    const [total, withName, withPostcode, withLat, withPlace, scotTotal, engTotal] = await Promise.all([
+    const [total, withName, withPostcode, withLat, withPlace, withVerified, scotTotal, engTotal] = await Promise.all([
       supabaseAdmin.from("gp_practices").select("practice_code", head),
       supabaseAdmin.from("gp_practices").select("practice_code", head).not("practice_name", "is", null),
       supabaseAdmin.from("gp_practices").select("practice_code", head).not("postcode", "is", null),
       supabaseAdmin.from("gp_practices").select("practice_code", head).not("lat", "is", null),
       supabaseAdmin.from("gp_practices").select("practice_code", head).not("google_place_id", "is", null),
+      supabaseAdmin.from("gp_practices").select("practice_code", head).not("google_name", "is", null),
       supabaseAdmin.from("gp_practices").select("practice_code", head).eq("country", "Scotland"),
       supabaseAdmin.from("gp_practices").select("practice_code", head).eq("country", "England"),
     ]);
@@ -630,10 +624,11 @@ export const getGpCoverage = createServerFn({ method: "GET" })
 
     // Health score = weighted blend of the things matching depends on.
     const score = Math.round(
-      n(withName) / t * 20 +
-      n(withPostcode) / t * 20 +
-      n(withLat) / t * 30 +
-      n(withPlace) / t * 30,
+      n(withName) / t * 15 +
+      n(withPostcode) / t * 15 +
+      n(withLat) / t * 25 +
+      n(withPlace) / t * 20 +
+      n(withVerified) / t * 25,
     );
 
     return {
@@ -642,12 +637,18 @@ export const getGpCoverage = createServerFn({ method: "GET" })
       withPostcode: n(withPostcode),
       withLat: n(withLat),
       withPlace: n(withPlace),
+      withVerified: n(withVerified),
       scotland: n(scotTotal),
       england: n(engTotal),
       pctName: pct(n(withName)),
       pctPostcode: pct(n(withPostcode)),
       pctLat: pct(n(withLat)),
       pctPlace: pct(n(withPlace)),
+      pctVerified: pct(n(withVerified)),
+      healthScore: Math.min(100, Math.max(0, score)),
+    };
+  });
+
       healthScore: Math.min(100, Math.max(0, score)),
     };
   });
