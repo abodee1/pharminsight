@@ -52,7 +52,7 @@ function Dashboard() {
   const [stats, setStats] = useState({
     items: 0, pf: 0, nms: 0, rank: 0, total: 0,
     period: "", pfPeriod: "", nmsPeriod: "",
-    finalPayment: 0, grossCost: 0, mcrPayment: 0, smkPayment: 0,
+    finalPayment: 0, grossCost: 0, mcrPayment: 0, smkPayment: 0, payPeriod: "",
     itemsDelta: 0, // % vs country avg for the same month
     pfShareOfPeers: 0, // percentile 0..100 of PF vs peers
   });
