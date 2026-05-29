@@ -171,8 +171,6 @@ function GPSurgeriesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((r) => (
-                <TableRow key={r.practice_code}>
                   <TableCell className="font-medium">
                     <Link
                       to="/gp-surgeries/$code"
@@ -180,8 +178,18 @@ function GPSurgeriesPage() {
                       className="inline-flex items-center gap-2 hover:underline"
                     >
                       <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
-                      {r.practice_name || "—"}
+                      <span>{r.google_name || r.practice_name || "—"}</span>
+                      {r.name_verified_at && (
+                        <span
+                          title="Verified against Google Maps"
+                          className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-700 bg-emerald-100 border border-emerald-200 rounded px-1.5 py-0.5"
+                        >
+                          ✓ Verified
+                        </span>
+                      )}
                     </Link>
+                  </TableCell>
+
                   </TableCell>
                   <TableCell className="hidden md:table-cell font-mono text-xs">
                     {r.practice_code}
