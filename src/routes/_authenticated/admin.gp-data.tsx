@@ -133,6 +133,28 @@ function GpDataAdmin() {
     }
   };
 
+  const triggerVerify = async () => {
+    setVerifying(true);
+    toast.info("Refreshing Google-verified names for already-matched practices…");
+    try {
+      let offset = 0;
+      let totalRefreshed = 0;
+      let totalScanned = 0;
+      for (let i = 0; i < 5; i++) {
+        const r = await runVerify({ data: { limit: 100, offset } });
+        totalRefreshed += r.refreshed;
+        totalScanned += r.scanned;
+        offset = r.nextOffset;
+        if (r.scanned < 100) break;
+      }
+      toast.success(`Verified names: refreshed ${totalRefreshed} of ${totalScanned} scanned`);
+      loadCoverage();
+    } catch (e: any) {
+      toast.error(`Verify failed: ${e?.message || e}`);
+    } finally {
+      setVerifying(false);
+    }
+  };
 
 
   const refresh = async () => {
