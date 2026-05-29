@@ -604,6 +604,12 @@ export const refreshVerifiedNames = createServerFn({ method: "POST" })
       apiErrors,
       nextOffset: offset + list.length,
       remaining: remaining ?? null,
+    };
+  });
+
+/**
+ * Coverage health snapshot for the admin dashboard.
+ */
 export const getGpCoverage = createServerFn({ method: "GET" })
   .handler(async () => {
     const head = { count: "exact" as const, head: true };
@@ -622,7 +628,6 @@ export const getGpCoverage = createServerFn({ method: "GET" })
     const t = n(total) || 1;
     const pct = (x: number) => Math.round((x / t) * 1000) / 10;
 
-    // Health score = weighted blend of the things matching depends on.
     const score = Math.round(
       n(withName) / t * 15 +
       n(withPostcode) / t * 15 +
@@ -645,10 +650,6 @@ export const getGpCoverage = createServerFn({ method: "GET" })
       pctLat: pct(n(withLat)),
       pctPlace: pct(n(withPlace)),
       pctVerified: pct(n(withVerified)),
-      healthScore: Math.min(100, Math.max(0, score)),
-    };
-  });
-
       healthScore: Math.min(100, Math.max(0, score)),
     };
   });
