@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      _pharmacy_geo_backfill: {
+        Row: {
+          id: string
+          lat: number
+          lng: number
+        }
+        Insert: {
+          id: string
+          lat: number
+          lng: number
+        }
+        Update: {
+          id?: string
+          lat?: number
+          lng?: number
+        }
+        Relationships: []
+      }
       ai_insights: {
         Row: {
           generated_at: string
