@@ -878,6 +878,21 @@ export type Database = {
       public_landing_data: { Args: never; Returns: Json }
       public_landing_data_compute: { Args: never; Returns: Json }
       refresh_landing_cache: { Args: never; Returns: undefined }
+      search_pharmacies_fuzzy: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          address: string
+          country: string
+          id: string
+          name: string
+          ods_code: string
+          postcode: string
+          region: string
+          score: number
+        }[]
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       [_ in never]: never

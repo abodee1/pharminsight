@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
-import { Search, Loader2, Globe } from "lucide-react";
+import { Search, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { searchPlacesText, type PlaceResult } from "@/lib/places.functions";
 import { CountryBadge } from "./CountryBadge";
+
 
 export type Pharmacy = {
   id: string;
@@ -42,15 +41,13 @@ export function PharmacySearch({
 }: Props) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Pharmacy[]>([]);
-  const [googleResults, setGoogleResults] = useState<PlaceResult[]>([]);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [googleLinking, setGoogleLinking] = useState<string | null>(null);
+  const [fuzzyResults, setFuzzyResults] = useState<Pharmacy[]>([]);
+  const [fuzzyLoading, setFuzzyLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
-  const searchPlaces = useServerFn(searchPlacesText);
   const excludeSet = new Set(excludeIds ?? []);
 
   // close on outside click / escape
@@ -78,9 +75,9 @@ export function PharmacySearch({
     const term = q.trim();
     if (term.length < 2) {
       setResults([]);
-      setGoogleResults([]);
+      setFuzzyResults([]);
       setLoading(false);
-      setGoogleLoading(false);
+      setFuzzyLoading(false);
       return;
     }
     setLoading(true);
@@ -92,52 +89,27 @@ export function PharmacySearch({
     return () => clearTimeout(t);
   }, [q]);
 
-  const runGoogleSearch = async () => {
+  const runFuzzySearch = async () => {
     const term = q.trim();
     if (term.length < 2) return;
-    setGoogleLoading(true);
-    setGoogleResults([]);
+    setFuzzyLoading(true);
+    setFuzzyResults([]);
     try {
-      const r = await searchPlaces({ data: { query: term } });
-      setGoogleResults(r.results);
-      if (r.results.length === 0) toast.info("No matches on Google.");
+      const { data, error } = await supabase.rpc("search_pharmacies_fuzzy", {
+        p_query: term,
+        p_limit: 10,
+      });
+      if (error) throw error;
+      const existing = new Set(results.map((r) => r.id));
+      const extras = ((data || []) as Pharmacy[]).filter((r) => !existing.has(r.id));
+      setFuzzyResults(extras);
+      if (extras.length === 0) toast.info("No close matches found.");
     } catch (e: any) {
-      toast.error(e?.message || "Google search failed.");
+      toast.error(e?.message || "Fuzzy search failed.");
     } finally {
-      setGoogleLoading(false);
+      setFuzzyLoading(false);
     }
   };
-
-  const handleGoogleSelect = async (p: PlaceResult) => {
-    if (!p.postcode) {
-      toast.error("No postcode in Google result — can't link to a pharmacy record.");
-      return;
-    }
-    setGoogleLinking(p.id);
-    try {
-      const compact = p.postcode.replace(/\s+/g, "");
-      const { data } = await supabase
-        .from("pharmacies")
-        .select("id,ods_code,name,address,postcode,country,region")
-        .or(`postcode.ilike.${p.postcode},postcode.ilike.${compact}`)
-        .limit(20);
-      const rows = (data || []) as Pharmacy[];
-      // Prefer best name match
-      const lname = p.name.toLowerCase();
-      const best =
-        rows.find((r) => r.name.toLowerCase() === lname) ||
-        rows.find((r) => lname.includes(r.name.toLowerCase().split(" ")[0])) ||
-        rows[0];
-      if (!best) {
-        toast.error(`"${p.name}" isn't in our dataset yet.`);
-        return;
-      }
-      handleSelect(best);
-    } finally {
-      setGoogleLinking(null);
-    }
-  };
-
 
   const handleSelect = (p: Pharmacy) => {
     if (onSelect) {
@@ -149,7 +121,7 @@ export function PharmacySearch({
       setOpen(false);
       setQ("");
       setResults([]);
-      setGoogleResults([]);
+      setFuzzyResults([]);
     } else {
       inputRef.current?.focus();
     }
@@ -219,51 +191,57 @@ export function PharmacySearch({
             );
           })}
 
-          {/* Google Places fallback */}
+          {/* Fuzzy match fallback */}
           <div className="border-t border-border bg-secondary/30">
-            {googleResults.length === 0 ? (
+            {fuzzyResults.length === 0 ? (
               <button
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={runGoogleSearch}
-                disabled={googleLoading}
+                onClick={runFuzzySearch}
+                disabled={fuzzyLoading}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
-                {googleLoading ? (
+                {fuzzyLoading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Globe className="h-3.5 w-3.5" />
+                  <Sparkles className="h-3.5 w-3.5" />
                 )}
-                {googleLoading ? "Searching Google…" : `Can't find it? Search Google for "${q.trim()}"`}
+                {fuzzyLoading ? "Searching…" : `Can't find it? Try a fuzzy match for "${q.trim()}"`}
               </button>
             ) : (
               <>
                 <p className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                  <Globe className="h-3 w-3" /> From Google
+                  <Sparkles className="h-3 w-3" /> Fuzzy matches
                 </p>
-                {googleResults.map((g) => (
-                  <button
-                    key={g.id}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => handleGoogleSelect(g)}
-                    disabled={googleLinking === g.id}
-                    className="w-full text-left flex items-center gap-3 px-3 py-2.5 border-t border-border/30 hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm truncate">{g.name}</p>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">{g.address}</p>
-                    </div>
-                    {googleLinking === g.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-                    ) : (
-                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground shrink-0">
-                        {g.postcode || "—"}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                {fuzzyResults.map((p) => {
+                  const already = excludeSet.has(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => !already && handleSelect(p)}
+                      disabled={already}
+                      className={[
+                        "w-full text-left flex items-center gap-3 px-3 py-2.5 border-t border-border/30",
+                        already ? "opacity-50 cursor-not-allowed" : "hover:bg-accent hover:text-accent-foreground",
+                      ].join(" ")}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-sm truncate">{p.name}</p>
+                          <CountryBadge country={p.country} />
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          {[p.address, p.postcode, p.region].filter(Boolean).join(" · ")}
+                        </p>
+                      </div>
+                      <span className="text-xs font-mono text-muted-foreground shrink-0">{p.ods_code}</span>
+                    </button>
+                  );
+                })}
               </>
             )}
           </div>
+
         </div>
       )}
     </div>
