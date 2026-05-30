@@ -625,6 +625,8 @@ export type Database = {
           country: string | null
           created_at: string
           id: string
+          lat: number | null
+          lng: number | null
           name: string
           ods_code: string
           postcode: string | null
@@ -636,6 +638,8 @@ export type Database = {
           country?: string | null
           created_at?: string
           id?: string
+          lat?: number | null
+          lng?: number | null
           name: string
           ods_code: string
           postcode?: string | null
@@ -647,6 +651,8 @@ export type Database = {
           country?: string | null
           created_at?: string
           id?: string
+          lat?: number | null
+          lng?: number | null
           name?: string
           ods_code?: string
           postcode?: string | null
@@ -875,6 +881,26 @@ export type Database = {
         }[]
       }
       gp_prescribing_add: { Args: { rows: Json }; Returns: number }
+      pharmacies_near: {
+        Args: {
+          p_lat: number
+          p_limit?: number
+          p_lng: number
+          p_radius_m?: number
+        }
+        Returns: {
+          address: string
+          country: string
+          distance_m: number
+          id: string
+          lat: number
+          lng: number
+          name: string
+          ods_code: string
+          postcode: string
+          region: string
+        }[]
+      }
       public_landing_data: { Args: never; Returns: Json }
       public_landing_data_compute: { Args: never; Returns: Json }
       refresh_landing_cache: { Args: never; Returns: undefined }
