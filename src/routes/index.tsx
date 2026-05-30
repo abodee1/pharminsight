@@ -525,7 +525,7 @@ function SiteFooter() {
       </div>
       <div className="border-t border-border">
         <div className="mx-auto max-w-7xl px-6 py-4 text-xs text-muted-foreground flex flex-col md:flex-row justify-between gap-2">
-          <span>© {new Date().getFullYear()} Pharmacy8</span>
+          <span>© {new Date().getFullYear()} PharmInsight</span>
           <span>Data updated monthly from official NHS releases.</span>
         </div>
       </div>
