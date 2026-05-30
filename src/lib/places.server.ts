@@ -177,9 +177,43 @@ export async function placesNearby(
 }
 
 export async function geocodeOne(name: string, postcode?: string | null, address?: string | null) {
+  // Prefer postcodes.io for UK postcodes — free, no key, no rate limit, and
+  // reliable from edge runtimes (Nominatim often blocks Cloudflare Worker
+  // requests, which is what was breaking the pharmacy location lookup).
+  const pc = (postcode || "").trim();
+  if (pc) {
+    try {
+      const r = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(pc)}`, {
+        headers: { "User-Agent": UA },
+      });
+      if (r.ok) {
+        const j = (await r.json()) as {
+          result?: { latitude: number; longitude: number; postcode: string };
+        };
+        if (j.result && j.result.latitude != null && j.result.longitude != null) {
+          return {
+            id: `pc:${j.result.postcode.replace(/\s+/g, "")}`,
+            name,
+            address: address || "",
+            postcode: j.result.postcode.toUpperCase(),
+            lat: j.result.latitude,
+            lng: j.result.longitude,
+            rating: null,
+            userRatingCount: null,
+          } satisfies PlaceResult;
+        }
+      }
+    } catch {
+      // Fall through to Nominatim below.
+    }
+  }
   const q = [name, postcode, address].filter(Boolean).join(", ");
-  const list = await placesTextSearch(q, { max: 1 });
-  return list[0] || null;
+  try {
+    const list = await placesTextSearch(q, { max: 1 });
+    return list[0] || null;
+  } catch {
+    return null;
+  }
 }
 
 // Kept for source-compat with any caller that imported it.
