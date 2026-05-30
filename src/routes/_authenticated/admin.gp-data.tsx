@@ -4,14 +4,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { backfillGpGeocodes, refreshScotlandGpContacts, refreshEnglandGpContacts, sweepUnmatchedPractices, refreshVerifiedNames, getGpCoverage } from "@/lib/gpMatch.functions";
-
-
+import { backfillGpGeocodes, refreshScotlandGpContacts, refreshEnglandGpContacts, getGpCoverage } from "@/lib/gpMatch.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/gp-data")({
   component: GpDataAdmin,
 });
-
 
 type Row = { source: string; dataset: string; year: number | null; month: number | null; status: string };
 
@@ -46,7 +43,6 @@ function CoverageStat({ label, pct, sub }: { label: string; pct: number; sub: st
   );
 }
 
-
 function GpDataAdmin() {
   const [logs, setLogs] = useState<Row[]>([]);
   const [queue, setQueue] = useState<Row[]>([]);
@@ -54,45 +50,15 @@ function GpDataAdmin() {
   const [geocoding, setGeocoding] = useState(false);
   const [refreshingScot, setRefreshingScot] = useState(false);
   const [refreshingEng, setRefreshingEng] = useState(false);
-  const [sweeping, setSweeping] = useState(false);
-  const [verifying, setVerifying] = useState(false);
   const [coverage, setCoverage] = useState<Awaited<ReturnType<typeof getGpCoverage>> | null>(null);
   const runBackfill = useServerFn(backfillGpGeocodes);
   const runScot = useServerFn(refreshScotlandGpContacts);
   const runEng = useServerFn(refreshEnglandGpContacts);
-  const runSweep = useServerFn(sweepUnmatchedPractices);
-  const runVerify = useServerFn(refreshVerifiedNames);
   const runCoverage = useServerFn(getGpCoverage);
-
 
   const loadCoverage = async () => {
     try { setCoverage(await runCoverage()); } catch { /* ignore */ }
   };
-
-  const triggerSweep = async () => {
-    setSweeping(true);
-    toast.info("Sweeping unmatched practices via Google Places…");
-    try {
-      let offset = 0;
-      let totalMatched = 0;
-      let totalScanned = 0;
-      // Run a few batches per click so admin sees real progress without blocking long.
-      for (let i = 0; i < 5; i++) {
-        const r = await runSweep({ data: { limit: 100, offset, radiusM: 300 } });
-        totalMatched += r.matched;
-        totalScanned += r.scanned;
-        offset = r.nextOffset;
-        if (r.scanned < 100) break;
-      }
-      toast.success(`Swept ${totalScanned} · matched ${totalMatched}`);
-      loadCoverage();
-    } catch (e: any) {
-      toast.error(`Sweep failed: ${e?.message || e}`);
-    } finally {
-      setSweeping(false);
-    }
-  };
-
 
   const triggerBackfill = async () => {
     setGeocoding(true);
@@ -100,6 +66,7 @@ function GpDataAdmin() {
     try {
       const r = await runBackfill({ data: { limit: 5000 } });
       toast.success(`Geocoded ${r.updated} (missed ${r.missed}). Remaining: ${r.remaining ?? "?"}`);
+      loadCoverage();
     } catch (e: any) {
       toast.error(`Geocode failed: ${e?.message || e}`);
     } finally {
@@ -133,30 +100,6 @@ function GpDataAdmin() {
     }
   };
 
-  const triggerVerify = async () => {
-    setVerifying(true);
-    toast.info("Refreshing Google-verified names for already-matched practices…");
-    try {
-      let offset = 0;
-      let totalRefreshed = 0;
-      let totalScanned = 0;
-      for (let i = 0; i < 5; i++) {
-        const r = await runVerify({ data: { limit: 100, offset } });
-        totalRefreshed += r.refreshed;
-        totalScanned += r.scanned;
-        offset = r.nextOffset;
-        if (r.scanned < 100) break;
-      }
-      toast.success(`Verified names: refreshed ${totalRefreshed} of ${totalScanned} scanned`);
-      loadCoverage();
-    } catch (e: any) {
-      toast.error(`Verify failed: ${e?.message || e}`);
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-
   const refresh = async () => {
     setLoading(true);
     const [l, q] = await Promise.all([
@@ -169,9 +112,7 @@ function GpDataAdmin() {
   };
   useEffect(() => { refresh(); loadCoverage(); }, []);
 
-
   const statusFor = (source: string, y: number, m: number): "success" | "failed" | "pending" | "absent" => {
-    // Quarterly series only meaningful at quarter months 1,4,7,10
     const ok = logs.find((r) => r.source === source && r.year === y && r.month === m && r.status === "success");
     if (ok) return "success";
     const fail = logs.find((r) => r.source === source && r.year === y && r.month === m && r.status === "failed");
@@ -207,16 +148,9 @@ function GpDataAdmin() {
           <Button variant="outline" size="sm" onClick={triggerBackfill} disabled={geocoding}>
             {geocoding ? "Geocoding…" : "Geocode practices"}
           </Button>
-          <Button variant="outline" size="sm" onClick={triggerSweep} disabled={sweeping}>
-            {sweeping ? "Sweeping…" : "Sweep → Google Places"}
-          </Button>
-          <Button variant="outline" size="sm" onClick={triggerVerify} disabled={verifying}>
-            {verifying ? "Verifying…" : "Refresh verified names"}
-          </Button>
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
             {loading ? "Loading…" : "Refresh"}
           </Button>
-
         </div>
       </div>
 
@@ -235,12 +169,10 @@ function GpDataAdmin() {
               style={{ width: `${coverage.healthScore}%` }}
             />
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+          <div className="grid grid-cols-3 gap-2 text-xs">
             <CoverageStat label="Has name" pct={coverage.pctName} sub={`${coverage.withName.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
             <CoverageStat label="Has postcode" pct={coverage.pctPostcode} sub={`${coverage.withPostcode.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
             <CoverageStat label="Geocoded" pct={coverage.pctLat} sub={`${coverage.withLat.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
-            <CoverageStat label="Matched to a Place" pct={coverage.pctPlace} sub={`${coverage.withPlace.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
-            <CoverageStat label="Google-verified name" pct={coverage.pctVerified} sub={`${coverage.withVerified.toLocaleString()} / ${coverage.total.toLocaleString()}`} />
           </div>
 
           <p className="text-xs text-muted-foreground">
@@ -248,8 +180,6 @@ function GpDataAdmin() {
           </p>
         </div>
       )}
-
-
 
       <p className="text-sm text-muted-foreground">
         Green = ingested · Red = failed · Amber = pending · Grey = not yet ingested. Click a grey cell to trigger that series.
@@ -296,4 +226,3 @@ function GpDataAdmin() {
     </div>
   );
 }
-
