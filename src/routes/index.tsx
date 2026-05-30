@@ -14,13 +14,13 @@ export const Route = createFileRoute("/")({
   component: Landing,
   head: () => ({
     meta: [
-      { title: "Pharmacy8 — Live UK pharmacy league tables & NHS analytics" },
+      { title: "PharmInsight — Live UK pharmacy league tables & NHS analytics" },
       {
         name: "description",
         content:
           "Live monthly leaderboards for every NHS pharmacy in England, Scotland, Wales and Northern Ireland. Items dispensed, Pharmacy First, NMS, EPS — plus benchmarking, financials and Companies House intelligence.",
       },
-      { property: "og:title", content: "Pharmacy8 — Live UK pharmacy league tables & NHS analytics" },
+      { property: "og:title", content: "PharmInsight — Live UK pharmacy league tables & NHS analytics" },
       { property: "og:description", content: "The free, faster, smarter alternative to pharmdata — live UK-wide pharmacy dispensing data with benchmarking and Companies House intelligence." },
       { property: "og:url", content: "https://pharmacy8.com/" },
       { property: "og:type", content: "website" },
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/")({
       children: JSON.stringify({
         "@context": "https://schema.org",
         "@type": "WebSite",
-        name: "Pharmacy8",
+        name: "PharmInsight",
         url: "https://pharmacy8.com/",
         description: "Live UK pharmacy dispensing leaderboards and NHS analytics.",
       }),
@@ -109,7 +109,7 @@ function SiteHeader() {
           <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <Pill className="h-4 w-4" />
           </span>
-          <span className="text-lg font-bold tracking-tight text-foreground">Pharmacy8</span>
+          <span className="text-lg font-bold tracking-tight text-foreground">PharmInsight</span>
         </Link>
         <div className="flex items-center gap-2">
           {loading ? null : user ? (
@@ -392,10 +392,10 @@ function CompareCta() {
         <div className="rounded-xl border border-border bg-gradient-to-br from-primary to-primary/80 text-primary-foreground p-8 md:p-10 shadow-lg">
           <div className="grid md:grid-cols-2 gap-6 items-center">
             <div>
-              <span className="inline-block text-xs uppercase tracking-widest text-gold font-semibold">Why Pharmacy8 beats pharmdata</span>
+              <span className="inline-block text-xs uppercase tracking-widest text-gold font-semibold">Why PharmInsight beats pharmdata</span>
               <h2 className="mt-2 text-2xl md:text-3xl font-bold">Live leaderboards, free benchmarking, AI analysis, Companies House data — in one place.</h2>
               <p className="mt-3 text-sm md:text-base text-primary-foreground/80 max-w-xl">
-                Pharmdata is read-only. Pharmacy8 lets you sign in, claim your pharmacy, benchmark against the local average and top 10%, see GP catchment, run AI analysis, and pull Companies House financials — all included.
+                Pharmdata is read-only. PharmInsight lets you sign in, claim your pharmacy, benchmark against the local average and top 10%, see GP catchment, run AI analysis, and pull Companies House financials — all included.
               </p>
               <div className="mt-5 flex flex-wrap gap-3">
                 <Link to="/register" className="rounded-md bg-gold text-gold-foreground px-5 py-2.5 text-sm font-semibold hover:opacity-90">
@@ -502,7 +502,7 @@ function SiteFooter() {
             <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <Pill className="h-3.5 w-3.5" />
             </span>
-            <span className="font-bold">Pharmacy8</span>
+            <span className="font-bold">PharmInsight</span>
           </div>
           <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
             Live UK pharmacy analytics, built on open NHS data. The smarter alternative to pharmdata.
@@ -525,7 +525,7 @@ function SiteFooter() {
       </div>
       <div className="border-t border-border">
         <div className="mx-auto max-w-7xl px-6 py-4 text-xs text-muted-foreground flex flex-col md:flex-row justify-between gap-2">
-          <span>© {new Date().getFullYear()} Pharmacy8</span>
+          <span>© {new Date().getFullYear()} PharmInsight</span>
           <span>Data updated monthly from official NHS releases.</span>
         </div>
       </div>

@@ -13,7 +13,11 @@ import {
   ShareDonut,
   TrendCard,
   GpPrescribingCard,
+  MetricSpotlight,
+  ServiceIntensityCard,
   type PeriodWindow,
+  type SpotlightMetric,
+  type IntensityRate,
 } from "@/components/Infographics";
 
 import {
@@ -58,7 +62,11 @@ function Dashboard() {
   });
   const [peerItems, setPeerItems] = useState<number[]>([]);
   const [peerPf, setPeerPf] = useState<number[]>([]);
+  const [peerNms, setPeerNms] = useState<number[]>([]);
+  const [peerFinalPay, setPeerFinalPay] = useState<number[]>([]);
+  const [peerGrossCost, setPeerGrossCost] = useState<number[]>([]);
   const [peerPfPeriod, setPeerPfPeriod] = useState<string>("");
+  const [intensityRates, setIntensityRates] = useState<IntensityRate[]>([]);
   const [revenueMix, setRevenueMix] = useState<{ label: string; value: number }[]>([]);
 
   useEffect(() => {
@@ -208,6 +216,54 @@ function Dashboard() {
         pfShareOfPeers: 0, // computed below once peerPf is known
       });
       setPeerItems(latestSnap.map((r) => r.items_dispensed || 0));
+      setPeerNms(latestSnap.map((r) => r.nms_count || 0));
+      setPeerFinalPay(latestSnap.map((r) => Number(r.final_payment) || 0));
+      setPeerGrossCost(latestSnap.map((r) => Number(r.gross_cost) || 0));
+
+      // Service intensity — per 1,000 items rates for this pharmacy vs cohort
+      const itemsArr = latestSnap.map((r) => r.items_dispensed || 0);
+      const pfArr = latestSnap.map((r) => r.pharmacy_first_count || 0);
+      const nmsArr = latestSnap.map((r) => r.nms_count || 0);
+      const epsArr = latestSnap.map((r) => (r as Row & { eps_items?: number }).eps_items || 0);
+      const rateArr = (num: number[], den: number[]) =>
+        num.map((v, i) => (den[i] > 0 ? (v / den[i]) * 1000 : 0)).filter((v) => v > 0);
+      const meanOf = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+      const topQuartileOf = (a: number[]) => {
+        if (!a.length) return 0;
+        const sorted = [...a].sort((x, y) => x - y);
+        return sorted[Math.floor(sorted.length * 0.75)] || 0;
+      };
+      const myItems = mineRow?.items_dispensed || 0;
+      const myPfCount = pfRow?.pharmacy_first_count || 0;
+      const myPfItems = pfRow ? (myMap.get(pfRow.year * 12 + (pfRow.month - 1))?.items_dispensed || myItems) : myItems;
+      const myNmsItems = nmsRow ? (myMap.get(nmsRow.year * 12 + (nmsRow.month - 1))?.items_dispensed || myItems) : myItems;
+      const myEpsItems = (mineRow as (Row & { eps_items?: number }) | undefined)?.eps_items || 0;
+      const pfRates = rateArr(pfArr, itemsArr);
+      const nmsRates = rateArr(nmsArr, itemsArr);
+      const epsRates = rateArr(epsArr, itemsArr);
+      setIntensityRates([
+        {
+          key: "pf",
+          label: "Pharmacy First",
+          yourRate: myPfItems > 0 ? (myPfCount / myPfItems) * 1000 : 0,
+          peerRate: meanOf(pfRates),
+          topRate: topQuartileOf(pfRates),
+        },
+        {
+          key: "nms",
+          label: "NMS",
+          yourRate: myNmsItems > 0 ? ((nmsRow?.nms_count || 0) / myNmsItems) * 1000 : 0,
+          peerRate: meanOf(nmsRates),
+          topRate: topQuartileOf(nmsRates),
+        },
+        {
+          key: "eps",
+          label: "EPS items",
+          yourRate: myItems > 0 ? (myEpsItems / myItems) * 1000 : 0,
+          peerRate: meanOf(epsRates),
+          topRate: topQuartileOf(epsRates),
+        },
+      ]);
 
       const pfY = pfRow?.year ?? statY; const pfM = pfRow?.month ?? statM;
       if (pfY === statY && pfM === statM) {
@@ -468,24 +524,75 @@ function Dashboard() {
         )}
       </div>
 
-      {peerItems.length > 8 && (
-        <div className="mt-6 grid md:grid-cols-2 gap-4">
+      {pharmacy && peerItems.length > 8 && (
+        <div className="mt-6">
+          <MetricSpotlight
+            title="Cohort spotlight — pick a metric"
+            highlightLabel={pharmacy.name}
+            peerLabel={`${pharmacy.country || "Country"} avg`}
+            caption="Switch metrics to see where you sit across reporting peers for the latest published period."
+            metrics={(() => {
+              const arr: SpotlightMetric[] = [
+                {
+                  key: "items",
+                  label: "Items",
+                  values: peerItems,
+                  yourValue: stats.items,
+                  period: stats.period,
+                },
+                {
+                  key: "pf",
+                  label: "Pharmacy First",
+                  values: peerPf,
+                  yourValue: stats.pf,
+                  period: peerPfPeriod || stats.period,
+                },
+                {
+                  key: "nms",
+                  label: "NMS",
+                  values: peerNms,
+                  yourValue: stats.nms,
+                  period: stats.nmsPeriod || stats.period,
+                },
+                {
+                  key: "final",
+                  label: "NHS revenue",
+                  values: peerFinalPay,
+                  yourValue: stats.finalPayment,
+                  period: stats.payPeriod || stats.period,
+                  format: money,
+                },
+                {
+                  key: "gross",
+                  label: "Gross cost",
+                  values: peerGrossCost,
+                  yourValue: stats.grossCost,
+                  period: stats.payPeriod || stats.period,
+                  format: money,
+                },
+              ];
+              return arr;
+            })()}
+          />
+        </div>
+      )}
+
+      {pharmacy && intensityRates.some((r) => r.topRate > 0) && (
+        <div className="mt-6">
+          <ServiceIntensityCard
+            rates={intensityRates}
+            caption="Toggle between Pharmacy First, NMS and EPS to see your normalised service take-up."
+          />
+        </div>
+      )}
+
+      {!pharmacy && peerItems.length > 8 && (
+        <div className="mt-6">
           <DistributionStrip
-            label={`How ${pharmacy?.country || "the country"} dispenses — ${stats.period}`}
+            label={`How the country dispenses — ${stats.period}`}
             values={peerItems}
-            highlightValue={pharmacy ? stats.items : undefined}
-            highlightLabel={pharmacy?.name}
             caption="Each bar is a band of pharmacies grouped by monthly items dispensed."
           />
-          {peerPf.length > 8 && (
-            <DistributionStrip
-              label={`Pharmacy First spread — ${peerPfPeriod || stats.period}`}
-              values={peerPf}
-              highlightValue={pharmacy ? stats.pf : undefined}
-              highlightLabel={pharmacy?.name}
-              caption="Walk-in clinical consultations distributed across reporting peers."
-            />
-          )}
         </div>
       )}
 
