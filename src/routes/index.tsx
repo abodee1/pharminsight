@@ -392,10 +392,10 @@ function CompareCta() {
         <div className="rounded-xl border border-border bg-gradient-to-br from-primary to-primary/80 text-primary-foreground p-8 md:p-10 shadow-lg">
           <div className="grid md:grid-cols-2 gap-6 items-center">
             <div>
-              <span className="inline-block text-xs uppercase tracking-widest text-gold font-semibold">Why Pharmacy8 beats pharmdata</span>
+              <span className="inline-block text-xs uppercase tracking-widest text-gold font-semibold">Why PharmInsight beats pharmdata</span>
               <h2 className="mt-2 text-2xl md:text-3xl font-bold">Live leaderboards, free benchmarking, AI analysis, Companies House data — in one place.</h2>
               <p className="mt-3 text-sm md:text-base text-primary-foreground/80 max-w-xl">
-                Pharmdata is read-only. Pharmacy8 lets you sign in, claim your pharmacy, benchmark against the local average and top 10%, see GP catchment, run AI analysis, and pull Companies House financials — all included.
+                Pharmdata is read-only. PharmInsight lets you sign in, claim your pharmacy, benchmark against the local average and top 10%, see GP catchment, run AI analysis, and pull Companies House financials — all included.
               </p>
               <div className="mt-5 flex flex-wrap gap-3">
                 <Link to="/register" className="rounded-md bg-gold text-gold-foreground px-5 py-2.5 text-sm font-semibold hover:opacity-90">
