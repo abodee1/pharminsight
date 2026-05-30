@@ -502,7 +502,7 @@ function SiteFooter() {
             <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <Pill className="h-3.5 w-3.5" />
             </span>
-            <span className="font-bold">Pharmacy8</span>
+            <span className="font-bold">PharmInsight</span>
           </div>
           <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
             Live UK pharmacy analytics, built on open NHS data. The smarter alternative to pharmdata.
