@@ -193,7 +193,7 @@ export function GpPrescribingCard({
   const [rows, setRows] = useState<
     { year: number; month: number; items: number; gp_count: number }[]
   >([]);
-  const [topGps, setTopGps] = useState<{ code: string; items: number }[]>([]);
+  const [topGps, setTopGps] = useState<{ code: string; name: string | null; items: number }[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -225,12 +225,28 @@ export function GpPrescribingCard({
       const sorted = [...byMonth.values()]
         .sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month))
         .map((v) => ({ year: v.year, month: v.month, items: v.items, gp_count: v.gps.size }));
-      const top = [...byGp.entries()]
+      const topCodes = [...byGp.entries()]
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([code, items]) => ({ code, items }));
+        .slice(0, 5);
+
+      // Resolve human-readable GP practice names. Only surface the list if
+      // we can name at least one practice — anonymous codes aren't useful.
+      let nameMap = new Map<string, string>();
+      if (topCodes.length) {
+        const { data: names } = await supabase
+          .from("gp_practices")
+          .select("practice_code,practice_name")
+          .in("practice_code", topCodes.map(([c]) => c));
+        (names || []).forEach((n: { practice_code: string; practice_name: string | null }) => {
+          if (n.practice_name) nameMap.set(n.practice_code, n.practice_name);
+        });
+      }
+      const named = topCodes
+        .filter(([code]) => nameMap.has(code))
+        .map(([code, items]) => ({ code, name: nameMap.get(code) || null, items }));
+
       setRows(sorted);
-      setTopGps(top);
+      setTopGps(named);
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -276,9 +292,12 @@ export function GpPrescribingCard({
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Top GP feeders (all-time)</p>
           <ul className="space-y-1.5 text-xs">
             {topGps.map((g) => (
-              <li key={g.code} className="flex items-center justify-between gap-2 border-b border-border last:border-b-0 pb-1.5 last:pb-0">
-                <span className="font-mono">{g.code}</span>
-                <span className="tabular-nums">{g.items.toLocaleString()} items</span>
+              <li key={g.code} className="flex items-center justify-between gap-3 border-b border-border last:border-b-0 pb-1.5 last:pb-0">
+                <span className="min-w-0 truncate">
+                  <span className="font-semibold">{g.name}</span>
+                  <span className="text-muted-foreground font-mono ml-2">{g.code}</span>
+                </span>
+                <span className="tabular-nums shrink-0">{g.items.toLocaleString()} items</span>
               </li>
             ))}
           </ul>
