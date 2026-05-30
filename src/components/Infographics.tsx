@@ -707,3 +707,191 @@ export function ShareDonut({
     </div>
   );
 }
+
+
+/* ----------------------------------------------------------------
+ * MetricSpotlight
+ * Customisable per-metric cohort lens. Users pick a metric from the
+ * toggle pills and see their percentile rail + peer distribution for
+ * the same reporting period, side by side. Replaces a fixed PF-only
+ * spread chart with a single configurable surface.
+ * ---------------------------------------------------------------- */
+export type SpotlightMetric = {
+  key: string;
+  label: string;
+  values: number[];
+  yourValue: number;
+  format?: (n: number) => string;
+  period?: string;
+};
+
+export function MetricSpotlight({
+  title,
+  metrics,
+  defaultKey,
+  highlightLabel,
+  peerLabel = "Peer avg",
+  caption,
+}: {
+  title: string;
+  metrics: SpotlightMetric[];
+  defaultKey?: string;
+  highlightLabel?: string;
+  peerLabel?: string;
+  caption?: string;
+}) {
+  const available = metrics.filter((m) => m.values.length > 0);
+  const [activeKey, setActiveKey] = useState<string>(defaultKey || available[0]?.key || "");
+  const active = available.find((m) => m.key === activeKey) || available[0];
+
+  if (!active) return null;
+  const fmtFn = active.format || fmt;
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold tracking-tight truncate">{title}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Pick a metric to see where you sit across the cohort{active.period ? ` · ${active.period}` : ""}.
+          </p>
+        </div>
+        <div className="inline-flex flex-wrap items-center gap-1 rounded-md border border-border bg-secondary/40 p-0.5">
+          {available.map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => setActiveKey(m.key)}
+              className={[
+                "px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+                active.key === m.key
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground",
+              ].join(" ")}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <PercentileRail
+          label={`${active.label}${active.period ? ` · ${active.period}` : ""}`}
+          value={active.yourValue}
+          values={active.values}
+          peerLabel={peerLabel}
+          nationalLabel="Highest"
+          formatValue={fmtFn}
+        />
+        <DistributionStrip
+          label={`${active.label} spread`}
+          values={active.values}
+          highlightValue={active.yourValue}
+          highlightLabel={highlightLabel || "You"}
+        />
+      </div>
+
+      {caption && <p className="mt-3 text-xs italic text-muted-foreground border-t border-border pt-2">{caption}</p>}
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------
+ * ServiceIntensityCard
+ * Customisable "per 1,000 items" rates — Pharmacy First, NMS, EPS —
+ * comparing your pharmacy against the country mean and the cohort
+ * top quartile. Toggle which rate is featured on the headline.
+ * ---------------------------------------------------------------- */
+export type IntensityRate = {
+  key: string;
+  label: string;
+  yourRate: number;
+  peerRate: number;
+  topRate: number;
+  unit?: string;
+};
+
+export function ServiceIntensityCard({
+  title = "Service intensity per 1,000 items",
+  rates,
+  caption,
+}: {
+  title?: string;
+  rates: IntensityRate[];
+  caption?: string;
+}) {
+  const usable = rates.filter((r) => r.topRate > 0);
+  const [activeKey, setActiveKey] = useState<string>(usable[0]?.key || "");
+  const active = usable.find((r) => r.key === activeKey) || usable[0];
+
+  if (!active) return null;
+
+  const max = Math.max(active.yourRate, active.peerRate, active.topRate, 0.0001);
+  const w = (v: number) => `${Math.max(2, Math.round((v / max) * 100))}%`;
+  const vsPeer = active.peerRate > 0
+    ? Math.round(((active.yourRate - active.peerRate) / active.peerRate) * 100)
+    : 0;
+  const tone = vsPeer > 0 ? "text-emerald-700" : vsPeer < 0 ? "text-rose-700" : "text-muted-foreground";
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold tracking-tight truncate">{title}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Rate per 1,000 items dispensed — strips out raw volume so a small busy pharmacy can still shine.
+          </p>
+        </div>
+        <div className="inline-flex flex-wrap items-center gap-1 rounded-md border border-border bg-secondary/40 p-0.5">
+          {usable.map((r) => (
+            <button
+              key={r.key}
+              type="button"
+              onClick={() => setActiveKey(r.key)}
+              className={[
+                "px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+                active.key === r.key
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground",
+              ].join(" ")}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-baseline justify-between gap-3 mb-3">
+        <p className="text-2xl font-semibold tabular-nums">
+          {active.yourRate.toFixed(1)}<span className="text-xs text-muted-foreground ml-1">{active.unit || "per 1k items"}</span>
+        </p>
+        {active.peerRate > 0 && (
+          <p className={`text-xs font-semibold ${tone}`}>
+            {vsPeer >= 0 ? "+" : ""}{vsPeer}% vs peer avg
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        {[
+          { label: "You", value: active.yourRate, accent: "bg-foreground" },
+          { label: "Peer avg", value: active.peerRate, accent: "bg-muted-foreground/70" },
+          { label: "Top 25%", value: active.topRate, accent: "bg-gold" },
+        ].map((row) => (
+          <div key={row.label}>
+            <div className="flex items-center justify-between text-[11px] mb-1">
+              <span className="text-muted-foreground uppercase tracking-wider">{row.label}</span>
+              <span className="tabular-nums font-semibold">{row.value.toFixed(1)}</span>
+            </div>
+            <div className="h-2 rounded-full bg-secondary overflow-hidden">
+              <div className={`h-full ${row.accent} rounded-full transition-all`} style={{ width: w(row.value) }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {caption && <p className="mt-3 text-xs italic text-muted-foreground border-t border-border pt-2">{caption}</p>}
+    </div>
+  );
+}
