@@ -1,224 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { placesNearby } from "@/lib/places.server";
-
-
-// ---------- Name normalisation ----------
-const STOPWORDS = new Set([
-  "the", "and", "of", "at", "for", "in", "on", "to",
-  "surgery", "surgeries", "practice", "practices", "medical", "centre",
-  "center", "health", "healthcare", "clinic", "doctors", "doctor", "drs",
-  "dr", "partners", "partnership", "group", "family", "the", "gp", "gps",
-  "nhs", "community", "patients", "patient",
-]);
-
-function tokens(s: string | null | undefined): Set<string> {
-  if (!s) return new Set();
-  return new Set(
-    s.toLowerCase()
-      .replace(/[^a-z0-9\s]/g, " ")
-      .split(/\s+/)
-      .filter((t) => t.length >= 2 && !STOPWORDS.has(t)),
-  );
-}
-
-function nameScore(a: string | null | undefined, b: string | null | undefined) {
-  const ta = tokens(a), tb = tokens(b);
-  if (!ta.size || !tb.size) return 0;
-  let hit = 0;
-  for (const t of ta) if (tb.has(t)) hit++;
-  // Jaccard-like, but reward shared tokens generously.
-  return hit / Math.max(1, Math.min(ta.size, tb.size));
-}
-
-function normPc(pc: string | null | undefined) {
-  return (pc || "").toUpperCase().replace(/\s+/g, "");
-}
-
-function haversineM(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
-  const R = 6371000;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(s));
-}
-
-type Candidate = {
-  practice_code: string;
-  practice_name: string | null;
-  postcode: string | null;
-  address_line: string | null;
-  lat: number | null;
-  lng: number | null;
-  google_place_id: string | null;
-};
-
-const placeInputSchema = z.object({
-  id: z.string().min(1).max(200),
-  name: z.string().min(1).max(300),
-  postcode: z.string().max(20).nullable().optional(),
-  address: z.string().max(400).nullable().optional(),
-  lat: z.number().min(-90).max(90).nullable().optional(),
-  lng: z.number().min(-180).max(180).nullable().optional(),
-});
-
-export type MatchedPractice = {
-  placeId: string;
-  practice_code: string;
-  practice_name: string | null;
-  postcode: string | null;
-  confidence: "cached" | "high" | "medium" | "low";
-  score: number;
-};
-
-/**
- * Match a batch of Google Places (GP surgeries) to gp_practices rows.
- * Strategy:
- *   1. Cache hit via google_place_id (instant, confidence "cached").
- *   2. Candidate pool = practices in same postcode + practices within 400m (if lat/lng given).
- *   3. Score candidates: postcode match + name token overlap + distance.
- *   4. Persist the winning practice_code → google_place_id back to gp_practices.
- */
-export const matchGpPractices = createServerFn({ method: "POST" })
-  .inputValidator((input: { places: Array<z.infer<typeof placeInputSchema>> }) =>
-    z.object({ places: z.array(placeInputSchema).min(1).max(50) }).parse(input),
-  )
-  .handler(async ({ data }) => {
-    const places = data.places;
-    const matches = new Map<string, MatchedPractice>();
-
-    // 1. Cache lookup by google_place_id.
-    const ids = places.map((p) => p.id);
-    const { data: cached } = await supabaseAdmin
-      .from("gp_practices")
-      .select("practice_code,practice_name,postcode,google_place_id")
-      .in("google_place_id", ids);
-    const cachedByPid = new Map<string, Candidate>();
-    for (const row of (cached as Candidate[] | null) ?? []) {
-      if (row.google_place_id) cachedByPid.set(row.google_place_id, row);
-    }
-    // Practice codes that are already claimed by another google_place_id —
-    // never let a different place re-claim them in this batch.
-    const claimedCodes = new Set<string>();
-    for (const p of places) {
-      const hit = cachedByPid.get(p.id);
-      if (hit) {
-        matches.set(p.id, {
-          placeId: p.id,
-          practice_code: hit.practice_code,
-          practice_name: hit.practice_name,
-          postcode: hit.postcode,
-          confidence: "cached",
-          score: 1,
-        });
-        claimedCodes.add(hit.practice_code);
-      }
-    }
-
-    // 2. For uncached places, build candidate set from postcode + geo proximity.
-    const uncached = places.filter((p) => !matches.has(p.id));
-    const postcodes = Array.from(
-      new Set(uncached.map((p) => p.postcode).filter(Boolean) as string[]),
-    );
-    let byPc = new Map<string, Candidate[]>();
-    if (postcodes.length) {
-      const variants = Array.from(new Set(postcodes.flatMap((p) => [p, p.replace(/\s+/g, "")])));
-      const { data: pcRows } = await supabaseAdmin
-        .from("gp_practices")
-        .select("practice_code,practice_name,postcode,address_line,lat,lng,google_place_id")
-        .or(variants.map((p) => `postcode.ilike.${p}`).join(","))
-        .limit(500);
-      for (const row of (pcRows as Candidate[] | null) ?? []) {
-        const k = normPc(row.postcode);
-        if (!k) continue;
-        if (!byPc.has(k)) byPc.set(k, []);
-        byPc.get(k)!.push(row);
-      }
-    }
-
-    // 3. Score every place × candidate. We collect a flat list of scored pairs
-    //    and then assign greedily (highest score first), ensuring each practice
-    //    code is consumed at most once per batch — this prevents two nearby
-    //    surgeries (e.g. Park Road vs Priory) from linking to the same record.
-    type Pair = { placeId: string; row: Candidate; score: number; conf: MatchedPractice["confidence"] };
-    const pairs: Pair[] = [];
-
-    for (const p of uncached) {
-      const candMap = new Map<string, Candidate>();
-
-      if (p.postcode) {
-        for (const c of byPc.get(normPc(p.postcode)) ?? []) candMap.set(c.practice_code, c);
-      }
-      if (p.lat != null && p.lng != null) {
-        const { data: nearRows } = await supabaseAdmin
-          .rpc("gp_practices_near", { p_lat: p.lat, p_lng: p.lng, p_radius_m: 400, p_limit: 15 });
-        for (const r of (nearRows as Candidate[] | null) ?? []) candMap.set(r.practice_code, r);
-      }
-
-      for (const c of candMap.values()) {
-        // Skip candidates already mapped to a *different* Google place — that
-        // pairing is locked in by the DB and stealing it would corrupt the cache.
-        if (c.google_place_id && c.google_place_id !== p.id) continue;
-        if (claimedCodes.has(c.practice_code)) continue;
-
-        const samePc = !!p.postcode && normPc(c.postcode) === normPc(p.postcode);
-        const ns = nameScore(p.name, c.practice_name);
-        const addrNs = p.address ? nameScore(p.address, c.address_line) : 0;
-        let dist = Infinity;
-        if (p.lat != null && p.lng != null && c.lat != null && c.lng != null) {
-          dist = haversineM({ lat: p.lat, lng: p.lng }, { lat: c.lat, lng: c.lng });
-        }
-        const distScore = dist === Infinity ? 0 : Math.max(0, 1 - dist / 400);
-        // Require *some* name overlap when there's no postcode and no geo signal —
-        // otherwise a generic postcode bucket alone can pair anything with anything.
-        const hasSignal = ns > 0 || samePc || dist !== Infinity;
-        if (!hasSignal) continue;
-        const score =
-          ns * 0.55 +
-          (samePc ? 0.25 : 0) +
-          distScore * 0.15 +
-          addrNs * 0.05;
-        const conf: MatchedPractice["confidence"] =
-          score >= 0.6 ? "high" : score >= 0.35 ? "medium" : "low";
-        pairs.push({ placeId: p.id, row: c, score, conf });
-      }
-    }
-
-    // Greedy assignment: best score first, one practice per place + one place per practice.
-    pairs.sort((a, b) => b.score - a.score);
-    const updates: Array<{ practice_code: string; google_place_id: string }> = [];
-    for (const pair of pairs) {
-      if (matches.has(pair.placeId)) continue;
-      if (claimedCodes.has(pair.row.practice_code)) continue;
-      if (pair.score < 0.35) continue; // confidence floor
-      matches.set(pair.placeId, {
-        placeId: pair.placeId,
-        practice_code: pair.row.practice_code,
-        practice_name: pair.row.practice_name,
-        postcode: pair.row.postcode,
-        confidence: pair.conf,
-        score: Number(pair.score.toFixed(3)),
-      });
-      claimedCodes.add(pair.row.practice_code);
-      if (pair.conf !== "low" && pair.row.google_place_id !== pair.placeId) {
-        updates.push({ practice_code: pair.row.practice_code, google_place_id: pair.placeId });
-      }
-    }
-
-    // Persist cache writes (only when the slot is still empty — avoids overwriting
-    // an existing mapping if another request raced us).
-    for (const u of updates) {
-      await supabaseAdmin
-        .from("gp_practices")
-        .update({ google_place_id: u.google_place_id })
-        .eq("practice_code", u.practice_code)
-        .is("google_place_id", null);
-    }
-
-    return { matches: Array.from(matches.values()) };
-  });
 
 /**
  * Batch-geocode every gp_practices row that lacks lat/lng using postcodes.io
@@ -260,7 +42,6 @@ export const backfillGpGeocodes = createServerFn({ method: "POST" })
         result: Array<{ query: string; result: { latitude: number; longitude: number } | null }>;
       };
 
-      // postcodes.io preserves order; map by query string (case-insensitive).
       const byQuery = new Map<string, { lat: number; lng: number }>();
       for (const r of json.result || []) {
         if (r.result) byQuery.set(r.query.toUpperCase(), { lat: r.result.latitude, lng: r.result.longitude });
@@ -309,13 +90,8 @@ function splitCsvLine(line: string): string[] {
   return out;
 }
 
-/**
- * Refresh practice_name / postcode / address_line / health_board for Scotland
- * practices from Public Health Scotland's "GP Practices and List Sizes" CSV.
- */
 export const refreshScotlandGpContacts = createServerFn({ method: "POST" })
   .handler(async () => {
-    // 1. Find the most recent CSV resource via CKAN.
     const pkgRes = await fetch(
       "https://www.opendata.nhs.scot/api/3/action/package_show?id=gp-practice-contact-details-and-list-sizes",
     );
@@ -329,7 +105,6 @@ export const refreshScotlandGpContacts = createServerFn({ method: "POST" })
     if (!csvs.length) throw new Error("No CSV resource found");
     const url = csvs[0].url;
 
-    // 2. Download + parse.
     const csvRes = await fetch(url);
     if (!csvRes.ok) throw new Error(`CSV download failed [${csvRes.status}]`);
     const text = await csvRes.text();
@@ -368,7 +143,6 @@ export const refreshScotlandGpContacts = createServerFn({ method: "POST" })
         address_line: address || null,
         health_board: iHB >= 0 ? ((c[iHB] ?? "").trim() || null) : null,
         country: "Scotland",
-
       });
     }
 
@@ -385,14 +159,8 @@ export const refreshScotlandGpContacts = createServerFn({ method: "POST" })
     return { source: csvs[0].name, upserted };
   });
 
-/**
- * Refresh practice_name / postcode for England practices from NHS Digital ODS
- * (ePraccur). Reads the CSV that's hosted unzipped on the NHS Digital mirror.
- */
 export const refreshEnglandGpContacts = createServerFn({ method: "POST" })
   .handler(async () => {
-    // ORD Bulk API: list all English GP practices.
-    // PrimaryRoleId RO177 = PRESCRIBING COST CENTRE (GP Practice). Offset starts at 1.
     let offset = 1;
     const limit = 1000;
     let upserted = 0;
@@ -411,7 +179,6 @@ export const refreshEnglandGpContacts = createServerFn({ method: "POST" })
         practice_name: o.Name,
         postcode: o.PostCode || null,
         country: "England",
-
       }));
       for (let i = 0; i < rows.length; i += 500) {
         const slice = rows.slice(i, i + 500);
@@ -424,187 +191,9 @@ export const refreshEnglandGpContacts = createServerFn({ method: "POST" })
       pages++;
       if (orgs.length < limit) break;
       offset += limit;
-      if (pages > 30) break; // safety cap
+      if (pages > 30) break;
     }
     return { upserted, pages };
-  });
-
-/**
- * Sweep unmatched, geocoded practices: for each one, ask Google Places for
- * nearby "doctor" results around its lat/lng, then claim the best match by
- * name overlap + proximity. Persists the winning google_place_id back to
- * gp_practices. Designed to be re-runnable — pass an offset to paginate.
- */
-export const sweepUnmatchedPractices = createServerFn({ method: "POST" })
-  .inputValidator((input: { limit?: number; offset?: number; radiusM?: number }) =>
-    z.object({
-      limit: z.number().min(1).max(500).optional(),
-      offset: z.number().min(0).max(50000).optional(),
-      radiusM: z.number().min(50).max(1500).optional(),
-    }).parse(input),
-  )
-  .handler(async ({ data }) => {
-    const limit = data.limit ?? 100;
-    const offset = data.offset ?? 0;
-    const radiusM = data.radiusM ?? 300;
-
-    const { data: rows, error } = await supabaseAdmin
-      .from("gp_practices")
-      .select("practice_code,practice_name,postcode,lat,lng")
-      .is("google_place_id", null)
-      .not("lat", "is", null)
-      .not("lng", "is", null)
-      .order("practice_code")
-      .range(offset, offset + limit - 1);
-    if (error) throw new Error(error.message);
-    const list = (rows ?? []) as Array<{
-      practice_code: string; practice_name: string | null; postcode: string | null;
-      lat: number | null; lng: number | null;
-    }>;
-
-    let matched = 0;
-    let noCandidate = 0;
-    let lowScore = 0;
-    let placeTaken = 0;
-    let apiErrors = 0;
-
-    for (const r of list) {
-      if (r.lat == null || r.lng == null) { noCandidate++; continue; }
-      let places: Awaited<ReturnType<typeof placesNearby>> = [];
-      try {
-        places = await placesNearby(r.lat, r.lng, "doctor", radiusM, 8);
-      } catch {
-        apiErrors++;
-        continue;
-      }
-      if (!places.length) { noCandidate++; continue; }
-
-      // Score each place against this specific practice.
-      let best: { placeId: string; placeName: string; score: number } | null = null;
-      for (const p of places) {
-        const ns = nameScore(p.name, r.practice_name);
-        const samePc = !!p.postcode && !!r.postcode && normPc(p.postcode) === normPc(r.postcode);
-        let dist = Infinity;
-        if (p.lat != null && p.lng != null) {
-          dist = haversineM({ lat: r.lat, lng: r.lng }, { lat: p.lat, lng: p.lng });
-        }
-        const distScore = dist === Infinity ? 0 : Math.max(0, 1 - dist / radiusM);
-        // Require some real signal — generic "doctor" alone isn't enough.
-        if (ns < 0.2 && !samePc && dist > 150) continue;
-        const score = ns * 0.6 + (samePc ? 0.25 : 0) + distScore * 0.15;
-        if (!best || score > best.score) best = { placeId: p.id, placeName: p.name, score };
-      }
-
-      if (!best || best.score < 0.4) { lowScore++; continue; }
-
-      // Don't steal a place_id already locked to another practice.
-      const { data: existing } = await supabaseAdmin
-        .from("gp_practices")
-        .select("practice_code")
-        .eq("google_place_id", best.placeId)
-        .maybeSingle();
-      if (existing && existing.practice_code !== r.practice_code) {
-        placeTaken++;
-        continue;
-      }
-
-      const { error: upErr } = await supabaseAdmin
-        .from("gp_practices")
-        .update({
-          google_place_id: best.placeId,
-          google_name: best.placeName || null,
-          name_verified_at: new Date().toISOString(),
-        })
-        .eq("practice_code", r.practice_code)
-        .is("google_place_id", null);
-      if (!upErr) matched++;
-    }
-
-    const { count: remaining } = await supabaseAdmin
-      .from("gp_practices")
-      .select("practice_code", { count: "exact", head: true })
-      .is("google_place_id", null)
-      .not("lat", "is", null);
-
-    return {
-      scanned: list.length,
-      matched,
-      noCandidate,
-      lowScore,
-      placeTaken,
-      apiErrors,
-      nextOffset: offset + list.length,
-      remaining: remaining ?? null,
-    };
-  });
-
-/**
- * For practices that already have a google_place_id but no captured
- * google_name (legacy matches), fetch the place name from Google and
- * stamp it onto the row so the "Verified by Google Maps" badge can
- * surface the verified label.
- */
-export const refreshVerifiedNames = createServerFn({ method: "POST" })
-  .inputValidator((input: { limit?: number; offset?: number }) =>
-    z.object({
-      limit: z.number().min(1).max(500).optional(),
-      offset: z.number().min(0).max(50000).optional(),
-    }).parse(input),
-  )
-  .handler(async ({ data }) => {
-    const limit = data.limit ?? 100;
-    const offset = data.offset ?? 0;
-
-    const { data: rows, error } = await supabaseAdmin
-      .from("gp_practices")
-      .select("practice_code,google_place_id,lat,lng")
-      .not("google_place_id", "is", null)
-      .is("google_name", null)
-      .order("practice_code")
-      .range(offset, offset + limit - 1);
-    if (error) throw new Error(error.message);
-    const list = (rows ?? []) as Array<{
-      practice_code: string; google_place_id: string | null;
-      lat: number | null; lng: number | null;
-    }>;
-
-    let refreshed = 0;
-    let apiErrors = 0;
-
-    for (const r of list) {
-      if (!r.google_place_id || r.lat == null || r.lng == null) continue;
-      try {
-        // Re-fetch nearby and pick the place matching our cached place_id —
-        // gives us the canonical Google name without needing a place-details call.
-        const places = await placesNearby(r.lat, r.lng, "doctor", 600, 20);
-        const hit = places.find((p) => p.id === r.google_place_id);
-        if (!hit) continue;
-        const { error: upErr } = await supabaseAdmin
-          .from("gp_practices")
-          .update({
-            google_name: hit.name || null,
-            name_verified_at: new Date().toISOString(),
-          })
-          .eq("practice_code", r.practice_code);
-        if (!upErr) refreshed++;
-      } catch {
-        apiErrors++;
-      }
-    }
-
-    const { count: remaining } = await supabaseAdmin
-      .from("gp_practices")
-      .select("practice_code", { count: "exact", head: true })
-      .not("google_place_id", "is", null)
-      .is("google_name", null);
-
-    return {
-      scanned: list.length,
-      refreshed,
-      apiErrors,
-      nextOffset: offset + list.length,
-      remaining: remaining ?? null,
-    };
   });
 
 /**
@@ -613,13 +202,11 @@ export const refreshVerifiedNames = createServerFn({ method: "POST" })
 export const getGpCoverage = createServerFn({ method: "GET" })
   .handler(async () => {
     const head = { count: "exact" as const, head: true };
-    const [total, withName, withPostcode, withLat, withPlace, withVerified, scotTotal, engTotal] = await Promise.all([
+    const [total, withName, withPostcode, withLat, scotTotal, engTotal] = await Promise.all([
       supabaseAdmin.from("gp_practices").select("practice_code", head),
       supabaseAdmin.from("gp_practices").select("practice_code", head).not("practice_name", "is", null),
       supabaseAdmin.from("gp_practices").select("practice_code", head).not("postcode", "is", null),
       supabaseAdmin.from("gp_practices").select("practice_code", head).not("lat", "is", null),
-      supabaseAdmin.from("gp_practices").select("practice_code", head).not("google_place_id", "is", null),
-      supabaseAdmin.from("gp_practices").select("practice_code", head).not("google_name", "is", null),
       supabaseAdmin.from("gp_practices").select("practice_code", head).eq("country", "Scotland"),
       supabaseAdmin.from("gp_practices").select("practice_code", head).eq("country", "England"),
     ]);
@@ -629,11 +216,9 @@ export const getGpCoverage = createServerFn({ method: "GET" })
     const pct = (x: number) => Math.round((x / t) * 1000) / 10;
 
     const score = Math.round(
-      n(withName) / t * 15 +
-      n(withPostcode) / t * 15 +
-      n(withLat) / t * 25 +
-      n(withPlace) / t * 20 +
-      n(withVerified) / t * 25,
+      (n(withName) / t) * 30 +
+      (n(withPostcode) / t) * 30 +
+      (n(withLat) / t) * 40,
     );
 
     return {
@@ -641,16 +226,11 @@ export const getGpCoverage = createServerFn({ method: "GET" })
       withName: n(withName),
       withPostcode: n(withPostcode),
       withLat: n(withLat),
-      withPlace: n(withPlace),
-      withVerified: n(withVerified),
       scotland: n(scotTotal),
       england: n(engTotal),
       pctName: pct(n(withName)),
       pctPostcode: pct(n(withPostcode)),
       pctLat: pct(n(withLat)),
-      pctPlace: pct(n(withPlace)),
-      pctVerified: pct(n(withVerified)),
       healthScore: Math.min(100, Math.max(0, score)),
     };
   });
-
