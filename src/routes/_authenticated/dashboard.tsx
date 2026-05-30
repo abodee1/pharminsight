@@ -524,24 +524,75 @@ function Dashboard() {
         )}
       </div>
 
-      {peerItems.length > 8 && (
-        <div className="mt-6 grid md:grid-cols-2 gap-4">
+      {pharmacy && peerItems.length > 8 && (
+        <div className="mt-6">
+          <MetricSpotlight
+            title="Cohort spotlight — pick a metric"
+            highlightLabel={pharmacy.name}
+            peerLabel={`${pharmacy.country || "Country"} avg`}
+            caption="Switch metrics to see where you sit across reporting peers for the latest published period."
+            metrics={(() => {
+              const arr: SpotlightMetric[] = [
+                {
+                  key: "items",
+                  label: "Items",
+                  values: peerItems,
+                  yourValue: stats.items,
+                  period: stats.period,
+                },
+                {
+                  key: "pf",
+                  label: "Pharmacy First",
+                  values: peerPf,
+                  yourValue: stats.pf,
+                  period: peerPfPeriod || stats.period,
+                },
+                {
+                  key: "nms",
+                  label: "NMS",
+                  values: peerNms,
+                  yourValue: stats.nms,
+                  period: stats.nmsPeriod || stats.period,
+                },
+                {
+                  key: "final",
+                  label: "NHS revenue",
+                  values: peerFinalPay,
+                  yourValue: stats.finalPayment,
+                  period: stats.payPeriod || stats.period,
+                  format: money,
+                },
+                {
+                  key: "gross",
+                  label: "Gross cost",
+                  values: peerGrossCost,
+                  yourValue: stats.grossCost,
+                  period: stats.payPeriod || stats.period,
+                  format: money,
+                },
+              ];
+              return arr;
+            })()}
+          />
+        </div>
+      )}
+
+      {pharmacy && intensityRates.some((r) => r.topRate > 0) && (
+        <div className="mt-6">
+          <ServiceIntensityCard
+            rates={intensityRates}
+            caption="Toggle between Pharmacy First, NMS and EPS to see your normalised service take-up."
+          />
+        </div>
+      )}
+
+      {!pharmacy && peerItems.length > 8 && (
+        <div className="mt-6">
           <DistributionStrip
-            label={`How ${pharmacy?.country || "the country"} dispenses — ${stats.period}`}
+            label={`How the country dispenses — ${stats.period}`}
             values={peerItems}
-            highlightValue={pharmacy ? stats.items : undefined}
-            highlightLabel={pharmacy?.name}
             caption="Each bar is a band of pharmacies grouped by monthly items dispensed."
           />
-          {peerPf.length > 8 && (
-            <DistributionStrip
-              label={`Pharmacy First spread — ${peerPfPeriod || stats.period}`}
-              values={peerPf}
-              highlightValue={pharmacy ? stats.pf : undefined}
-              highlightLabel={pharmacy?.name}
-              caption="Walk-in clinical consultations distributed across reporting peers."
-            />
-          )}
         </div>
       )}
 
