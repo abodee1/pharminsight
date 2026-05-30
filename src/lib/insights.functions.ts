@@ -1,14 +1,24 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { geocodeOne, placesNearby } from "./places.server";
+
+async function geocodePostcode(postcode: string | null | undefined): Promise<{ lat: number; lng: number } | null> {
+  if (!postcode) return null;
+  try {
+    const res = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode.trim())}`);
+    if (!res.ok) return null;
+    const j = await res.json() as { result?: { latitude: number; longitude: number } };
+    if (j.result?.latitude == null) return null;
+    return { lat: j.result.latitude, lng: j.result.longitude };
+  } catch { return null; }
+}
 
 // ============================================================
 // Shared expert framing — same standard used by Acquisition Report
 // ============================================================
 const EXPERT_SYSTEM = `You are a senior M&A advisor and operations consultant for UK community pharmacy, with deep command of NHS pharmacy economics across England, Scotland, Wales and Northern Ireland — drug tariff, ESPS, Pharmacy First, MCR, EPS, flu, NMS, smoking cessation, EHC and supervised consumption. You write in crisp, professional British English with the tone of a partner at a specialist healthcare brokerage briefing an investment committee: direct, commercially sharp, clinically informed, never generic.
 
-You will be given a structured data pack for one pharmacy: identity, 24 months of dispensing and service activity, NHS payment lines, country/regional peer benchmarks, and the local landscape from Google Places (nearby competitor pharmacies and GP surgeries with ratings and distances).
+You will be given a structured data pack for one pharmacy: identity, 24 months of dispensing and service activity, NHS payment lines, country/regional peer benchmarks, and the local landscape from our own NHS dataset (nearby competitor pharmacies and GP surgeries with distances in metres).
 
 ABSOLUTE RULES
 - Be specific to the actual numbers in the data. Quote figures (items, £, %, YoY) inline.
@@ -223,28 +233,30 @@ async function buildPharmacyContext(supabase: any, pharmacy_id: string) {
 
   let nearby: any = { competitors: [], gps: [], center: null, error: null };
   try {
-    const geo = await geocodeOne(pharmacy.name, pharmacy.postcode, pharmacy.address);
-    if (geo?.lat && geo?.lng) {
-      const center = { lat: geo.lat, lng: geo.lng, id: geo.id };
-      const [pharm, doctors] = await Promise.all([
-        placesNearby(center.lat, center.lng, "pharmacy", 1600, 15),
-        placesNearby(center.lat, center.lng, "doctor", 1600, 15),
+    let center: { lat: number; lng: number } | null = null;
+    if (pharmacy.lat != null && pharmacy.lng != null) {
+      center = { lat: pharmacy.lat, lng: pharmacy.lng };
+    } else {
+      center = await geocodePostcode(pharmacy.postcode);
+    }
+    if (center) {
+      const [{ data: pharm }, { data: gps }] = await Promise.all([
+        supabase.rpc("pharmacies_near", { p_lat: center.lat, p_lng: center.lng, p_radius_m: 1600, p_limit: 15 }),
+        supabase.rpc("gp_practices_near", { p_lat: center.lat, p_lng: center.lng, p_radius_m: 1600, p_limit: 15 }),
       ]);
-      const others = pharm.filter((p) => p.id !== geo.id && p.name.toLowerCase() !== pharmacy.name.toLowerCase());
+      const others = (pharm || []).filter((p: any) => p.id !== pharmacy.id);
       nearby = {
         center,
-        competitors: others.map((p) => ({
-          name: p.name, distance_m: distM(center, p), rating: p.rating ?? null,
-          user_rating_count: p.userRatingCount ?? null, postcode: p.postcode,
+        competitors: others.map((p: any) => ({
+          name: p.name, distance_m: Math.round(p.distance_m), postcode: p.postcode,
         })),
-        gps: doctors.map((p) => ({
-          name: p.name, distance_m: distM(center, p), rating: p.rating ?? null,
-          user_rating_count: p.userRatingCount ?? null, postcode: p.postcode,
+        gps: (gps || []).map((p: any) => ({
+          name: p.practice_name, distance_m: Math.round(p.distance_m), postcode: p.postcode,
         })),
       };
     }
   } catch (e: any) {
-    nearby.error = e?.message || "places lookup failed";
+    nearby.error = e?.message || "nearby lookup failed";
   }
 
   return {
