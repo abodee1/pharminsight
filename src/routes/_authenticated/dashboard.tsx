@@ -62,7 +62,11 @@ function Dashboard() {
   });
   const [peerItems, setPeerItems] = useState<number[]>([]);
   const [peerPf, setPeerPf] = useState<number[]>([]);
+  const [peerNms, setPeerNms] = useState<number[]>([]);
+  const [peerFinalPay, setPeerFinalPay] = useState<number[]>([]);
+  const [peerGrossCost, setPeerGrossCost] = useState<number[]>([]);
   const [peerPfPeriod, setPeerPfPeriod] = useState<string>("");
+  const [intensityRates, setIntensityRates] = useState<IntensityRate[]>([]);
   const [revenueMix, setRevenueMix] = useState<{ label: string; value: number }[]>([]);
 
   useEffect(() => {
