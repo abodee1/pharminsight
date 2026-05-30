@@ -191,51 +191,57 @@ export function PharmacySearch({
             );
           })}
 
-          {/* Google Places fallback */}
+          {/* Fuzzy match fallback */}
           <div className="border-t border-border bg-secondary/30">
-            {googleResults.length === 0 ? (
+            {fuzzyResults.length === 0 ? (
               <button
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={runGoogleSearch}
-                disabled={googleLoading}
+                onClick={runFuzzySearch}
+                disabled={fuzzyLoading}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
-                {googleLoading ? (
+                {fuzzyLoading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Globe className="h-3.5 w-3.5" />
+                  <Sparkles className="h-3.5 w-3.5" />
                 )}
-                {googleLoading ? "Searching Google…" : `Can't find it? Search Google for "${q.trim()}"`}
+                {fuzzyLoading ? "Searching…" : `Can't find it? Try a fuzzy match for "${q.trim()}"`}
               </button>
             ) : (
               <>
                 <p className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                  <Globe className="h-3 w-3" /> From Google
+                  <Sparkles className="h-3 w-3" /> Fuzzy matches
                 </p>
-                {googleResults.map((g) => (
-                  <button
-                    key={g.id}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => handleGoogleSelect(g)}
-                    disabled={googleLinking === g.id}
-                    className="w-full text-left flex items-center gap-3 px-3 py-2.5 border-t border-border/30 hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm truncate">{g.name}</p>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">{g.address}</p>
-                    </div>
-                    {googleLinking === g.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-                    ) : (
-                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground shrink-0">
-                        {g.postcode || "—"}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                {fuzzyResults.map((p) => {
+                  const already = excludeSet.has(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => !already && handleSelect(p)}
+                      disabled={already}
+                      className={[
+                        "w-full text-left flex items-center gap-3 px-3 py-2.5 border-t border-border/30",
+                        already ? "opacity-50 cursor-not-allowed" : "hover:bg-accent hover:text-accent-foreground",
+                      ].join(" ")}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-sm truncate">{p.name}</p>
+                          <CountryBadge country={p.country} />
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          {[p.address, p.postcode, p.region].filter(Boolean).join(" · ")}
+                        </p>
+                      </div>
+                      <span className="text-xs font-mono text-muted-foreground shrink-0">{p.ods_code}</span>
+                    </button>
+                  );
+                })}
               </>
             )}
           </div>
+
         </div>
       )}
     </div>
