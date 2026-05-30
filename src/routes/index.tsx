@@ -14,13 +14,13 @@ export const Route = createFileRoute("/")({
   component: Landing,
   head: () => ({
     meta: [
-      { title: "Pharmacy8 — Live UK pharmacy league tables & NHS analytics" },
+      { title: "PharmInsight — Live UK pharmacy league tables & NHS analytics" },
       {
         name: "description",
         content:
           "Live monthly leaderboards for every NHS pharmacy in England, Scotland, Wales and Northern Ireland. Items dispensed, Pharmacy First, NMS, EPS — plus benchmarking, financials and Companies House intelligence.",
       },
-      { property: "og:title", content: "Pharmacy8 — Live UK pharmacy league tables & NHS analytics" },
+      { property: "og:title", content: "PharmInsight — Live UK pharmacy league tables & NHS analytics" },
       { property: "og:description", content: "The free, faster, smarter alternative to pharmdata — live UK-wide pharmacy dispensing data with benchmarking and Companies House intelligence." },
       { property: "og:url", content: "https://pharmacy8.com/" },
       { property: "og:type", content: "website" },
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/")({
       children: JSON.stringify({
         "@context": "https://schema.org",
         "@type": "WebSite",
-        name: "Pharmacy8",
+        name: "PharmInsight",
         url: "https://pharmacy8.com/",
         description: "Live UK pharmacy dispensing leaderboards and NHS analytics.",
       }),
