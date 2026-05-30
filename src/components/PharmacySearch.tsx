@@ -75,9 +75,9 @@ export function PharmacySearch({
     const term = q.trim();
     if (term.length < 2) {
       setResults([]);
-      setGoogleResults([]);
+      setFuzzyResults([]);
       setLoading(false);
-      setGoogleLoading(false);
+      setFuzzyLoading(false);
       return;
     }
     setLoading(true);
@@ -89,52 +89,27 @@ export function PharmacySearch({
     return () => clearTimeout(t);
   }, [q]);
 
-  const runGoogleSearch = async () => {
+  const runFuzzySearch = async () => {
     const term = q.trim();
     if (term.length < 2) return;
-    setGoogleLoading(true);
-    setGoogleResults([]);
+    setFuzzyLoading(true);
+    setFuzzyResults([]);
     try {
-      const r = await searchPlaces({ data: { query: term } });
-      setGoogleResults(r.results);
-      if (r.results.length === 0) toast.info("No matches on Google.");
+      const { data, error } = await supabase.rpc("search_pharmacies_fuzzy", {
+        p_query: term,
+        p_limit: 10,
+      });
+      if (error) throw error;
+      const existing = new Set(results.map((r) => r.id));
+      const extras = ((data || []) as Pharmacy[]).filter((r) => !existing.has(r.id));
+      setFuzzyResults(extras);
+      if (extras.length === 0) toast.info("No close matches found.");
     } catch (e: any) {
-      toast.error(e?.message || "Google search failed.");
+      toast.error(e?.message || "Fuzzy search failed.");
     } finally {
-      setGoogleLoading(false);
+      setFuzzyLoading(false);
     }
   };
-
-  const handleGoogleSelect = async (p: PlaceResult) => {
-    if (!p.postcode) {
-      toast.error("No postcode in Google result — can't link to a pharmacy record.");
-      return;
-    }
-    setGoogleLinking(p.id);
-    try {
-      const compact = p.postcode.replace(/\s+/g, "");
-      const { data } = await supabase
-        .from("pharmacies")
-        .select("id,ods_code,name,address,postcode,country,region")
-        .or(`postcode.ilike.${p.postcode},postcode.ilike.${compact}`)
-        .limit(20);
-      const rows = (data || []) as Pharmacy[];
-      // Prefer best name match
-      const lname = p.name.toLowerCase();
-      const best =
-        rows.find((r) => r.name.toLowerCase() === lname) ||
-        rows.find((r) => lname.includes(r.name.toLowerCase().split(" ")[0])) ||
-        rows[0];
-      if (!best) {
-        toast.error(`"${p.name}" isn't in our dataset yet.`);
-        return;
-      }
-      handleSelect(best);
-    } finally {
-      setGoogleLinking(null);
-    }
-  };
-
 
   const handleSelect = (p: Pharmacy) => {
     if (onSelect) {
@@ -146,7 +121,7 @@ export function PharmacySearch({
       setOpen(false);
       setQ("");
       setResults([]);
-      setGoogleResults([]);
+      setFuzzyResults([]);
     } else {
       inputRef.current?.focus();
     }
