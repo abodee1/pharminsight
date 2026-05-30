@@ -13,7 +13,11 @@ import {
   ShareDonut,
   TrendCard,
   GpPrescribingCard,
+  MetricSpotlight,
+  ServiceIntensityCard,
   type PeriodWindow,
+  type SpotlightMetric,
+  type IntensityRate,
 } from "@/components/Infographics";
 
 import {
