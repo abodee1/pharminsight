@@ -1,11 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Trophy, BarChart2, Building2, Pill, Activity, Stethoscope, ArrowUpRight,
-  Sparkles, Database, MapPin, TrendingUp,
+  Pill, Activity, Stethoscope, ArrowUpRight, ArrowRight, Sparkles,
+  TrendingUp, MapPin, Building2, BarChart2, Trophy, Database,
 } from "lucide-react";
 import {
-  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, Tooltip,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,32 +18,22 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Live monthly leaderboards for every NHS pharmacy in England, Scotland, Wales and Northern Ireland. Items dispensed, Pharmacy First, NMS, EPS — plus benchmarking, financials and Companies House intelligence.",
+          "An editorial dashboard of every NHS pharmacy in the UK. Live monthly leaderboards, benchmarking, GP catchment and Companies House intelligence — free.",
       },
-      { property: "og:title", content: "PharmInsight — Live UK pharmacy league tables & NHS analytics" },
-      { property: "og:description", content: "The free, faster, smarter alternative to pharmdata — live UK-wide pharmacy dispensing data with benchmarking and Companies House intelligence." },
+      { property: "og:title", content: "PharmInsight — A living atlas of UK community pharmacy" },
+      { property: "og:description", content: "Live UK-wide dispensing data with benchmarking, GP catchment and Companies House intelligence." },
       { property: "og:url", content: "https://pharmacy8.com/" },
       { property: "og:type", content: "website" },
     ],
     links: [{ rel: "canonical", href: "https://pharmacy8.com/" }],
-    scripts: [{
-      type: "application/ld+json",
-      children: JSON.stringify({
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        name: "PharmInsight",
-        url: "https://pharmacy8.com/",
-        description: "Live UK pharmacy dispensing leaderboards and NHS analytics.",
-      }),
-    }],
   }),
 });
 
+/* ---------- types ---------- */
 type LeaderRow = { ods: string; name: string; region: string | null; country: string | null; value: number };
 type TrendRow = { year: number; month: number; items: number; eps: number; pf: number; nms: number };
 type CountryRow = { country: string; value: number; pf: number; nms: number; pharmacies: number };
 type RegionRow = { region: string; country: string; value: number; pharmacies: number };
-
 type Dashboard = {
   period: { year: number; month: number } | null;
   totals_now: { items: number; pf: number; nms: number; eps: number; pharmacies: number };
@@ -56,6 +46,7 @@ type Dashboard = {
   by_country: CountryRow[];
 };
 
+/* ---------- formatters ---------- */
 const fmt = (n: number) => n.toLocaleString("en-GB");
 const fmtCompact = (n: number) => {
   if (n >= 1e9) return (n / 1e9).toFixed(1) + "bn";
@@ -66,6 +57,12 @@ const fmtCompact = (n: number) => {
 const monthName = (y: number, m: number) =>
   new Date(y, m - 1, 1).toLocaleString("en-GB", { month: "long", year: "numeric" });
 
+function titleCase(s: string) {
+  return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase())
+    .replace(/\bLtd\b/i, "Ltd").replace(/\bUk\b/g, "UK").replace(/\bNhs\b/g, "NHS");
+}
+
+/* ---------- Landing ---------- */
 function Landing() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,44 +79,79 @@ function Landing() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
-      <SiteHeader />
-      <main>
-        <Hero totals={data?.totals_now} period={data?.period} />
-        <ValueRow />
-        <LeaderboardsBlock data={data} error={error} />
-        <TrendBlock data={data} />
-        <RegionsBlock data={data} />
-        <CountryBlock data={data} />
-        <CompareCta />
-        <Features />
-        <ClosingCta />
-      </main>
-      <SiteFooter />
+    <div className="paper min-h-screen">
+      {/* Paper & Ink scoped palette */}
+      <style>{`
+        .paper {
+          --paper: #f5f3ee;
+          --paper-2: #ece8de;
+          --ink: #0d0d0d;
+          --ink-2: #2d2d2d;
+          --rule: #d9d3c4;
+          --ink-dim: #6b6657;
+          background: var(--paper);
+          color: var(--ink);
+          font-family: var(--font-sans);
+        }
+        .paper a { color: inherit; }
+        .paper .grain {
+          background-image:
+            radial-gradient(rgba(0,0,0,0.045) 1px, transparent 1px);
+          background-size: 3px 3px;
+        }
+        .serif { font-family: "Inter", ui-serif, Georgia, serif; font-feature-settings: "ss01","cv11"; letter-spacing: -0.02em; }
+        .num { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+        .rule { border-color: var(--rule); }
+        .ink-dim { color: var(--ink-dim); }
+        .tile { background: #fff; border: 1px solid var(--rule); border-radius: 14px; }
+        .tile-dark { background: var(--ink); color: var(--paper); border: 1px solid var(--ink); border-radius: 14px; }
+        .tile-paper { background: var(--paper-2); border: 1px solid var(--rule); border-radius: 14px; }
+        .kicker { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-dim); }
+        .kicker-on-dark { color: rgba(245,243,238,0.6); }
+        .dot-grid {
+          background-image: radial-gradient(rgba(13,13,13,0.18) 1px, transparent 1px);
+          background-size: 14px 14px;
+        }
+      `}</style>
+
+      <PaperHeader />
+      <Hero data={data} />
+      <Marquee />
+      <BentoDeck data={data} error={error} />
+      <NationsStrip data={data} />
+      <Leaderboards data={data} />
+      <Manifesto />
+      <PaperFooter />
     </div>
   );
 }
 
-function SiteHeader() {
+/* ---------- header ---------- */
+function PaperHeader() {
   const { user, loading } = useAuth();
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur">
+    <header className="sticky top-0 z-30 backdrop-blur" style={{ background: "rgba(245,243,238,0.85)", borderBottom: "1px solid var(--rule)" }}>
       <div className="mx-auto max-w-7xl px-6 py-3 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+        <Link to="/" className="flex items-center gap-2.5">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md" style={{ background: "var(--ink)", color: "var(--paper)" }}>
             <Pill className="h-4 w-4" />
           </span>
-          <span className="text-lg font-bold tracking-tight text-foreground">PharmInsight</span>
+          <div className="leading-tight">
+            <div className="text-base font-bold tracking-tight">PharmInsight</div>
+            <div className="text-[10px] uppercase tracking-[0.22em] ink-dim">An atlas of UK pharmacy</div>
+          </div>
         </Link>
         <div className="flex items-center gap-2">
+          <a href="#leaderboards" className="hidden md:inline text-sm font-medium px-3 py-2 hover:opacity-70">Leaderboards</a>
+          <a href="#atlas" className="hidden md:inline text-sm font-medium px-3 py-2 hover:opacity-70">The atlas</a>
           {loading ? null : user ? (
-            <Link to="/dashboard" className="inline-flex items-center gap-1 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90">
+            <Link to="/dashboard" className="inline-flex items-center gap-1 rounded-md px-4 py-2 text-sm font-semibold" style={{ background: "var(--ink)", color: "var(--paper)" }}>
               Open dashboard <ArrowUpRight className="h-3.5 w-3.5" />
             </Link>
           ) : (
             <>
-              <Link to="/login" className="text-sm font-medium text-foreground hover:text-primary px-3 py-2">Sign in</Link>
-              <Link to="/register" className="inline-flex items-center gap-1 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90">
+              <Link to="/login" className="text-sm font-medium px-3 py-2 hover:opacity-70">Sign in</Link>
+              <Link to="/register" className="inline-flex items-center gap-1 rounded-md px-4 py-2 text-sm font-semibold" style={{ background: "var(--ink)", color: "var(--paper)" }}>
                 Get started <ArrowUpRight className="h-3.5 w-3.5" />
               </Link>
             </>
@@ -130,101 +162,510 @@ function SiteHeader() {
   );
 }
 
-function Hero({ totals, period }: { totals?: Dashboard["totals_now"]; period?: Dashboard["period"] }) {
+/* ---------- hero (editorial masthead) ---------- */
+function Hero({ data }: { data: Dashboard | null }) {
+  const period = data?.period;
+  const issue = period ? `Vol. ${period.year}  ·  No. ${String(period.month).padStart(2, "0")}` : "Loading edition…";
   return (
-    <section className="relative overflow-hidden border-b border-border">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(80%_60%_at_50%_0%,oklch(0.96_0.04_265)_0%,transparent_70%)]" />
-      <div className="mx-auto max-w-7xl px-6 pt-16 pb-12">
-        <div className="text-center max-w-4xl mx-auto">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
-            <Sparkles className="h-3.5 w-3.5 text-gold" />
-            Live NHS data · updated monthly · free to view
-          </span>
-          <h1 className="mt-5 text-4xl md:text-6xl font-bold tracking-tight text-foreground">
-            Every NHS pharmacy in the UK,{" "}
-            <span className="text-gold">ranked in real time.</span>
-          </h1>
-          <p className="mt-5 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
-            Items dispensed, Pharmacy First, NMS, EPS, financials and Companies House intelligence —
-            for England, Scotland, Wales and Northern Ireland.
-          </p>
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-            <Link to="/register" className="rounded-md bg-primary text-primary-foreground px-6 py-3 text-sm font-semibold hover:opacity-90">
-              Create free account
-            </Link>
-            <a href="#leaderboards" className="rounded-md border border-border bg-card px-6 py-3 text-sm font-semibold hover:bg-secondary">
-              See live league tables
-            </a>
-          </div>
+    <section className="relative">
+      <div className="mx-auto max-w-7xl px-6 pt-10 pb-6">
+        <div className="flex items-end justify-between gap-6 pb-4 border-b-2" style={{ borderColor: "var(--ink)" }}>
+          <div className="kicker">The PharmInsight Atlas</div>
+          <div className="kicker num">{issue}</div>
         </div>
-
-        <div className="mt-12 grid grid-cols-2 md:grid-cols-5 gap-3">
-          <StatTile icon={Database} label="Pharmacies tracked" value={totals ? fmt(totals.pharmacies) : "…"} hint={period ? monthName(period.year, period.month) : "Loading"} />
-          <StatTile icon={Pill} label="Items dispensed" value={totals ? fmtCompact(totals.items) : "…"} hint="this month" />
-          <StatTile icon={Stethoscope} label="Pharmacy First" value={totals ? fmtCompact(totals.pf) : "…"} hint="consultations" />
-          <StatTile icon={Activity} label="NMS interventions" value={totals ? fmtCompact(totals.nms) : "…"} hint="this month" />
-          <StatTile icon={TrendingUp} label="EPS items" value={totals ? fmtCompact(totals.eps) : "…"} hint="electronic prescriptions" />
+        <div className="grid lg:grid-cols-12 gap-8 pt-8">
+          <div className="lg:col-span-8">
+            <h1 className="serif text-[44px] md:text-[68px] lg:text-[84px] leading-[0.95] font-bold">
+              Every NHS pharmacy<br />
+              in the UK,<br />
+              <span className="italic" style={{ color: "var(--ink-2)" }}>observed each month.</span>
+            </h1>
+            <p className="mt-6 text-base md:text-lg max-w-xl ink-dim leading-relaxed">
+              A living dashboard of dispensing, services, financials and catchment for
+              16,000+ community pharmacies across the four nations. Built on open NHS data —
+              free to read, free to claim.
+            </p>
+            <div className="mt-7 flex flex-wrap items-center gap-3">
+              <Link to="/register" className="inline-flex items-center gap-2 rounded-md px-5 py-3 text-sm font-semibold" style={{ background: "var(--ink)", color: "var(--paper)" }}>
+                Claim your pharmacy <ArrowRight className="h-4 w-4" />
+              </Link>
+              <a href="#atlas" className="inline-flex items-center gap-2 rounded-md px-5 py-3 text-sm font-semibold border-2" style={{ borderColor: "var(--ink)" }}>
+                Explore this month's atlas
+              </a>
+            </div>
+          </div>
+          <aside className="lg:col-span-4 lg:border-l rule lg:pl-8 flex flex-col justify-end">
+            <div className="kicker mb-3">Index</div>
+            <ol className="space-y-2 text-sm">
+              {[
+                ["01", "Bento of the nation", "#atlas"],
+                ["02", "Four nations, one ledger", "#nations"],
+                ["03", "This month's league tables", "#leaderboards"],
+                ["04", "Why we built this", "#manifesto"],
+              ].map(([n, t, h]) => (
+                <li key={n} className="flex items-baseline gap-3">
+                  <span className="num text-xs ink-dim w-6">{n}</span>
+                  <a href={h} className="font-medium border-b border-transparent hover:border-current">{t}</a>
+                </li>
+              ))}
+            </ol>
+          </aside>
         </div>
       </div>
     </section>
   );
 }
 
-function StatTile({ icon: Icon, label, value, hint }: { icon: any; label: string; value: string; hint: string }) {
-  return (
-    <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
-      </div>
-      <div className="mt-1.5 text-2xl font-bold tracking-tight tabular-nums">{value}</div>
-      <div className="text-[11px] text-muted-foreground mt-0.5">{hint}</div>
-    </div>
-  );
-}
-
-function ValueRow() {
+/* ---------- marquee strip ---------- */
+function Marquee() {
   const items = [
-    "16,000+ NHS pharmacies",
-    "60+ months of history",
-    "Companies House linkage",
-    "Local landscape & GP linkage",
-    "AI-powered analysis",
+    "16,000+ NHS pharmacies", "Updated monthly from official NHS releases",
+    "England · Scotland · Wales · Northern Ireland", "Companies House linked",
+    "GP catchment", "Open Government Licence v3.0",
   ];
   return (
-    <div className="border-b border-border bg-secondary/40">
-      <div className="mx-auto max-w-7xl px-6 py-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
-        {items.map((t) => <span key={t} className="flex items-center gap-1.5">✓ {t}</span>)}
+    <div className="border-y rule overflow-hidden" style={{ background: "var(--ink)", color: "var(--paper)" }}>
+      <div className="mx-auto max-w-7xl px-6 py-3 flex flex-wrap items-center gap-x-8 gap-y-1 text-xs">
+        {items.map((t, i) => (
+          <span key={i} className="flex items-center gap-2 uppercase tracking-[0.15em]" style={{ opacity: 0.85 }}>
+            <span className="inline-block h-1 w-1 rounded-full" style={{ background: "var(--paper)" }} />
+            {t}
+          </span>
+        ))}
       </div>
     </div>
   );
 }
 
-function LeaderboardsBlock({ data, error }: { data: Dashboard | null; error: string | null }) {
+/* ---------- bento atlas ---------- */
+function BentoDeck({ data, error }: { data: Dashboard | null; error: string | null }) {
+  const totals = data?.totals_now;
+  const period = data?.period;
+  const trend = (data?.totals_trend || []).map((r) => ({
+    label: new Date(r.year, r.month - 1, 1).toLocaleString("en-GB", { month: "short" }),
+    items: r.items, eps: r.eps,
+  }));
+
+  return (
+    <section id="atlas" className="border-b rule">
+      <div className="mx-auto max-w-7xl px-6 py-14">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <div className="kicker">§ 01 — The bento</div>
+            <h2 className="serif text-3xl md:text-5xl font-bold mt-2">A nation, in tiles.</h2>
+          </div>
+          <div className="text-xs ink-dim text-right max-w-xs hidden md:block">
+            Each tile draws on the most recent fully reported month{period ? ` (${monthName(period.year, period.month)})` : ""}.
+          </div>
+        </div>
+        {error && <p className="text-sm text-destructive mb-4">{error}</p>}
+
+        <div className="grid grid-cols-12 gap-4 auto-rows-[minmax(140px,auto)]">
+          {/* Hero number — items dispensed */}
+          <div className="col-span-12 md:col-span-7 row-span-2 tile-dark p-6 md:p-8 relative overflow-hidden">
+            <div className="absolute inset-0 dot-grid opacity-20" />
+            <div className="relative flex flex-col h-full justify-between">
+              <div className="flex items-start justify-between">
+                <span className="kicker kicker-on-dark">Total items dispensed</span>
+                <Pill className="h-4 w-4 opacity-60" />
+              </div>
+              <div>
+                <div className="serif num text-[88px] md:text-[140px] leading-[0.85] font-bold">
+                  {totals ? fmtCompact(totals.items) : "—"}
+                </div>
+                <div className="mt-3 text-sm opacity-70">
+                  prescription items dispensed across the UK in {period ? monthName(period.year, period.month) : "the latest month"}.
+                </div>
+              </div>
+              {/* tiny trend */}
+              <div className="h-16 -mx-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trend} margin={{ top: 6, right: 8, left: 8, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="hg" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f5f3ee" stopOpacity={0.55} />
+                        <stop offset="100%" stopColor="#f5f3ee" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <Area type="monotone" dataKey="items" stroke="#f5f3ee" strokeWidth={1.5} fill="url(#hg)" />
+                    <Tooltip
+                      formatter={(v: any) => fmt(Number(v))}
+                      contentStyle={{ background: "#0d0d0d", border: "1px solid #2d2d2d", borderRadius: 8, color: "#f5f3ee", fontSize: 11 }}
+                      labelStyle={{ color: "#f5f3ee" }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          {/* Pharmacies tracked */}
+          <BigStat
+            className="col-span-6 md:col-span-5"
+            kicker="Pharmacies tracked"
+            value={totals ? fmt(totals.pharmacies) : "—"}
+            sub="across all four UK nations"
+            icon={Database}
+          />
+
+          {/* Pharmacy First */}
+          <BigStat
+            className="col-span-6 md:col-span-5"
+            kicker="Pharmacy First"
+            value={totals ? fmtCompact(totals.pf) : "—"}
+            sub="consultations this month"
+            icon={Stethoscope}
+          />
+
+          {/* UK 4 nations infographic */}
+          <NationsMap className="col-span-12 md:col-span-7 row-span-2" data={data} />
+
+          {/* NMS */}
+          <BigStat
+            className="col-span-6 md:col-span-5"
+            kicker="NMS"
+            value={totals ? fmtCompact(totals.nms) : "—"}
+            sub="new medicine service interventions"
+            icon={Activity}
+          />
+
+          {/* EPS */}
+          <BigStat
+            className="col-span-6 md:col-span-5"
+            kicker="EPS items"
+            value={totals ? fmtCompact(totals.eps) : "—"}
+            sub="electronic prescriptions"
+            icon={TrendingUp}
+          />
+
+          {/* Top regions bar (compact) */}
+          <RegionsTile className="col-span-12 md:col-span-7" data={data} />
+
+          {/* Benchmark sample */}
+          <BenchmarkSample className="col-span-12 md:col-span-5" />
+
+          {/* Companies House CTA */}
+          <CHTile className="col-span-12 md:col-span-7" />
+
+          {/* AI analysis CTA */}
+          <AITile className="col-span-12 md:col-span-5" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BigStat({
+  className = "", kicker, value, sub, icon: Icon,
+}: { className?: string; kicker: string; value: string; sub: string; icon: any }) {
+  return (
+    <div className={`tile p-5 md:p-6 flex flex-col justify-between ${className}`}>
+      <div className="flex items-center justify-between">
+        <span className="kicker">{kicker}</span>
+        <Icon className="h-4 w-4 ink-dim" />
+      </div>
+      <div className="mt-4">
+        <div className="serif num text-5xl md:text-6xl font-bold leading-none">{value}</div>
+        <div className="mt-2 text-xs ink-dim">{sub}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Four nations infographic ---------- */
+function NationsMap({ className = "", data }: { className?: string; data: Dashboard | null }) {
+  const rows = data?.by_country || [];
+  const max = Math.max(1, ...rows.map((r) => r.value));
+  // simplified geographic blocks — Scotland top, NI left-mid, England right, Wales lower-left
+  const layout: Record<string, { x: number; y: number; w: number; h: number }> = {
+    Scotland: { x: 60, y: 8, w: 120, h: 70 },
+    "Northern Ireland": { x: 8, y: 80, w: 60, h: 40 },
+    Wales: { x: 80, y: 110, w: 50, h: 50 },
+    England: { x: 130, y: 80, w: 110, h: 110 },
+  };
+  return (
+    <div className={`tile-paper p-5 md:p-6 relative overflow-hidden ${className}`}>
+      <div className="flex items-start justify-between">
+        <div>
+          <span className="kicker">Four nations</span>
+          <h3 className="serif text-2xl md:text-3xl font-bold mt-1">One ledger.</h3>
+        </div>
+        <span className="text-xs ink-dim">share of items dispensed</span>
+      </div>
+      <div className="mt-5 grid grid-cols-5 gap-4 items-center">
+        <svg viewBox="0 0 250 210" className="col-span-2 w-full h-auto">
+          <defs>
+            <pattern id="hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+              <line x1="0" y1="0" x2="0" y2="6" stroke="#0d0d0d" strokeWidth="1" />
+            </pattern>
+          </defs>
+          {Object.entries(layout).map(([country, box]) => {
+            const row = rows.find((r) => r.country?.toLowerCase() === country.toLowerCase());
+            const intensity = row ? row.value / max : 0.2;
+            return (
+              <g key={country}>
+                <rect x={box.x} y={box.y} width={box.w} height={box.h}
+                  fill={intensity > 0.6 ? "#0d0d0d" : "url(#hatch)"}
+                  opacity={0.25 + intensity * 0.7}
+                  stroke="#0d0d0d" strokeWidth="1" rx="4" />
+                <text x={box.x + 4} y={box.y + 12} fontSize="8"
+                  fill={intensity > 0.6 ? "#f5f3ee" : "#0d0d0d"}
+                  fontWeight="700" style={{ letterSpacing: "0.08em" }}>
+                  {country.toUpperCase()}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+        <div className="col-span-3 space-y-3">
+          {(rows.length ? rows : Array.from({ length: 4 })).map((r: any, i: number) => {
+            const pct = r ? Math.round((r.value / max) * 100) : 0;
+            return (
+              <div key={i} className="border-b rule pb-2">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm font-semibold">{r?.country || "—"}</span>
+                  <span className="num text-sm font-bold">{r ? fmtCompact(r.value) : "…"}</span>
+                </div>
+                <div className="mt-1 h-1.5 rounded-full" style={{ background: "#e6dfcd" }}>
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--ink)" }} />
+                </div>
+                <div className="mt-1 flex justify-between text-[10px] ink-dim">
+                  <span>{r ? `${fmt(r.pharmacies)} pharmacies` : "…"}</span>
+                  <span className="num">{r ? `PF ${fmtCompact(r.pf)} · NMS ${fmtCompact(r.nms)}` : ""}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Top regions bar ---------- */
+function RegionsTile({ className = "", data }: { className?: string; data: Dashboard | null }) {
+  const rows = (data?.top_regions || []).slice(0, 8).map((r) => ({
+    name: titleCase(r.region).replace(/^Nhs /i, ""), value: r.value,
+  }));
+  return (
+    <div className={`tile p-5 md:p-6 ${className}`}>
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="kicker">Top areas</span>
+          <h3 className="serif text-xl md:text-2xl font-bold mt-1">Where the volume sits.</h3>
+        </div>
+        <MapPin className="h-4 w-4 ink-dim" />
+      </div>
+      <div className="mt-4 h-56">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={rows} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+            <XAxis type="number" hide tickFormatter={(v: number) => fmtCompact(v)} />
+            <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11, fill: "#2d2d2d" }} stroke="transparent" />
+            <Tooltip
+              formatter={(v: any) => fmt(Number(v))}
+              contentStyle={{ background: "#fff", border: "1px solid #d9d3c4", borderRadius: 8, fontSize: 12 }}
+            />
+            <Bar dataKey="value" fill="#0d0d0d" radius={[0, 4, 4, 0]}>
+              {rows.map((_, i) => <Cell key={i} fill={i === 0 ? "#0d0d0d" : "#2d2d2d"} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Benchmark sample (synthetic illustration) ---------- */
+function BenchmarkSample({ className = "" }: { className?: string }) {
+  const sample = useMemo(() => ([
+    { label: "Items", you: 8200, local: 6400, top: 11000 },
+    { label: "PF", you: 64, local: 38, top: 92 },
+    { label: "NMS", you: 41, local: 28, top: 78 },
+    { label: "EPS %", you: 92, local: 88, top: 97 },
+  ]), []);
+  return (
+    <div className={`tile p-5 md:p-6 ${className}`}>
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="kicker">Sample pharmacy</span>
+          <h3 className="serif text-xl md:text-2xl font-bold mt-1">You vs the cohort.</h3>
+        </div>
+        <BarChart2 className="h-4 w-4 ink-dim" />
+      </div>
+      <div className="mt-4 space-y-3">
+        {sample.map((m) => {
+          const max = Math.max(m.you, m.local, m.top);
+          return (
+            <div key={m.label}>
+              <div className="flex justify-between text-xs">
+                <span className="font-semibold">{m.label}</span>
+                <span className="num ink-dim">local {fmtCompact(m.local)} · top {fmtCompact(m.top)}</span>
+              </div>
+              <div className="relative mt-1 h-5 rounded" style={{ background: "var(--paper-2)" }}>
+                <div className="absolute inset-y-0 left-0 rounded" style={{ width: `${(m.local / max) * 100}%`, background: "#cdc4ad" }} />
+                <div className="absolute inset-y-0 left-0 rounded" style={{ width: `${(m.you / max) * 100}%`, background: "var(--ink)" }} />
+                <div className="absolute inset-y-0" style={{ left: `${(m.top / max) * 100}%`, width: 2, background: "#000", opacity: 0.5 }} />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-bold num" style={{ color: "var(--paper)" }}>
+                  {fmtCompact(m.you)}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-4 text-[11px] ink-dim">
+        Illustrative numbers. Claim your pharmacy to see the real comparison against your ICB cohort.
+      </p>
+    </div>
+  );
+}
+
+/* ---------- Companies House tile ---------- */
+function CHTile({ className = "" }: { className?: string }) {
+  return (
+    <div className={`tile-paper p-5 md:p-6 ${className}`}>
+      <div className="grid md:grid-cols-2 gap-4 items-center">
+        <div>
+          <span className="kicker">Companies House, linked</span>
+          <h3 className="serif text-2xl md:text-3xl font-bold mt-1">Numbers, with names attached.</h3>
+          <p className="text-sm ink-dim mt-2 max-w-sm">
+            Every limited-company pharmacy joined to its accounts, directors, valuation range and red flags.
+          </p>
+          <Link to="/register" className="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold border-b-2" style={{ borderColor: "var(--ink)" }}>
+            Browse pharmacy owners <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center text-xs">
+          {[
+            { k: "T/O range", v: "£0.6–1.4m" },
+            { k: "Net assets", v: "£212k" },
+            { k: "Avg age", v: "11 yrs" },
+            { k: "Directors", v: "2" },
+            { k: "Sister sites", v: "4" },
+            { k: "Red flags", v: "0" },
+          ].map((c) => (
+            <div key={c.k} className="rounded-md p-2" style={{ background: "#fff", border: "1px solid var(--rule)" }}>
+              <div className="kicker text-[9px]">{c.k}</div>
+              <div className="num text-sm font-bold mt-1">{c.v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- AI tile ---------- */
+function AITile({ className = "" }: { className?: string }) {
+  return (
+    <div className={`tile-dark p-5 md:p-6 relative overflow-hidden ${className}`}>
+      <div className="absolute inset-0 dot-grid opacity-15" />
+      <div className="relative">
+        <span className="kicker kicker-on-dark">One-click AI</span>
+        <h3 className="serif text-2xl md:text-3xl font-bold mt-1">Read the room.</h3>
+        <p className="text-sm opacity-75 mt-2 max-w-sm">
+          A 30-second written summary of how a pharmacy is performing — written in the voice of a calm consultant.
+        </p>
+        <div className="mt-4 rounded-md p-3 text-xs" style={{ background: "rgba(245,243,238,0.08)", border: "1px solid rgba(245,243,238,0.15)" }}>
+          <Sparkles className="h-3.5 w-3.5 inline mr-1.5 opacity-70" />
+          "Items dispensed up 6% YoY. Pharmacy First sits in the top quartile for the local ICB.
+          Worth pressing on NMS — currently 32% behind the local average."
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Nations strip ---------- */
+function NationsStrip({ data }: { data: Dashboard | null }) {
+  const rows = data?.by_country || [];
+  return (
+    <section id="nations" className="border-b rule" style={{ background: "var(--paper-2)" }}>
+      <div className="mx-auto max-w-7xl px-6 py-14">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <div className="kicker">§ 02 — Four nations</div>
+            <h2 className="serif text-3xl md:text-5xl font-bold mt-2">One country, four ledgers.</h2>
+          </div>
+          <p className="text-xs ink-dim max-w-xs text-right hidden md:block">
+            Each nation publishes its own dispensing data, on its own cadence. We line them up.
+          </p>
+        </div>
+        <div className="grid md:grid-cols-4 gap-0 border-y-2" style={{ borderColor: "var(--ink)" }}>
+          {(rows.length ? rows : Array.from({ length: 4 })).map((r: any, i: number) => (
+            <div key={i} className={`p-5 md:p-7 ${i < 3 ? "md:border-r rule" : ""} ${i > 0 && i < rows.length ? "border-t md:border-t-0 rule" : ""}`}>
+              <div className="num text-xs ink-dim">0{i + 1}</div>
+              <div className="serif text-2xl font-bold mt-1">{r?.country || "—"}</div>
+              <div className="num serif text-4xl md:text-5xl font-bold mt-3">{r ? fmtCompact(r.value) : "…"}</div>
+              <div className="text-[11px] ink-dim">items dispensed</div>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+                <Mini k="Pharm." v={r ? fmt(r.pharmacies) : "…"} />
+                <Mini k="PF" v={r ? fmtCompact(r.pf) : "…"} />
+                <Mini k="NMS" v={r ? fmtCompact(r.nms) : "…"} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+function Mini({ k, v }: { k: string; v: string }) {
+  return <div><div className="kicker text-[9px]">{k}</div><div className="num font-semibold mt-0.5">{v}</div></div>;
+}
+
+/* ---------- Leaderboards ---------- */
+function Leaderboards({ data }: { data: Dashboard | null }) {
   const period = data?.period;
   const boards = [
-    { key: "items", title: "Items dispensed", icon: Pill, rows: data?.top_items },
-    { key: "pf",    title: "Pharmacy First",   icon: Stethoscope, rows: data?.top_pf },
-    { key: "nms",   title: "NMS",              icon: Activity, rows: data?.top_nms },
-    { key: "eps",   title: "EPS items",        icon: TrendingUp, rows: data?.top_eps },
+    { key: "items", title: "Items dispensed", rows: data?.top_items },
+    { key: "pf", title: "Pharmacy First", rows: data?.top_pf },
+    { key: "nms", title: "NMS", rows: data?.top_nms },
+    { key: "eps", title: "EPS", rows: data?.top_eps },
   ];
   return (
-    <section id="leaderboards" className="border-b border-border">
-      <div className="mx-auto max-w-7xl px-6 py-16">
-        <SectionHeader
-          eyebrow="Live UK leaderboards"
-          title="Who's top of the league this month?"
-          subtitle={period ? `Top 10 across the UK · ${monthName(period.year, period.month)}` : "Loading latest month…"}
-        />
-        {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
-        <div className="mt-8 grid md:grid-cols-2 xl:grid-cols-4 gap-5">
+    <section id="leaderboards" className="border-b rule">
+      <div className="mx-auto max-w-7xl px-6 py-14">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <div className="kicker">§ 03 — League tables</div>
+            <h2 className="serif text-3xl md:text-5xl font-bold mt-2">Top of the page,<br />top of the league.</h2>
+          </div>
+          <p className="text-xs ink-dim max-w-xs text-right hidden md:block">
+            UK-wide top 10 for {period ? monthName(period.year, period.month) : "the latest month"}. Sign in to filter by ICB and unlock 36 months of history.
+          </p>
+        </div>
+        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
           {boards.map((b) => (
-            <LeaderCard key={b.key} title={b.title} icon={b.icon} rows={b.rows} />
+            <div key={b.key} className="tile overflow-hidden">
+              <div className="px-4 py-3 border-b rule flex items-center justify-between" style={{ background: "var(--paper-2)" }}>
+                <span className="text-sm font-semibold">{b.title}</span>
+                <Trophy className="h-3.5 w-3.5 ink-dim" />
+              </div>
+              <ol className="divide-y rule">
+                {(b.rows || Array.from({ length: 10 })).map((r: any, i: number) => (
+                  <li key={i} className="flex items-center gap-3 px-4 py-2 text-sm">
+                    <span className={[
+                      "num inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold flex-shrink-0",
+                      i === 0 ? "bg-black text-white" : "border rule",
+                    ].join(" ")}>{i + 1}</span>
+                    {r ? (
+                      <>
+                        <span className="flex-1 truncate font-medium">{titleCase(r.name)}</span>
+                        <span className="num font-bold">{fmtCompact(r.value)}</span>
+                      </>
+                    ) : (
+                      <span className="flex-1 h-3 rounded animate-pulse" style={{ background: "var(--paper-2)" }} />
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </div>
           ))}
         </div>
         <div className="mt-6 text-center">
-          <Link to="/register" className="text-sm font-semibold text-primary hover:underline">
-            Sign in to filter by ICB, Health Board and 36 months of history →
+          <Link to="/register" className="text-sm font-semibold border-b-2 pb-0.5" style={{ borderColor: "var(--ink)" }}>
+            Unlock full filters and history →
           </Link>
         </div>
       </div>
@@ -232,301 +673,81 @@ function LeaderboardsBlock({ data, error }: { data: Dashboard | null; error: str
   );
 }
 
-function LeaderCard({ title, icon: Icon, rows }: { title: string; icon: any; rows?: LeaderRow[] }) {
-  return (
-    <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-secondary/50">
-        <Icon className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-semibold">{title}</h3>
-      </div>
-      <ol className="divide-y divide-border">
-        {(rows || Array.from({ length: 10 })).map((r: any, i: number) => (
-          <li key={i} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-            <span className={[
-              "inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold flex-shrink-0",
-              i === 0 ? "bg-gold/20 text-gold" : i < 3 ? "bg-secondary text-foreground" : "bg-muted text-muted-foreground",
-            ].join(" ")}>{i + 1}</span>
-            {r ? (
-              <>
-                <span className="flex-1 truncate font-medium text-foreground">{titleCase(r.name)}</span>
-                <span className="tabular-nums font-semibold text-foreground">{fmt(r.value)}</span>
-              </>
-            ) : (
-              <span className="flex-1 h-3 rounded bg-muted animate-pulse" />
-            )}
-          </li>
-        ))}
-      </ol>
-    </div>
-  );
-}
-
-function titleCase(s: string) {
-  return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/\bLtd\b/i, "Ltd").replace(/\bUk\b/g, "UK").replace(/\bNhs\b/g, "NHS");
-}
-
-function TrendBlock({ data }: { data: Dashboard | null }) {
-  const series = (data?.totals_trend || []).map((r) => ({
-    label: new Date(r.year, r.month - 1, 1).toLocaleString("en-GB", { month: "short", year: "2-digit" }),
-    items: r.items,
-    eps: r.eps,
-  }));
-  return (
-    <section className="border-b border-border bg-secondary/30">
-      <div className="mx-auto max-w-7xl px-6 py-16">
-        <SectionHeader
-          eyebrow="National trend"
-          title="UK NHS dispensing — last 24 months"
-          subtitle="Total items dispensed (all four nations) vs Electronic Prescription Service (EPS) items."
-        />
-        <div className="mt-8 rounded-lg border border-border bg-card p-5 shadow-sm">
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series} margin={{ top: 10, right: 16, left: -10, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="gItems" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--chart-2)" stopOpacity={0.45} />
-                    <stop offset="100%" stopColor="var(--chart-2)" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gEps" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--gold)" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="var(--gold)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                <YAxis tickFormatter={(v: number) => fmtCompact(v)} tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                <Tooltip
-                  formatter={(v: any) => fmt(Number(v))}
-                  contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
-                />
-                <Area type="monotone" dataKey="items" name="Total items" stroke="var(--chart-2)" strokeWidth={2} fill="url(#gItems)" />
-                <Area type="monotone" dataKey="eps" name="EPS items" stroke="var(--gold)" strokeWidth={2} fill="url(#gEps)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function RegionsBlock({ data }: { data: Dashboard | null }) {
-  const rows = data?.top_regions || [];
-  const max = Math.max(1, ...rows.map((r) => r.value));
-  return (
-    <section className="border-b border-border">
-      <div className="mx-auto max-w-7xl px-6 py-16">
-        <SectionHeader
-          eyebrow="Areas"
-          title="Top 12 areas by dispensing volume"
-          subtitle="NHS regions, ICBs and Health Boards ranked by total items this month."
-        />
-        <div className="mt-8 grid md:grid-cols-2 gap-x-8 gap-y-2">
-          {(rows.length ? rows : Array.from({ length: 12 })).map((r: any, i: number) => (
-            <div key={i} className="flex items-center gap-3 py-2">
-              <span className="text-xs tabular-nums text-muted-foreground w-6 text-right">{i + 1}</span>
-              <MapPin className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-medium truncate">{r ? titleCase(r.region) : ""}</span>
-                  <span className="text-sm font-semibold tabular-nums">{r ? fmtCompact(r.value) : ""}</span>
-                </div>
-                <div className="mt-1 h-1.5 rounded-full bg-secondary overflow-hidden">
-                  <div className="h-full bg-primary transition-all" style={{ width: r ? `${(r.value / max) * 100}%` : "0%" }} />
-                </div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground">
-                  {r ? `${r.pharmacies} pharmacies · ${r.country}` : ""}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function CountryBlock({ data }: { data: Dashboard | null }) {
-  const rows = data?.by_country || [];
-  return (
-    <section className="border-b border-border bg-secondary/30">
-      <div className="mx-auto max-w-7xl px-6 py-16">
-        <SectionHeader
-          eyebrow="UK breakdown"
-          title="Four nations, one view"
-          subtitle="England, Scotland, Wales and Northern Ireland side by side."
-        />
-        <div className="mt-8 grid md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {(rows.length ? rows : Array.from({ length: 4 })).map((r: any, i: number) => (
-            <div key={i} className="rounded-lg border border-border bg-card p-5 shadow-sm">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">{r?.country || "—"}</div>
-              <div className="mt-2 text-3xl font-bold tabular-nums">{r ? fmtCompact(r.value) : "…"}</div>
-              <div className="text-xs text-muted-foreground">items dispensed</div>
-              <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
-                <Mini label="Pharmacies" value={r ? fmt(r.pharmacies) : "…"} />
-                <Mini label="PF" value={r ? fmtCompact(r.pf) : "…"} />
-                <Mini label="NMS" value={r ? fmtCompact(r.nms) : "…"} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Mini({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-muted-foreground">{label}</div>
-      <div className="font-semibold tabular-nums">{value}</div>
-    </div>
-  );
-}
-
-function CompareCta() {
-  return (
-    <section className="border-b border-border">
-      <div className="mx-auto max-w-7xl px-6 py-14">
-        <div className="rounded-xl border border-border bg-gradient-to-br from-primary to-primary/80 text-primary-foreground p-8 md:p-10 shadow-lg">
-          <div className="grid md:grid-cols-2 gap-6 items-center">
-            <div>
-              <span className="inline-block text-xs uppercase tracking-widest text-gold font-semibold">Why PharmInsight beats pharmdata</span>
-              <h2 className="mt-2 text-2xl md:text-3xl font-bold">Live leaderboards, free benchmarking, AI analysis, Companies House data — in one place.</h2>
-              <p className="mt-3 text-sm md:text-base text-primary-foreground/80 max-w-xl">
-                Pharmdata is read-only. PharmInsight lets you sign in, claim your pharmacy, benchmark against the local average and top 10%, see GP catchment, run AI analysis, and pull Companies House financials — all included.
-              </p>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <Link to="/register" className="rounded-md bg-gold text-gold-foreground px-5 py-2.5 text-sm font-semibold hover:opacity-90">
-                  Claim your pharmacy
-                </Link>
-                <Link to="/login" className="rounded-md border border-primary-foreground/30 px-5 py-2.5 text-sm font-semibold hover:bg-primary-foreground/10">
-                  Sign in
-                </Link>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <CompareTile label="Live league tables" us="✓" them="✓" />
-              <CompareTile label="Filter by ICB / HB" us="✓" them="✓" />
-              <CompareTile label="Benchmark vs local" us="✓" them="✗" />
-              <CompareTile label="Companies House" us="✓" them="✗" />
-              <CompareTile label="GP catchment" us="✓" them="✗" />
-              <CompareTile label="AI analysis" us="✓" them="✗" />
-              <CompareTile label="Local landscape" us="✓" them="✗" />
-              <CompareTile label="Free to use" us="✓" them="paid" />
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function CompareTile({ label, us, them }: { label: string; us: string; them: string }) {
-  return (
-    <div className="rounded-md bg-primary-foreground/10 border border-primary-foreground/15 px-3 py-2.5">
-      <div className="text-xs text-primary-foreground/70">{label}</div>
-      <div className="mt-1 flex items-center justify-between text-sm">
-        <span className="text-gold font-semibold">Us {us}</span>
-        <span className="text-primary-foreground/60">Them {them}</span>
-      </div>
-    </div>
-  );
-}
-
-function Features() {
-  const items = [
-    { icon: Trophy, title: "Leaderboards", body: "Every pharmacy, every service, every month — filter by country, ICB and Health Board." },
-    { icon: BarChart2, title: "Benchmarking", body: "See where you sit vs the local cohort and the national top 10%, in plain English." },
-    { icon: Building2, title: "Companies House", body: "Linked financials, directors, valuation range and red flags for every limited company." },
-    { icon: MapPin, title: "Local landscape", body: "Nearby competing pharmacies, surrounding GP surgeries and dispensing share." },
-    { icon: Stethoscope, title: "Pharmacy First", body: "Track every advanced service: PF, NMS, MCR, smoking cessation, methadone and more." },
-    { icon: Sparkles, title: "AI analysis", body: "One click turns the numbers into a 30-second performance summary, written like a consultant would." },
+/* ---------- Manifesto ---------- */
+function Manifesto() {
+  const principles = [
+    { n: "I.", t: "Open data deserves clear pages.", b: "NHS releases are dense PDFs and spreadsheets. We publish them as a living atlas, free to read." },
+    { n: "II.", t: "Compare, don't just count.", b: "Every number sits next to its local cohort and the top decile. Context is the product." },
+    { n: "III.", t: "Numbers with names attached.", b: "Companies House, GP catchment and four-nation services in one record. Not a different tab." },
+    { n: "IV.", t: "Read it in 30 seconds.", b: "AI turns the dashboard into a paragraph. Skim the page, claim the insight, move on." },
   ];
   return (
-    <section className="border-b border-border">
+    <section id="manifesto" className="border-b rule">
       <div className="mx-auto max-w-7xl px-6 py-16">
-        <SectionHeader eyebrow="Everything you need" title="Built for owners, consultants and acquirers." />
-        <div className="mt-10 grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {items.map((f) => (
-            <div key={f.title} className="rounded-lg border border-border bg-card p-6 shadow-sm hover:border-gold/40 hover:shadow-md transition-all">
-              <div className="h-10 w-10 rounded-md bg-gold/15 flex items-center justify-center text-gold">
-                <f.icon className="h-5 w-5" />
+        <div className="grid lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-4">
+            <div className="kicker">§ 04 — Manifesto</div>
+            <h2 className="serif text-3xl md:text-5xl font-bold mt-2">Why we built this.</h2>
+            <p className="mt-4 text-sm ink-dim max-w-sm">
+              We were tired of paying for a read-only mirror of free NHS data. So we built the
+              alternative: a clearer atlas, with the context built in.
+            </p>
+            <Link to="/register" className="inline-flex items-center gap-2 mt-6 rounded-md px-5 py-3 text-sm font-semibold" style={{ background: "var(--ink)", color: "var(--paper)" }}>
+              Start reading the atlas <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="lg:col-span-8 grid md:grid-cols-2 gap-px" style={{ background: "var(--rule)" }}>
+            {principles.map((p) => (
+              <div key={p.n} className="p-6" style={{ background: "var(--paper)" }}>
+                <div className="serif text-2xl font-bold">{p.n}</div>
+                <div className="serif text-lg font-bold mt-1">{p.t}</div>
+                <p className="text-sm ink-dim mt-2 leading-relaxed">{p.b}</p>
               </div>
-              <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
-              <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{f.body}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </section>
   );
 }
 
-function ClosingCta() {
+/* ---------- footer ---------- */
+function PaperFooter() {
   return (
-    <section className="border-b border-border bg-secondary/30">
-      <div className="mx-auto max-w-3xl px-6 py-20 text-center">
-        <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Ready to know where you stand?</h2>
-        <p className="mt-3 text-muted-foreground">It takes 30 seconds. No card. Full access to leaderboards, benchmarking and AI analysis.</p>
-        <div className="mt-6 flex justify-center gap-3">
-          <Link to="/register" className="rounded-md bg-primary text-primary-foreground px-6 py-3 text-sm font-semibold hover:opacity-90">
-            Create free account
-          </Link>
-          <Link to="/login" className="rounded-md border border-border bg-card px-6 py-3 text-sm font-semibold hover:bg-secondary">
-            Sign in
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SectionHeader({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle?: string }) {
-  return (
-    <div className="text-center max-w-3xl mx-auto">
-      <span className="text-xs uppercase tracking-widest text-gold font-semibold">{eyebrow}</span>
-      <h2 className="mt-2 text-2xl md:text-3xl font-bold tracking-tight text-foreground">{title}</h2>
-      {subtitle && <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>}
-    </div>
-  );
-}
-
-function SiteFooter() {
-  return (
-    <footer>
-      <div className="mx-auto max-w-7xl px-6 py-10 grid md:grid-cols-3 gap-6 text-sm">
+    <footer style={{ background: "var(--ink)", color: "var(--paper)" }}>
+      <div className="mx-auto max-w-7xl px-6 py-14 grid md:grid-cols-3 gap-8">
         <div>
           <div className="flex items-center gap-2">
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-md" style={{ background: "var(--paper)", color: "var(--ink)" }}>
               <Pill className="h-3.5 w-3.5" />
             </span>
             <span className="font-bold">PharmInsight</span>
           </div>
-          <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
-            Live UK pharmacy analytics, built on open NHS data. The smarter alternative to pharmdata.
+          <p className="mt-3 text-xs opacity-70 leading-relaxed max-w-xs">
+            A living atlas of UK community pharmacy, built on open NHS data.
           </p>
         </div>
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Product</div>
-          <ul className="mt-3 space-y-1.5">
-            <li><Link to="/register" className="hover:text-primary">Get started</Link></li>
-            <li><Link to="/login" className="hover:text-primary">Sign in</Link></li>
-            <li><a href="#leaderboards" className="hover:text-primary">Leaderboards</a></li>
+          <div className="kicker kicker-on-dark">Read</div>
+          <ul className="mt-3 space-y-1.5 text-sm">
+            <li><a href="#atlas" className="hover:opacity-60">The bento</a></li>
+            <li><a href="#nations" className="hover:opacity-60">Four nations</a></li>
+            <li><a href="#leaderboards" className="hover:opacity-60">League tables</a></li>
+            <li><a href="#manifesto" className="hover:opacity-60">Manifesto</a></li>
           </ul>
         </div>
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Data sources</div>
-          <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
-            NHS BSA (England), Public Health Scotland, NHS Wales, HSC BSO (Northern Ireland), Companies House — all under the Open Government Licence v3.0.
+          <div className="kicker kicker-on-dark">Sources</div>
+          <p className="mt-3 text-xs opacity-70 leading-relaxed">
+            NHS BSA (England), Public Health Scotland, NHS Wales, HSC BSO (Northern Ireland) and
+            Companies House — Open Government Licence v3.0.
           </p>
         </div>
       </div>
-      <div className="border-t border-border">
-        <div className="mx-auto max-w-7xl px-6 py-4 text-xs text-muted-foreground flex flex-col md:flex-row justify-between gap-2">
+      <div className="border-t" style={{ borderColor: "rgba(245,243,238,0.15)" }}>
+        <div className="mx-auto max-w-7xl px-6 py-4 text-xs opacity-70 flex flex-col md:flex-row justify-between gap-2">
           <span>© {new Date().getFullYear()} PharmInsight</span>
-          <span>Data updated monthly from official NHS releases.</span>
+          <span>Updated monthly from official NHS releases.</span>
         </div>
       </div>
     </footer>
