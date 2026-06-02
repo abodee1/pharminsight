@@ -575,12 +575,21 @@ function PharmacyProfile() {
             </div>
           )}
 
-          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <MiniChart title="Items dispensed" data={chartData} dataKey="items" />
-            {!isScotland && <MiniChart title="EPS items" data={chartData} dataKey="eps_items" />}
-            {!isScotland && <MiniChart title="NMS" data={chartData} dataKey="nms" />}
-            <MiniChart title="Pharmacy First" data={chartData} dataKey="pf" />
-            <MiniChart title="Gross cost (£)" data={chartData} dataKey="cost" />
+          <div className="mt-6">
+            <InteractiveTrend
+              rows={trimmedRows}
+              available={isScotland ? ["items", "pf", "gross", "final"] : ["items", "eps", "nms", "pf", "gross"]}
+            />
+          </div>
+
+          <div className="mt-6">
+            <LocalRadiusInsights
+              pharmacyId={pharmacy.id}
+              pharmacyName={pharmacy.name}
+              postcode={pharmacy.postcode}
+              lat={pharmacy.lat}
+              lng={pharmacy.lng}
+            />
           </div>
 
           {peerDistribution && latest && (
