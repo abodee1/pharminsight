@@ -105,7 +105,7 @@ function PharmacyProfile() {
       setLoading(true);
       const { data: p } = await supabase
         .from("pharmacies")
-        .select("id,ods_code,name,address,postcode,region,country")
+        .select("id,ods_code,name,address,postcode,region,country,lat,lng")
         .eq("ods_code", odsCode.toUpperCase())
         .maybeSingle();
       setPharmacy((p as Pharmacy) || null);
