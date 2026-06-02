@@ -14,6 +14,8 @@ import type { LucideIcon } from "lucide-react";
 import { PharmacySearch } from "@/components/PharmacySearch";
 import { PercentileRail, AnnotatedSparkline, ShareDonut, GpPrescribingCard } from "@/components/Infographics";
 import { LocalLandscape } from "@/components/LocalLandscape";
+import { LocalRadiusInsights } from "@/components/LocalRadiusInsights";
+import { InteractiveTrend } from "@/components/InteractiveTrend";
 import { AnalysisPanel } from "@/components/AnalysisPanel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetchAll } from "@/lib/fetchAll";
