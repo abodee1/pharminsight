@@ -437,7 +437,7 @@ function PharmacyProfile() {
         { label: "Final NHS payment", key: "money", field: "final_payment", format: gbp },
       ]
     : [];
-  const metrics = [...baseDefs, ...scottishDefs].map(buildMetric);
+  const metrics = [...baseDefs, ...scottishDefs].map(buildMetric).filter((m) => m.value > 0);
 
   const tableRows = [...trimmedRows].slice(-24).reverse();
 
