@@ -43,6 +43,7 @@ type Pharmacy = {
   id: string; ods_code: string; name: string;
   address: string | null; postcode: string | null;
   region: string | null; country: string | null;
+  lat: number | null; lng: number | null;
 };
 type Row = {
   month: number; year: number;
