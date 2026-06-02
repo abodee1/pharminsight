@@ -417,9 +417,9 @@ function PharmacyProfile() {
         : [
             { label: "Items dispensed", key: "items_dispensed", field: "items_dispensed" },
             { label: "EPS items", key: "eps_items", field: "eps_items" },
-            { label: "EPS nominations", key: "items_dispensed", field: "eps_nominations" },
             { label: "NMS", key: "nms_count", field: "nms_count" },
             { label: "Pharmacy First", key: "pharmacy_first_count", field: "pharmacy_first_count" },
+            { label: "Flu vaccinations", key: "flu_vaccinations", field: "flu_vaccinations" },
           ])
     : [];
   const scottishDefs: MetricDef[] = isScotland && latest
