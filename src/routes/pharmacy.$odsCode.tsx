@@ -578,7 +578,7 @@ function PharmacyProfile() {
           <div className="mt-6">
             <InteractiveTrend
               rows={trimmedRows}
-              available={isScotland ? ["items", "pf", "gross", "final"] : ["items", "eps", "nms", "pf", "gross"]}
+              available={isScotland ? ["items", "pf", "gross", "final"] : ["items", "eps", "nms", "pf"]}
             />
           </div>
 
