@@ -417,9 +417,9 @@ function PharmacyProfile() {
         : [
             { label: "Items dispensed", key: "items_dispensed", field: "items_dispensed" },
             { label: "EPS items", key: "eps_items", field: "eps_items" },
-            { label: "EPS nominations", key: "items_dispensed", field: "eps_nominations" },
             { label: "NMS", key: "nms_count", field: "nms_count" },
             { label: "Pharmacy First", key: "pharmacy_first_count", field: "pharmacy_first_count" },
+            { label: "Flu vaccinations", key: "flu_vaccinations", field: "flu_vaccinations" },
           ])
     : [];
   const scottishDefs: MetricDef[] = isScotland && latest
@@ -437,7 +437,7 @@ function PharmacyProfile() {
         { label: "Final NHS payment", key: "money", field: "final_payment", format: gbp },
       ]
     : [];
-  const metrics = [...baseDefs, ...scottishDefs].map(buildMetric);
+  const metrics = [...baseDefs, ...scottishDefs].map(buildMetric).filter((m) => m.value > 0);
 
   const tableRows = [...trimmedRows].slice(-24).reverse();
 
@@ -578,7 +578,7 @@ function PharmacyProfile() {
           <div className="mt-6">
             <InteractiveTrend
               rows={trimmedRows}
-              available={isScotland ? ["items", "pf", "gross", "final"] : ["items", "eps", "nms", "pf", "gross"]}
+              available={isScotland ? ["items", "pf", "gross", "final"] : ["items", "eps", "nms", "pf"]}
             />
           </div>
 
