@@ -101,7 +101,7 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
       setLoading(true);
       // 1) find latest period available across this cohort for the chosen metric
       const field = METRIC_FIELD[metric];
-      const { data: latestRow } = await supabase
+      const latestRes = await supabase
         .from("dispensing_data")
         .select(`year,month,${field}`)
         .in("pharmacy_id", ids)
@@ -110,8 +110,9 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
         .order("month", { ascending: false })
         .limit(1);
       if (!alive) return;
-      const ly = latestRow?.[0]?.year as number | undefined;
-      const lm = latestRow?.[0]?.month as number | undefined;
+      const latestRow = (latestRes.data as unknown as Array<{ year: number; month: number }> | null);
+      const ly = latestRow?.[0]?.year;
+      const lm = latestRow?.[0]?.month;
       if (!ly || !lm) {
         setPerPharm(new Map()); setPeriod(""); setLoading(false); return;
       }
