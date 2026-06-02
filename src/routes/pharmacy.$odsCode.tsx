@@ -14,6 +14,8 @@ import type { LucideIcon } from "lucide-react";
 import { PharmacySearch } from "@/components/PharmacySearch";
 import { PercentileRail, AnnotatedSparkline, ShareDonut, GpPrescribingCard } from "@/components/Infographics";
 import { LocalLandscape } from "@/components/LocalLandscape";
+import { LocalRadiusInsights } from "@/components/LocalRadiusInsights";
+import { InteractiveTrend } from "@/components/InteractiveTrend";
 import { AnalysisPanel } from "@/components/AnalysisPanel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetchAll } from "@/lib/fetchAll";
@@ -41,6 +43,7 @@ type Pharmacy = {
   id: string; ods_code: string; name: string;
   address: string | null; postcode: string | null;
   region: string | null; country: string | null;
+  lat: number | null; lng: number | null;
 };
 type Row = {
   month: number; year: number;
@@ -102,7 +105,7 @@ function PharmacyProfile() {
       setLoading(true);
       const { data: p } = await supabase
         .from("pharmacies")
-        .select("id,ods_code,name,address,postcode,region,country")
+        .select("id,ods_code,name,address,postcode,region,country,lat,lng")
         .eq("ods_code", odsCode.toUpperCase())
         .maybeSingle();
       setPharmacy((p as Pharmacy) || null);
@@ -572,12 +575,21 @@ function PharmacyProfile() {
             </div>
           )}
 
-          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <MiniChart title="Items dispensed" data={chartData} dataKey="items" />
-            {!isScotland && <MiniChart title="EPS items" data={chartData} dataKey="eps_items" />}
-            {!isScotland && <MiniChart title="NMS" data={chartData} dataKey="nms" />}
-            <MiniChart title="Pharmacy First" data={chartData} dataKey="pf" />
-            <MiniChart title="Gross cost (£)" data={chartData} dataKey="cost" />
+          <div className="mt-6">
+            <InteractiveTrend
+              rows={trimmedRows}
+              available={isScotland ? ["items", "pf", "gross", "final"] : ["items", "eps", "nms", "pf", "gross"]}
+            />
+          </div>
+
+          <div className="mt-6">
+            <LocalRadiusInsights
+              pharmacyId={pharmacy.id}
+              pharmacyName={pharmacy.name}
+              postcode={pharmacy.postcode}
+              lat={pharmacy.lat}
+              lng={pharmacy.lng}
+            />
           </div>
 
           {peerDistribution && latest && (
