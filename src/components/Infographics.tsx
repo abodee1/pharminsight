@@ -568,25 +568,17 @@ export function AnnotatedSparkline({
   const max = Math.max(...vals);
   const range = max - min || 1;
 
-  const xs = points.map((_, i) => pad + (i / (points.length - 1)) * (w - pad * 2));
-  const ys = points.map((p) => h - pad - ((p.value - min) / range) * (h - pad * 2));
+  const xs = usable.map((_, i) => pad + (i / (usable.length - 1)) * (w - pad * 2));
+  const ys = usable.map((p) => h - pad - ((p.value - min) / range) * (h - pad * 2));
 
   const path = xs.map((x, i) => `${i === 0 ? "M" : "L"}${x},${ys[i]}`).join(" ");
   const area = `${path} L${xs[xs.length - 1]},${h - pad} L${xs[0]},${h - pad} Z`;
 
   const peakIdx = vals.indexOf(max);
   const troughIdx = vals.indexOf(min);
-  // Use first/last non-zero values so leading/trailing months with no
-  // reported data (common for Pharmacy First, NMS, etc.) don't produce
-  // a misleading -100% change.
-  const firstNonZeroIdx = vals.findIndex((v) => v > 0);
-  let lastNonZeroIdx = -1;
-  for (let i = vals.length - 1; i >= 0; i--) {
-    if (vals[i] > 0) { lastNonZeroIdx = i; break; }
-  }
-  const hasChange = firstNonZeroIdx >= 0 && lastNonZeroIdx > firstNonZeroIdx;
-  const first = hasChange ? vals[firstNonZeroIdx] : 0;
-  const last = hasChange ? vals[lastNonZeroIdx] : 0;
+  const first = vals[0];
+  const last = vals[vals.length - 1];
+  const hasChange = first > 0;
   const yoy = hasChange ? Math.round(((last - first) / first) * 100) : 0;
   const tone = !hasChange ? "text-muted-foreground" : yoy > 0 ? "text-emerald-700" : yoy < 0 ? "text-rose-700" : "text-muted-foreground";
 
@@ -608,10 +600,10 @@ export function AnnotatedSparkline({
 
       <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
         <span>
-          Peak: <span className="font-semibold text-foreground">{fmt(max)}{unit}</span> · {points[peakIdx].period}
+          Peak: <span className="font-semibold text-foreground">{fmt(max)}{unit}</span> · {usable[peakIdx].period}
         </span>
         <span>
-          Low: <span className="font-semibold text-foreground">{fmt(min)}{unit}</span> · {points[troughIdx].period}
+          Low: <span className="font-semibold text-foreground">{fmt(min)}{unit}</span> · {usable[troughIdx].period}
         </span>
       </div>
       {caption && <p className="mt-3 text-xs italic text-muted-foreground border-t border-border pt-2">{caption}</p>}
