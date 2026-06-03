@@ -524,36 +524,40 @@ function Dashboard() {
         )}
       </div>
 
-      {pharmacy && peerItems.length > 8 && (
-        <div className="mt-6">
-          <MetricSpotlight
-            title="Cohort spotlight — pick a metric"
-            highlightLabel={pharmacy.name}
-            peerLabel={`${pharmacy.country || "Country"} avg`}
-            caption="Switch metrics to see where you sit across reporting peers for the latest published period."
-            metrics={(() => {
-              const arr: SpotlightMetric[] = [
-                {
-                  key: "items",
-                  label: "Items",
-                  values: peerItems,
-                  yourValue: stats.items,
-                  period: stats.period,
-                },
-                {
-                  key: "pf",
-                  label: "Pharmacy First",
-                  values: peerPf,
-                  yourValue: stats.pf,
-                  period: peerPfPeriod || stats.period,
-                },
-                {
-                  key: "nms",
-                  label: "NMS",
-                  values: peerNms,
-                  yourValue: stats.nms,
-                  period: stats.nmsPeriod || stats.period,
-                },
+      {pharmacy && peerItems.length > 8 && (() => {
+        // Only surface metrics where the cohort actually has reported data.
+        // Avoids showing "NHS revenue · £0" for countries that don't publish
+        // payment data (England, Wales, NI) — where every peer value is 0.
+        const hasData = (vals: number[]) =>
+          vals.length > 0 && vals.some((v) => v > 0);
+        const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
+        const raw: SpotlightMetric[] = [
+          {
+            key: "items",
+            label: "Items",
+            values: peerItems,
+            yourValue: stats.items,
+            period: stats.period,
+          },
+          {
+            key: "pf",
+            label: "Pharmacy First",
+            values: peerPf,
+            yourValue: stats.pf,
+            period: peerPfPeriod || stats.period,
+          },
+          {
+            key: "nms",
+            label: "NMS",
+            values: peerNms,
+            yourValue: stats.nms,
+            period: stats.nmsPeriod || stats.period,
+          },
+          // Payment metrics are only meaningful for Scotland (only country
+          // publishing per-pharmacy verified payments). Hide elsewhere so
+          // the chart never shows a flat 0 bar.
+          ...(isScot
+            ? [
                 {
                   key: "final",
                   label: "NHS revenue",
@@ -561,7 +565,7 @@ function Dashboard() {
                   yourValue: stats.finalPayment,
                   period: stats.payPeriod || stats.period,
                   format: money,
-                },
+                } as SpotlightMetric,
                 {
                   key: "gross",
                   label: "Gross cost",
@@ -569,13 +573,24 @@ function Dashboard() {
                   yourValue: stats.grossCost,
                   period: stats.payPeriod || stats.period,
                   format: money,
-                },
-              ];
-              return arr;
-            })()}
-          />
-        </div>
-      )}
+                } as SpotlightMetric,
+              ]
+            : []),
+        ];
+        const metrics = raw.filter((m) => hasData(m.values));
+        if (metrics.length === 0) return null;
+        return (
+          <div className="mt-6">
+            <MetricSpotlight
+              title={`Cohort spotlight — ${pharmacy.region || pharmacy.country || "your region"}`}
+              highlightLabel={pharmacy.name}
+              peerLabel={`${pharmacy.country || "Country"} avg`}
+              caption="Switch metrics to see where you sit across reporting peers for the latest published period."
+              metrics={metrics}
+            />
+          </div>
+        );
+      })()}
 
       {pharmacy && intensityRates.some((r) => r.topRate > 0) && (
         <div className="mt-6">
