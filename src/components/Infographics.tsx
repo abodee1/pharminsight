@@ -546,8 +546,12 @@ export function AnnotatedSparkline({
   unit?: string;
   caption?: string;
 }) {
+  // Drop months with no reported activity so the trough doesn't sit at 0
+  // for metrics (Pharmacy First, NMS, EPS) that started later in the window.
+  const filtered = points.filter((p) => p.value > 0);
+  const usable = filtered.length >= 2 ? filtered : points;
 
-  if (points.length < 2) {
+  if (usable.length < 2) {
     return (
       <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
         <h3 className="text-sm font-semibold">{label}</h3>
@@ -559,7 +563,7 @@ export function AnnotatedSparkline({
   const w = 320;
   const h = 80;
   const pad = 8;
-  const vals = points.map((p) => p.value);
+  const vals = usable.map((p) => p.value);
   const min = Math.min(...vals);
   const max = Math.max(...vals);
   const range = max - min || 1;
