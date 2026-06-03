@@ -657,30 +657,49 @@ function PharmacyProfile() {
           )}
 
 
-          {isScotland && latest && (
-            <section className="mt-6">
-              <ShareDonut
-                label={`Payment composition · ${MONTHS[latest.month - 1]} ${latest.year}`}
-                caption="Where this month's NHS revenue came from. Pharmacy First, MCR and smoking-cessation are shown as paid fees; dispensing is the residual gross cost minus these service streams."
-                formatValue={(n) => "£" + n.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                segments={[
-                  { label: "Pharmacy First", value: Number(latest.pharmacy_first_payment) || 0 },
-                  { label: "MCR", value: Number(latest.mcr_payment) || 0 },
-                  { label: "Smoking cessation", value: Number(latest.smoking_cessation_payment) || 0 },
-                  {
-                    label: "Dispensing & other",
-                    value: Math.max(
-                      0,
-                      (Number(latest.gross_cost) || 0)
-                        - (Number(latest.pharmacy_first_payment) || 0)
-                        - (Number(latest.mcr_payment) || 0)
-                        - (Number(latest.smoking_cessation_payment) || 0),
-                    ),
-                  },
-                ]}
-              />
-            </section>
-          )}
+          {isScotland && latest && (() => {
+            // Trailing 12-month payment composition for a richer breakdown.
+            const slice = trimmedRows.slice(-12);
+            const sumF = (k: keyof Row) => slice.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+            const sumI = (k: keyof Row) => slice.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+            const pf = sumF("pharmacy_first_payment");
+            const mcrPay = sumF("mcr_payment");
+            const smkPay = sumF("smoking_cessation_payment");
+            const gross = sumF("gross_cost");
+            const finalPay = sumF("final_payment");
+            const dispensing = Math.max(0, gross - pf - mcrPay - smkPay);
+            const topUp = Math.max(0, finalPay - gross);
+            const recovery = Math.max(0, gross - finalPay);
+            // Estimate methadone supervision fee at £2.50/dose (PCA fee schedule)
+            const methDoses = sumI("supervised_methadone_doses");
+            const methSupervision = methDoses * 2.5;
+            // Pull methadone fee out of "dispensing" residual since it's a service fee.
+            const dispNet = Math.max(0, dispensing - methSupervision);
+            const ehcItems = sumI("ehc_items");
+            const periodLabel = slice.length
+              ? `${MONTHS[slice[0].month - 1]} ${String(slice[0].year).slice(2)} – ${MONTHS[slice[slice.length - 1].month - 1]} ${String(slice[slice.length - 1].year).slice(2)}`
+              : "";
+            const segments = [
+              { label: "Dispensing reimbursement", value: dispNet },
+              { label: "Pharmacy First", value: pf },
+              { label: "MCR (chronic medication)", value: mcrPay },
+              { label: "Methadone supervision (est.)", value: methSupervision },
+              { label: "Smoking cessation", value: smkPay },
+              { label: "EHC items (est.)", value: ehcItems * 11 },
+              { label: "Adjustments & top-ups", value: topUp },
+              { label: "Clawback / recoveries", value: recovery },
+            ].filter((s) => s.value > 0);
+            return (
+              <section className="mt-6">
+                <ShareDonut
+                  label={`Payment composition · trailing 12 months${periodLabel ? ` · ${periodLabel}` : ""}`}
+                  caption="Where NHS revenue came from over the last 12 reported months. Dispensing reimbursement is the residual gross drug cost net of service fees. Methadone supervision and EHC are estimated at PCA reference rates (£2.50/dose · £11/item) — actual amounts may vary."
+                  formatValue={(n) => "£" + n.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  segments={segments}
+                />
+              </section>
+            );
+          })()}
           <section className="mt-6">
             <GpPrescribingCard pharmacyOds={pharmacy.ods_code} />
           </section>
