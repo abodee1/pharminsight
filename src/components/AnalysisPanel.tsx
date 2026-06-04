@@ -330,10 +330,7 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
       )}
 
 
-      <div className="rounded-xl border border-gold/40 bg-gold/5 p-5">
-        <div className="flex items-center gap-2 mb-2"><Sparkles className="h-4 w-4 text-gold" /><h3 className="text-sm font-semibold">AI Performance Summary</h3>{aiAt && <span className="ml-auto text-[10px] text-muted-foreground">{new Date(aiAt).toLocaleString()}</span>}</div>
-          {aiLoading ? <p className="text-sm text-muted-foreground"><Loader2 className="inline h-3 w-3 animate-spin mr-1" /> Generating…</p> : <p className="text-sm whitespace-pre-wrap leading-relaxed">{aiText || "—"}</p>}
-      </div>
+      <RemunerationReport pharmacy={pharmacy} rows={rows} />
     </div>
   );
 }
