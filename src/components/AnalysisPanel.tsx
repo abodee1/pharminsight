@@ -488,10 +488,7 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
   const [localAvg, setLocalAvg] = useState<Record<string, number>>({});
   const [nationalAvg, setNationalAvg] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
-  const [aiText, setAiText] = useState("");
-  const [aiAt, setAiAt] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const gen = useServerFn(generateBenchmarkingInsight);
+
 
   const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
   const latestIdx = useMemo(() => {
