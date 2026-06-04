@@ -144,8 +144,8 @@ type LogRow = {
   status: string;
   year: number | null;
   month: number | null;
-  records_processed: number | null;
-  error_message: string | null;
+  rows_ingested: number | null;
+  error: string | null;
   created_at: string;
 };
 type QueueRow = {
@@ -267,7 +267,7 @@ function DatasetCard({ ds, stats, onRun, running }: {
         {lastFailure && (!lastSuccess || new Date(lastFailure.created_at) > new Date(lastSuccess.created_at)) && (
           <div className="rounded-md border border-rose-200 bg-rose-50 text-rose-900 text-xs px-3 py-2">
             <AlertTriangle className="inline h-3.5 w-3.5 mr-1" />
-            Last attempt failed{lastFailure.error_message ? `: ${lastFailure.error_message.slice(0, 140)}` : ""}
+            Last attempt failed{lastFailure.error ? `: ${lastFailure.error.slice(0, 140)}` : ""}
           </div>
         )}
 
@@ -331,7 +331,7 @@ function DataIngestionAdmin() {
     const [{ data: lg }, { data: q }, { data: recent }] = await Promise.all([
       supabase
         .from("ingestion_log")
-        .select("source,status,year,month,records_processed,error_message,created_at")
+        .select("source,status,year,month,rows_ingested,error,created_at")
         .in("source", sources)
         .gte("created_at", new Date(Date.now() - 90 * 86400000).toISOString())
         .order("created_at", { ascending: false })
@@ -343,7 +343,7 @@ function DataIngestionAdmin() {
         .limit(2000),
       supabase
         .from("ingestion_log")
-        .select("source,status,year,month,records_processed,error_message,created_at")
+        .select("source,status,year,month,rows_ingested,error,created_at")
         .in("source", sources)
         .order("created_at", { ascending: false })
         .limit(40),
@@ -376,7 +376,7 @@ function DataIngestionAdmin() {
         latestFailure: failures[0] ?? null,
         successes30d: last30.filter((l) => l.status === "success").length,
         failures30d: last30.filter((l) => l.status === "failed").length,
-        totalRecords30d: last30.reduce((s, l) => s + (l.records_processed ?? 0), 0),
+        totalRecords30d: last30.reduce((s, l) => s + (l.rows_ingested ?? 0), 0),
         pendingQueue: pending,
         coveragePct,
       };
@@ -512,8 +512,8 @@ function DataIngestionAdmin() {
                         <TableCell className="text-xs">{ds?.label ?? e.source}</TableCell>
                         <TableCell className="text-xs tabular-nums">{periodLabel(e.year, e.month)}</TableCell>
                         <TableCell><StatusBadge status={e.status} /></TableCell>
-                        <TableCell className="text-xs text-right tabular-nums">{e.records_processed?.toLocaleString() ?? "—"}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-[24rem] truncate">{e.error_message ?? ""}</TableCell>
+                        <TableCell className="text-xs text-right tabular-nums">{e.rows_ingested?.toLocaleString() ?? "—"}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[24rem] truncate">{e.error ?? ""}</TableCell>
                       </TableRow>
                     );
                   })}
