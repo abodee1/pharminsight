@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Sparkles, X, Star, Loader2, RefreshCw, Printer, AlertTriangle, CheckCircle2, TrendingUp, TrendingDown, Minus, Upload } from "lucide-react";
+import { X, Star, Loader2, RefreshCw, Printer, AlertTriangle, CheckCircle2, TrendingUp, TrendingDown, Minus, Upload, FileText } from "lucide-react";
 import { toast } from "sonner";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from "recharts";
 import { confirmCompany, rejectCandidate, searchCompany } from "@/lib/companiesHouse.functions";
-import { generateBenchmarkingInsight, generatePerformanceSummary } from "@/lib/aiAnalysis.functions";
+import { RemunerationReport } from "@/components/RemunerationReport";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -196,7 +196,7 @@ export function AnalysisPanel({ pharmacy, open, onClose }: { pharmacy: Pharmacy;
               {tab === "acquisition" && (canAcquire ? <AcquisitionTab pharmacy={pharmacy} rows={rows} /> :
                 <div className="p-10 text-center">
                   <div className="mx-auto max-w-md rounded-xl border border-border bg-card p-8">
-                    <Sparkles className="h-8 w-8 mx-auto text-gold mb-3" />
+                    <FileText className="h-8 w-8 mx-auto text-gold mb-3" />
                     <p className="font-semibold">Acquisition tools locked</p>
                     <p className="text-sm text-muted-foreground mt-2">Available for pharmacy owners and consultants. Update your role in settings.</p>
                   </div>
@@ -256,46 +256,6 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
     { label: "Flu vaccinations", v: latest.flu_vaccinations, p: prior?.flu_vaccinations ?? 0 },
   ]) : [];
 
-  // AI summary
-  const genFn = useServerFn(generatePerformanceSummary);
-  const [aiText, setAiText] = useState("");
-  const [aiAt, setAiAt] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const triggered = useRef(false);
-  useEffect(() => {
-    if (triggered.current || !latest) return;
-    triggered.current = true;
-    setAiLoading(true);
-    const last3 = rows.slice(Math.max(0, latestIdx - 2), latestIdx + 1);
-    const last3Avg = last3.reduce((s, r) => s + r.items_dispensed, 0) / Math.max(1, last3.length);
-    const base = {
-      pharmacy_name: pharmacy.name, region: pharmacy.region, country: pharmacy.country,
-      last3_avg_items: Math.round(last3Avg),
-      items_trend: last12.map((r) => r.items_dispensed),
-    };
-    const payload = isScot
-      ? { ...base,
-          mcr_registrations_last: latest.mcr_registrations,
-          mcr_items_last: latest.mcr_items,
-          methadone_items_last: latest.methadone_items,
-          supervised_doses_last: latest.supervised_methadone_doses,
-          ehc_items_last: latest.ehc_items,
-          smoking_cessation_last: latest.smoking_cessation,
-          pharmacy_first_payment_last: Number(latest.pharmacy_first_payment) || 0,
-          mcr_payment_last: Number(latest.mcr_payment) || 0,
-        }
-      : { ...base,
-          nms_last: latest.nms_count,
-          pf_last: latest.pharmacy_first_count,
-          flu_last: latest.flu_vaccinations,
-          eps_rate: epsRate,
-          eps_nominations_last: latest.eps_nominations,
-        };
-    genFn({ data: payload })
-      .then((r) => { setAiText(r.text); setAiAt(r.generated_at); })
-      .catch((e) => toast.error(e.message || "AI summary failed"))
-      .finally(() => setAiLoading(false));
-  }, [latest, rows, latestIdx, last12, epsRate, genFn, pharmacy.name, pharmacy.region, pharmacy.country, isScot]);
 
   if (!latest) return <div className="p-10 text-center text-sm text-muted-foreground">No dispensing data yet.</div>;
 
@@ -304,6 +264,7 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
       <div className="flex items-center gap-2">
         <span className="inline-flex items-center text-xs rounded-full bg-secondary px-2.5 py-1">Data current to {MONTHS[latest.month - 1]} {latest.year}</span>
       </div>
+
 
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-semibold mb-3">12-month items dispensed</h3>
@@ -369,10 +330,7 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
       )}
 
 
-      <div className="rounded-xl border border-gold/40 bg-gold/5 p-5">
-        <div className="flex items-center gap-2 mb-2"><Sparkles className="h-4 w-4 text-gold" /><h3 className="text-sm font-semibold">AI Performance Summary</h3>{aiAt && <span className="ml-auto text-[10px] text-muted-foreground">{new Date(aiAt).toLocaleString()}</span>}</div>
-          {aiLoading ? <p className="text-sm text-muted-foreground"><Loader2 className="inline h-3 w-3 animate-spin mr-1" /> Generating…</p> : <p className="text-sm whitespace-pre-wrap leading-relaxed">{aiText || "—"}</p>}
-      </div>
+      <RemunerationReport pharmacy={pharmacy} rows={rows} />
     </div>
   );
 }
@@ -530,10 +488,7 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
   const [localAvg, setLocalAvg] = useState<Record<string, number>>({});
   const [nationalAvg, setNationalAvg] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
-  const [aiText, setAiText] = useState("");
-  const [aiAt, setAiAt] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const gen = useServerFn(generateBenchmarkingInsight);
+
 
   const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
   const latestIdx = useMemo(() => {
@@ -619,17 +574,14 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
 
   const radar = rowsTable.slice(0, 6).map((r) => ({ metric: r.label, you: r.nat ? Math.round((r.self / r.nat) * 100) : 0, nat: 100 }));
 
-  const runAI = async () => {
-    setAiLoading(true);
-    try {
-      const r = await gen({ data: {
-        pharmacy_name: pharmacy.name,
-        country: pharmacy.country,
-        rows: rowsTable.map((rw) => ({ label: rw.label, self: rw.self, local: rw.local, national: rw.nat })),
-      }});
-      setAiText(r.text); setAiAt(r.generated_at);
-    } catch (e: any) { toast.error(e.message); } finally { setAiLoading(false); }
-  };
+  // Deterministic narrative — strongest / weakest vs national, plus headline takeaway
+  const ranked = rowsTable
+    .filter((r) => r.nat > 0)
+    .map((r) => ({ ...r, idx: (r.self / r.nat) * 100, gap: ((r.self - r.nat) / r.nat) * 100 }))
+    .sort((a, b) => b.idx - a.idx);
+  const strongest = ranked.slice(0, 2).filter((r) => r.gap > 0);
+  const weakest = ranked.slice(-2).filter((r) => r.gap < 0).reverse();
+  const overallIdx = ranked.length ? Math.round(ranked.reduce((s, r) => s + r.idx, 0) / ranked.length) : 0;
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -665,10 +617,34 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
         </RadarChart></ResponsiveContainer></div>
       </div>
 
-      <div className="rounded-xl border border-gold/40 bg-gold/5 p-5">
-        <div className="flex items-center gap-2 mb-2"><Sparkles className="h-4 w-4 text-gold" /><h3 className="text-sm font-semibold">AI Benchmarking Assessment</h3>{aiAt && <span className="ml-auto text-[10px] text-muted-foreground">{new Date(aiAt).toLocaleString()}</span>}</div>
-        {aiText ? <p className="text-sm whitespace-pre-wrap leading-relaxed">{aiText}</p> :
-          <Button size="sm" onClick={runAI} disabled={aiLoading}>{aiLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</> : "Generate insight"}</Button>}
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h3 className="text-sm font-semibold mb-3">Benchmarking assessment</h3>
+        <p className="text-sm leading-relaxed">
+          Overall index: <span className="font-semibold">{overallIdx}</span> vs national 100.
+          {overallIdx >= 110 && " This pharmacy trades materially above the national pace across most measured services."}
+          {overallIdx < 110 && overallIdx >= 90 && " This pharmacy tracks broadly in line with the national pace."}
+          {overallIdx < 90 && " This pharmacy is trading meaningfully below the national pace — material upside if service uptake is closed."}
+        </p>
+        {strongest.length > 0 && (
+          <div className="mt-3 text-sm">
+            <p className="font-medium text-emerald-800">Strongest vs national:</p>
+            <ul className="mt-1 space-y-1">
+              {strongest.map((r) => (
+                <li key={r.label} className="text-sm">• <span className="font-medium">{r.label}</span> — {r.gap > 0 ? "+" : ""}{r.gap.toFixed(0)}% vs national average.</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {weakest.length > 0 && (
+          <div className="mt-3 text-sm">
+            <p className="font-medium text-rose-800">Largest gaps to close:</p>
+            <ul className="mt-1 space-y-1">
+              {weakest.map((r) => (
+                <li key={r.label} className="text-sm">• <span className="font-medium">{r.label}</span> — {r.gap.toFixed(0)}% vs national average. Closing this to peer parity would meaningfully lift service remuneration.</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
