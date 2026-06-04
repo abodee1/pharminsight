@@ -574,17 +574,14 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
 
   const radar = rowsTable.slice(0, 6).map((r) => ({ metric: r.label, you: r.nat ? Math.round((r.self / r.nat) * 100) : 0, nat: 100 }));
 
-  const runAI = async () => {
-    setAiLoading(true);
-    try {
-      const r = await gen({ data: {
-        pharmacy_name: pharmacy.name,
-        country: pharmacy.country,
-        rows: rowsTable.map((rw) => ({ label: rw.label, self: rw.self, local: rw.local, national: rw.nat })),
-      }});
-      setAiText(r.text); setAiAt(r.generated_at);
-    } catch (e: any) { toast.error(e.message); } finally { setAiLoading(false); }
-  };
+  // Deterministic narrative — strongest / weakest vs national, plus headline takeaway
+  const ranked = rowsTable
+    .filter((r) => r.nat > 0)
+    .map((r) => ({ ...r, idx: (r.self / r.nat) * 100, gap: ((r.self - r.nat) / r.nat) * 100 }))
+    .sort((a, b) => b.idx - a.idx);
+  const strongest = ranked.slice(0, 2).filter((r) => r.gap > 0);
+  const weakest = ranked.slice(-2).filter((r) => r.gap < 0).reverse();
+  const overallIdx = ranked.length ? Math.round(ranked.reduce((s, r) => s + r.idx, 0) / ranked.length) : 0;
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -620,10 +617,34 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
         </RadarChart></ResponsiveContainer></div>
       </div>
 
-      <div className="rounded-xl border border-gold/40 bg-gold/5 p-5">
-        <div className="flex items-center gap-2 mb-2"><Sparkles className="h-4 w-4 text-gold" /><h3 className="text-sm font-semibold">AI Benchmarking Assessment</h3>{aiAt && <span className="ml-auto text-[10px] text-muted-foreground">{new Date(aiAt).toLocaleString()}</span>}</div>
-        {aiText ? <p className="text-sm whitespace-pre-wrap leading-relaxed">{aiText}</p> :
-          <Button size="sm" onClick={runAI} disabled={aiLoading}>{aiLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</> : "Generate insight"}</Button>}
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h3 className="text-sm font-semibold mb-3">Benchmarking assessment</h3>
+        <p className="text-sm leading-relaxed">
+          Overall index: <span className="font-semibold">{overallIdx}</span> vs national 100.
+          {overallIdx >= 110 && " This pharmacy trades materially above the national pace across most measured services."}
+          {overallIdx < 110 && overallIdx >= 90 && " This pharmacy tracks broadly in line with the national pace."}
+          {overallIdx < 90 && " This pharmacy is trading meaningfully below the national pace — material upside if service uptake is closed."}
+        </p>
+        {strongest.length > 0 && (
+          <div className="mt-3 text-sm">
+            <p className="font-medium text-emerald-800">Strongest vs national:</p>
+            <ul className="mt-1 space-y-1">
+              {strongest.map((r) => (
+                <li key={r.label} className="text-sm">• <span className="font-medium">{r.label}</span> — {r.gap > 0 ? "+" : ""}{r.gap.toFixed(0)}% vs national average.</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {weakest.length > 0 && (
+          <div className="mt-3 text-sm">
+            <p className="font-medium text-rose-800">Largest gaps to close:</p>
+            <ul className="mt-1 space-y-1">
+              {weakest.map((r) => (
+                <li key={r.label} className="text-sm">• <span className="font-medium">{r.label}</span> — {r.gap.toFixed(0)}% vs national average. Closing this to peer parity would meaningfully lift service remuneration.</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
