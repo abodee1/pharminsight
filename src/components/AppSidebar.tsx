@@ -10,6 +10,7 @@ import {
   LogOut,
   Bookmark,
   Stethoscope,
+  Database,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { PharmacySearch } from "./PharmacySearch";
@@ -23,6 +24,7 @@ const links = [
   { to: "/gp-surgeries", label: "GP Surgeries", icon: Stethoscope },
   { to: "/my-analyses", label: "My Analyses", icon: Bookmark },
 
+  { to: "/admin/data-ingestion", label: "Data Ingestion", icon: Database },
   { to: "/admin/payments-import", label: "Payments Import", icon: Upload },
   { to: "/settings", label: "My Account", icon: Settings },
 ];
