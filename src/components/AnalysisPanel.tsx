@@ -257,13 +257,14 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
   ]) : [];
 
 
-
+  if (!latest) return <div className="p-10 text-center text-sm text-muted-foreground">No dispensing data yet.</div>;
 
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center gap-2">
         <span className="inline-flex items-center text-xs rounded-full bg-secondary px-2.5 py-1">Data current to {MONTHS[latest.month - 1]} {latest.year}</span>
       </div>
+
 
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-semibold mb-3">12-month items dispensed</h3>
