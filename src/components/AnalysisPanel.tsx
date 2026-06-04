@@ -196,7 +196,7 @@ export function AnalysisPanel({ pharmacy, open, onClose }: { pharmacy: Pharmacy;
               {tab === "acquisition" && (canAcquire ? <AcquisitionTab pharmacy={pharmacy} rows={rows} /> :
                 <div className="p-10 text-center">
                   <div className="mx-auto max-w-md rounded-xl border border-border bg-card p-8">
-                    <Sparkles className="h-8 w-8 mx-auto text-gold mb-3" />
+                    <FileText className="h-8 w-8 mx-auto text-gold mb-3" />
                     <p className="font-semibold">Acquisition tools locked</p>
                     <p className="text-sm text-muted-foreground mt-2">Available for pharmacy owners and consultants. Update your role in settings.</p>
                   </div>
