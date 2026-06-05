@@ -187,7 +187,9 @@ async function processOne() {
 export const Route = createFileRoute("/api/public/hooks/ingest-scotland-gp")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const auth = await authorizeHookRequest(request);
+        if (!auth.ok) return new Response(auth.message, { status: auth.status });
         try {
           const queued = await discover();
           const result = await processOne();

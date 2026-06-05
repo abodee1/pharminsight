@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { authorizeHookRequest } from "@/lib/hook-auth.server";
 
 const SOURCE = "NHSBSA";
 const CKAN_BASE = "https://opendata.nhsbsa.net/api/3/action";
@@ -254,6 +255,8 @@ export const Route = createFileRoute("/api/public/hooks/ingest-england")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const auth = await authorizeHookRequest(request);
+        if (!auth.ok) return new Response(auth.message, { status: auth.status });
         try {
           const url = new URL(request.url);
           const reingest = url.searchParams.get("reingest") === "1";
