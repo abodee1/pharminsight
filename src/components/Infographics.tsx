@@ -344,66 +344,161 @@ export function GpPrescribingCard({
 
   return (
     <div className="space-y-3">
-      <TrendCard
-        title={title}
-        subtitle={loading ? "Loading…" : `${avgGps} GP practices · ${totalItems.toLocaleString()} items over ${win}M`}
-        caption="From official England, Scotland and NI linkage data — items dispensed against scripts issued by each GP practice."
-        points={points}
-        window={win}
-        onWindowChange={setWin}
-        formatValue={(n) => n.toLocaleString()}
+      <Flippable
+        minHeight={340}
+        front={
+          <TrendCard
+            title={title}
+            subtitle={loading ? "Loading…" : `${avgGps} GP practices · ${totalItems.toLocaleString()} items over ${win}M`}
+            caption="From official England, Scotland and NI linkage data — items dispensed against scripts issued by each GP practice."
+            points={points}
+            window={win}
+            onWindowChange={setWin}
+            formatValue={(n) => n.toLocaleString()}
+          />
+        }
+        back={
+          <ExplainPanel title="How to read this chart">
+            <p>
+              Each point on the line is the <strong>total number of NHS prescription items</strong> this pharmacy dispensed in that month
+              originating from GP practices it has a registered link with.
+            </p>
+            <ul className="list-disc pl-4 space-y-1">
+              <li><strong>{avgGps} GP practices</strong> — on average, this many distinct surgeries sent scripts to this pharmacy each month in the selected window.</li>
+              <li><strong>{totalItems.toLocaleString()} items</strong> — total prescription items dispensed over the last {win} months from linked GPs.</li>
+              <li>A <strong>rising line</strong> means the pharmacy is capturing more GP-originated scripts; a falling line means script volume from feeders is declining.</li>
+            </ul>
+            <p className="text-muted-foreground">
+              Source: official NHS BSA (England), PHS (Scotland) and BSO (Northern Ireland) GP-to-pharmacy linkage extracts.
+            </p>
+          </ExplainPanel>
+        }
       />
       {topGps.length > 0 && (
-        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Top GP feeders · last {win} months</p>
-            <p className="text-[10px] text-muted-foreground">
-              Items · Share · Items / patient · Δ vs prior {win}M
-            </p>
-          </div>
-          <ul className="space-y-2 text-xs">
-            {topGps.map((g) => {
-              const delta = g.itemsPrev > 0 ? Math.round(((g.items - g.itemsPrev) / g.itemsPrev) * 100) : null;
-              const tone = delta == null ? "text-muted-foreground" : delta > 0 ? "text-emerald-700" : delta < 0 ? "text-rose-700" : "text-muted-foreground";
-              const perPatient = g.listSize && g.listSize > 0 ? g.items / g.listSize : null;
-              return (
-                <li key={g.code} className="border-b border-border last:border-b-0 pb-2 last:pb-0">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold truncate">{g.name}</p>
-                      <p className="text-[10px] text-muted-foreground font-mono truncate">
-                        {g.code}{g.postcode ? ` · ${g.postcode}` : ""}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="font-semibold tabular-nums">{g.items.toLocaleString()} items</p>
-                      <p className="text-[10px] text-muted-foreground tabular-nums">
-                        {(g.share * 100).toFixed(1)}% share
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-1 grid grid-cols-3 gap-2 text-[10px]">
-                    <div className="rounded bg-secondary/40 px-2 py-1">
-                      <span className="text-muted-foreground">List size · </span>
-                      <span className="font-semibold tabular-nums">{g.listSize ? g.listSize.toLocaleString() : "—"}</span>
-                    </div>
-                    <div className="rounded bg-secondary/40 px-2 py-1">
-                      <span className="text-muted-foreground">Items / patient · </span>
-                      <span className="font-semibold tabular-nums">{perPatient != null ? perPatient.toFixed(1) : "—"}</span>
-                    </div>
-                    <div className={`rounded bg-secondary/40 px-2 py-1 ${tone}`}>
-                      <span className="text-muted-foreground">Δ · </span>
-                      <span className="font-semibold tabular-nums">
-                        {delta == null ? "—" : `${delta >= 0 ? "+" : ""}${delta}%`}
-                      </span>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+        <Flippable
+          minHeight={Math.max(240, 72 + topGps.length * 78)}
+          front={
+            <div className="rounded-lg border border-border bg-card p-4 shadow-sm h-full">
+              <div className="flex items-center justify-between mb-3 pr-28">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Top GP feeders · last {win} months</p>
+                <p className="text-[10px] text-muted-foreground hidden sm:block">
+                  Items · Share · Items / patient · Δ vs prior {win}M
+                </p>
+              </div>
+              <ul className="space-y-2 text-xs">
+                {topGps.map((g) => {
+                  const delta = g.itemsPrev > 0 ? Math.round(((g.items - g.itemsPrev) / g.itemsPrev) * 100) : null;
+                  const tone = delta == null ? "text-muted-foreground" : delta > 0 ? "text-emerald-700" : delta < 0 ? "text-rose-700" : "text-muted-foreground";
+                  const perPatient = g.listSize && g.listSize > 0 ? g.items / g.listSize : null;
+                  return (
+                    <li key={g.code} className="border-b border-border last:border-b-0 pb-2 last:pb-0">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate">{g.name}</p>
+                          <p className="text-[10px] text-muted-foreground font-mono truncate">
+                            {g.code}{g.postcode ? ` · ${g.postcode}` : ""}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-semibold tabular-nums">{g.items.toLocaleString()} items</p>
+                          <p className="text-[10px] text-muted-foreground tabular-nums">
+                            {(g.share * 100).toFixed(1)}% share
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-1 grid grid-cols-3 gap-2 text-[10px]">
+                        <div className="rounded bg-secondary/40 px-2 py-1">
+                          <span className="text-muted-foreground">List size · </span>
+                          <span className="font-semibold tabular-nums">{g.listSize ? g.listSize.toLocaleString() : "—"}</span>
+                        </div>
+                        <div className="rounded bg-secondary/40 px-2 py-1">
+                          <span className="text-muted-foreground">Items / patient · </span>
+                          <span className="font-semibold tabular-nums">{perPatient != null ? perPatient.toFixed(1) : "—"}</span>
+                        </div>
+                        <div className={`rounded bg-secondary/40 px-2 py-1 ${tone}`}>
+                          <span className="text-muted-foreground">Δ · </span>
+                          <span className="font-semibold tabular-nums">
+                            {delta == null ? "—" : `${delta >= 0 ? "+" : ""}${delta}%`}
+                          </span>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          }
+          back={
+            <ExplainPanel title="What 'Top GP feeders' tells you">
+              <p>
+                These are the GP surgeries sending the <strong>most prescription items</strong> to this pharmacy over the last {win} months,
+                ranked by volume. Together they show where the pharmacy's NHS dispensing income originates.
+              </p>
+              <ul className="list-disc pl-4 space-y-1">
+                <li><strong>Items</strong> — total prescription items dispensed from that surgery's scripts in the window.</li>
+                <li><strong>Share</strong> — that surgery's % of all linked-GP items dispensed by this pharmacy. A high share (e.g. &gt;30%) means heavy reliance on one practice.</li>
+                <li><strong>List size</strong> — number of patients registered at the GP practice (latest NHS list-size return).</li>
+                <li><strong>Items / patient</strong> — items dispensed per registered patient. Higher numbers suggest the pharmacy is the dominant dispenser for that practice's patients.</li>
+                <li><strong>Δ vs prior {win}M</strong> — % change vs the previous equivalent window. Green = growing feeder, red = shrinking feeder (a possible churn signal).</li>
+              </ul>
+              <p className="text-muted-foreground">
+                Use this to spot concentration risk (one surgery dominating revenue), under-served nearby practices, and feeders trending up or down.
+              </p>
+            </ExplainPanel>
+          }
+        />
       )}
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------
+ * Flippable + ExplainPanel
+ * Click the ⓘ badge in the corner to flip the card and reveal a
+ * plain-language explanation of what the visualisation shows.
+ * ---------------------------------------------------------------- */
+function Flippable({
+  front,
+  back,
+  minHeight = 280,
+}: {
+  front: React.ReactNode;
+  back: React.ReactNode;
+  minHeight?: number;
+}) {
+  const [flipped, setFlipped] = useState(false);
+  return (
+    <div className="relative [perspective:1600px]" style={{ minHeight }}>
+      <button
+        type="button"
+        onClick={() => setFlipped((f) => !f)}
+        aria-label={flipped ? "Hide explanation" : "What does this mean?"}
+        className="absolute right-2 top-2 z-10 inline-flex h-7 items-center gap-1 rounded-full border border-border bg-background/90 px-2 text-[10px] font-medium text-muted-foreground shadow-sm hover:bg-secondary hover:text-foreground transition"
+      >
+        {flipped ? "← Back to chart" : "ⓘ What does this mean?"}
+      </button>
+      <div
+        className="relative w-full transition-transform duration-500 [transform-style:preserve-3d]"
+        style={{ transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)", minHeight }}
+      >
+        <div className="absolute inset-0 [backface-visibility:hidden]">
+          {front}
+        </div>
+        <div className="absolute inset-0 [backface-visibility:hidden]" style={{ transform: "rotateY(180deg)" }}>
+          {back}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExplainPanel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="h-full rounded-lg border border-border bg-card p-5 pr-10 shadow-sm overflow-auto">
+      <h4 className="text-sm font-semibold mb-2">{title}</h4>
+      <div className="space-y-2 text-xs leading-relaxed text-foreground">
+        {children}
+      </div>
     </div>
   );
 }
