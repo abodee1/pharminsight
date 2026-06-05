@@ -1,4 +1,5 @@
 // Scotland — Prescriptions in the Community (monthly).
+import { authorizeHookRequest } from "@/lib/hook-auth.server";
 // Dataset 1 of the GP ingestion plan.
 // Files: "Data by Prescriber Location" (GP prescribing) + "Data by Dispenser Location" (pharmacy dispensing).
 import { createFileRoute } from "@tanstack/react-router";
@@ -187,7 +188,9 @@ async function processOne() {
 export const Route = createFileRoute("/api/public/hooks/ingest-scotland-gp")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const auth = await authorizeHookRequest(request);
+        if (!auth.ok) return new Response(auth.message, { status: auth.status });
         try {
           const queued = await discover();
           const result = await processOne();

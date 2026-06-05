@@ -79,7 +79,9 @@ function PaymentsImport() {
     setBusy(true);
     setResult(null);
     try {
-      const anon = (import.meta as any).env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: sess } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
+      const accessToken = sess.session?.access_token;
+      if (!accessToken) throw new Error("Not signed in");
       const payload = {
         data_source: source,
         rows: rows
@@ -100,7 +102,7 @@ function PaymentsImport() {
         const batch = { ...payload, rows: payload.rows.slice(i, i + 1000) };
         const res = await fetch("/api/public/ingest/pharmacy-payments", {
           method: "POST",
-          headers: { "Content-Type": "application/json", apikey: anon },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
           body: JSON.stringify(batch),
         });
         if (!res.ok) throw new Error(await res.text());

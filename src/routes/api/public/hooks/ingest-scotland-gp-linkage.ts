@@ -1,4 +1,5 @@
 // Scotland — Prescribed and Dispensed (quarterly GP→pharmacy linkage).
+import { authorizeHookRequest } from "@/lib/hook-auth.server";
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -100,7 +101,9 @@ async function processOne() {
 export const Route = createFileRoute("/api/public/hooks/ingest-scotland-gp-linkage")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const auth = await authorizeHookRequest(request);
+        if (!auth.ok) return new Response(auth.message, { status: auth.status });
         try {
           const queued = await discover();
           const result = await processOne();
