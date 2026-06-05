@@ -198,7 +198,7 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
             {nearby.length ? ` · ${nearby.length} pharmacies` : ""}
           </p>
         </div>
-        <PeriodPills value={win} onChange={setWin} options={[1, 3, 6, 12] as PeriodWindow[]} />
+        <PeriodPills value={win} onChange={setWin} options={[3, 6, 12, 24]} />
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
