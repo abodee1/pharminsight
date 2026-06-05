@@ -59,7 +59,7 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
   );
   const [radius, setRadius] = useState<number>(3200);
   const [metric, setMetric] = useState<MetricKey>("items");
-  const [win, setWin] = useState<PeriodWindow>(3 as PeriodWindow);
+  const [win, setWin] = useState<PeriodWindow>(3);
   const [nearby, setNearby] = useState<Nearby[]>([]);
   const [perPharm, setPerPharm] = useState<Map<string, number>>(new Map());
   const [period, setPeriod] = useState<string>("");
@@ -198,7 +198,7 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
             {nearby.length ? ` · ${nearby.length} pharmacies` : ""}
           </p>
         </div>
-        <PeriodPills value={win} onChange={setWin} options={[1, 3, 6, 12] as PeriodWindow[]} />
+        <PeriodPills value={win} onChange={setWin} options={[3, 6, 12, 24]} />
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
