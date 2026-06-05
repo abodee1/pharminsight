@@ -15,9 +15,7 @@ export const NAV_LINKS = [
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy },
   { to: "/benchmarking", label: "Benchmarking", icon: BarChart2 },
   { to: "/compare", label: "Compare", icon: GitCompare },
-  { to: "/gp-surgeries", label: "GP Surgeries", icon: Stethoscope },
   { to: "/my-analyses", label: "My Analyses", icon: Bookmark },
-  { to: "/admin/payments-import", label: "Payments Import", icon: Upload },
   { to: "/settings", label: "My Account", icon: Settings },
 ] as const;
 
