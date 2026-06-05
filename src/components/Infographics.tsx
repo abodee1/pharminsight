@@ -180,6 +180,17 @@ export function TrendCard({
  * ---------------------------------------------------------------- */
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+type GpFeeder = {
+  code: string;
+  name: string | null;
+  postcode: string | null;
+  address: string | null;
+  items: number;        // window total
+  itemsPrev: number;    // previous window total (same length)
+  listSize: number | null;
+  share: number;        // 0..1 of pharmacy total in window
+};
+
 export function GpPrescribingCard({
   pharmacyOds,
   defaultWindow = 12,
@@ -193,7 +204,11 @@ export function GpPrescribingCard({
   const [rows, setRows] = useState<
     { year: number; month: number; items: number; gp_count: number }[]
   >([]);
-  const [topGps, setTopGps] = useState<{ code: string; name: string | null; items: number }[]>([]);
+  const [allLinkage, setAllLinkage] = useState<
+    { year: number; month: number; practice_code: string; items_dispensed: number }[]
+  >([]);
+  const [practiceMeta, setPracticeMeta] = useState<Map<string, { name: string | null; postcode: string | null; address: string | null }>>(new Map());
+  const [listSizes, setListSizes] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -207,58 +222,109 @@ export function GpPrescribingCard({
         .eq("pharmacy_ods_code", pharmacyOds)
         .order("year", { ascending: false })
         .order("month", { ascending: false })
-        .limit(5000);
+        .limit(20000);
       if (cancelled) return;
       if (error || !data) {
-        setRows([]); setTopGps([]); setLoading(false); return;
+        setRows([]); setAllLinkage([]); setLoading(false); return;
       }
       const byMonth = new Map<string, { year: number; month: number; items: number; gps: Set<string> }>();
-      const byGp = new Map<string, number>();
+      const codes = new Set<string>();
       for (const r of data) {
         const k = `${r.year}-${r.month}`;
         const cur = byMonth.get(k) || { year: r.year, month: r.month, items: 0, gps: new Set<string>() };
         cur.items += Number(r.items_dispensed) || 0;
         cur.gps.add(r.practice_code);
         byMonth.set(k, cur);
-        byGp.set(r.practice_code, (byGp.get(r.practice_code) || 0) + (Number(r.items_dispensed) || 0));
+        codes.add(r.practice_code);
       }
       const sorted = [...byMonth.values()]
         .sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month))
         .map((v) => ({ year: v.year, month: v.month, items: v.items, gp_count: v.gps.size }));
-      const topCodes = [...byGp.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5);
 
-      // Resolve human-readable GP practice names. Only surface the list if
-      // we can name at least one practice — anonymous codes aren't useful.
-      let nameMap = new Map<string, string>();
-      if (topCodes.length) {
-        const { data: names } = await supabase
-          .from("gp_practices")
-          .select("practice_code,practice_name")
-          .in("practice_code", topCodes.map(([c]) => c));
-        (names || []).forEach((n: { practice_code: string; practice_name: string | null }) => {
-          if (n.practice_name) nameMap.set(n.practice_code, n.practice_name);
-        });
+      // Resolve GP metadata + most-recent list size
+      const codeArr = [...codes];
+      const meta = new Map<string, { name: string | null; postcode: string | null; address: string | null }>();
+      const sizes = new Map<string, number>();
+      if (codeArr.length) {
+        for (let i = 0; i < codeArr.length; i += 200) {
+          const slice = codeArr.slice(i, i + 200);
+          const [{ data: gps }, { data: ls }] = await Promise.all([
+            supabase.from("gp_practices")
+              .select("practice_code,practice_name,postcode,address_line")
+              .in("practice_code", slice),
+            supabase.from("gp_list_sizes")
+              .select("practice_code,registered_patients,list_size_date")
+              .in("practice_code", slice)
+              .order("list_size_date", { ascending: false }),
+          ]);
+          (gps || []).forEach((g: { practice_code: string; practice_name: string | null; postcode: string | null; address_line: string | null }) => {
+            meta.set(g.practice_code, { name: g.practice_name, postcode: g.postcode, address: g.address_line });
+          });
+          (ls || []).forEach((l: { practice_code: string; registered_patients: number }) => {
+            if (!sizes.has(l.practice_code)) sizes.set(l.practice_code, l.registered_patients);
+          });
+        }
       }
-      const named = topCodes
-        .filter(([code]) => nameMap.has(code))
-        .map(([code, items]) => ({ code, name: nameMap.get(code) || null, items }));
 
       setRows(sorted);
-      setTopGps(named);
+      setAllLinkage(data as { year: number; month: number; practice_code: string; items_dispensed: number }[]);
+      setPracticeMeta(meta);
+      setListSizes(sizes);
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [pharmacyOds]);
 
   const points = useMemo(
-    () => rows.slice(-12).map((r) => ({
+    () => rows.slice(-Math.max(12, win)).map((r) => ({
       label: `${MONTHS[r.month - 1]} ${String(r.year).slice(2)}`,
       value: r.items,
     })),
-    [rows],
+    [rows, win],
   );
+
+  // Compute window-bounded top feeders w/ prior-window comparison + share
+  const topGps = useMemo<GpFeeder[]>(() => {
+    if (!rows.length || !allLinkage.length) return [];
+    // Pull most recent N months actually present in data
+    const monthKeys = rows.map((r) => r.year * 12 + r.month);
+    const latest = monthKeys[monthKeys.length - 1];
+    const curStart = latest - (win - 1);
+    const prevStart = latest - (2 * win - 1);
+    const prevEnd = latest - win;
+
+    const cur = new Map<string, number>();
+    const prev = new Map<string, number>();
+    let totalCur = 0;
+    for (const r of allLinkage) {
+      const k = r.year * 12 + r.month;
+      const v = Number(r.items_dispensed) || 0;
+      if (k >= curStart && k <= latest) {
+        cur.set(r.practice_code, (cur.get(r.practice_code) || 0) + v);
+        totalCur += v;
+      } else if (k >= prevStart && k <= prevEnd) {
+        prev.set(r.practice_code, (prev.get(r.practice_code) || 0) + v);
+      }
+    }
+    const named = [...cur.entries()]
+      .filter(([code]) => practiceMeta.get(code)?.name)
+      .map(([code, items]) => {
+        const m = practiceMeta.get(code)!;
+        return {
+          code,
+          name: m.name,
+          postcode: m.postcode,
+          address: m.address,
+          items,
+          itemsPrev: prev.get(code) || 0,
+          listSize: listSizes.get(code) ?? null,
+          share: totalCur > 0 ? items / totalCur : 0,
+        };
+      })
+      .sort((a, b) => b.items - a.items)
+      .slice(0, 8);
+    return named;
+  }, [allLinkage, rows, win, practiceMeta, listSizes]);
 
   if (!pharmacyOds) return null;
   if (!loading && !rows.length) {
@@ -289,17 +355,52 @@ export function GpPrescribingCard({
       />
       {topGps.length > 0 && (
         <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Top GP feeders (all-time)</p>
-          <ul className="space-y-1.5 text-xs">
-            {topGps.map((g) => (
-              <li key={g.code} className="flex items-center justify-between gap-3 border-b border-border last:border-b-0 pb-1.5 last:pb-0">
-                <span className="min-w-0 truncate">
-                  <span className="font-semibold">{g.name}</span>
-                  <span className="text-muted-foreground font-mono ml-2">{g.code}</span>
-                </span>
-                <span className="tabular-nums shrink-0">{g.items.toLocaleString()} items</span>
-              </li>
-            ))}
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Top GP feeders · last {win} months</p>
+            <p className="text-[10px] text-muted-foreground">
+              Items · Share · Items / patient · Δ vs prior {win}M
+            </p>
+          </div>
+          <ul className="space-y-2 text-xs">
+            {topGps.map((g) => {
+              const delta = g.itemsPrev > 0 ? Math.round(((g.items - g.itemsPrev) / g.itemsPrev) * 100) : null;
+              const tone = delta == null ? "text-muted-foreground" : delta > 0 ? "text-emerald-700" : delta < 0 ? "text-rose-700" : "text-muted-foreground";
+              const perPatient = g.listSize && g.listSize > 0 ? g.items / g.listSize : null;
+              return (
+                <li key={g.code} className="border-b border-border last:border-b-0 pb-2 last:pb-0">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold truncate">{g.name}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono truncate">
+                        {g.code}{g.postcode ? ` · ${g.postcode}` : ""}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-semibold tabular-nums">{g.items.toLocaleString()} items</p>
+                      <p className="text-[10px] text-muted-foreground tabular-nums">
+                        {(g.share * 100).toFixed(1)}% share
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-1 grid grid-cols-3 gap-2 text-[10px]">
+                    <div className="rounded bg-secondary/40 px-2 py-1">
+                      <span className="text-muted-foreground">List size · </span>
+                      <span className="font-semibold tabular-nums">{g.listSize ? g.listSize.toLocaleString() : "—"}</span>
+                    </div>
+                    <div className="rounded bg-secondary/40 px-2 py-1">
+                      <span className="text-muted-foreground">Items / patient · </span>
+                      <span className="font-semibold tabular-nums">{perPatient != null ? perPatient.toFixed(1) : "—"}</span>
+                    </div>
+                    <div className={`rounded bg-secondary/40 px-2 py-1 ${tone}`}>
+                      <span className="text-muted-foreground">Δ · </span>
+                      <span className="font-semibold tabular-nums">
+                        {delta == null ? "—" : `${delta >= 0 ? "+" : ""}${delta}%`}
+                      </span>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
