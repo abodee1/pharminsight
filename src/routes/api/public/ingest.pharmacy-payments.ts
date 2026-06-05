@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { authorizeHookRequest } from "@/lib/hook-auth.server";
 
 // Public ingestion endpoint for monthly pharmacy payment data.
 // Auth: requires the Supabase anon `apikey` header (matches our pg_cron pattern).
@@ -38,10 +39,8 @@ export const Route = createFileRoute("/api/public/ingest/pharmacy-payments")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apikey = request.headers.get("apikey");
-        if (!apikey || apikey !== process.env.SUPABASE_PUBLISHABLE_KEY) {
-          return new Response("Unauthorized", { status: 401 });
-        }
+        const auth = await authorizeHookRequest(request);
+        if (!auth.ok) return new Response(auth.message, { status: auth.status });
 
         let parsed;
         try {

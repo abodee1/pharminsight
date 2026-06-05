@@ -397,7 +397,12 @@ function DataIngestionAdmin() {
     setRunning((s) => ({ ...s, [ds.source]: true }));
     toast.info(`Triggering ${ds.label}…`);
     try {
-      const res = await fetch(`/api/public/hooks/${ds.hook}`, { method: "POST" });
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      const res = await fetch(`/api/public/hooks/${ds.hook}`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`);
       toast.success(`${ds.label}: queued ${j.queued ?? 0}, processed ${j.processed ?? 0}`);
