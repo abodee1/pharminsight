@@ -7,8 +7,8 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 
-export type PeriodWindow = 1 | 3 | 6 | 12;
-export const PERIOD_OPTIONS: PeriodWindow[] = [1, 3, 6, 12];
+export type PeriodWindow = 1 | 3 | 6 | 12 | 24;
+export const PERIOD_OPTIONS: PeriodWindow[] = [3, 6, 12, 24];
 
 /* ----------------------------------------------------------------
  * PeriodPills
