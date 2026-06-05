@@ -37,9 +37,7 @@ const MET: Record<MetricKey, MetricDef> = {
   final: { key: "final", label: "Final NHS payment (£)", short: "Final £", field: (r) => Number(r.final_payment) || 0, format: (n) => "£" + Math.round(n).toLocaleString(), color: "var(--chart-1)" },
 };
 
-const WINDOWS: PeriodWindow[] = [3, 6, 12];
-// Extended windows including 24M for the trend (cast to satisfy PeriodPills)
-const EXT_WINDOWS = [3, 6, 12, 24] as unknown as PeriodWindow[];
+const EXT_WINDOWS: PeriodWindow[] = [3, 6, 12, 24];
 
 export function InteractiveTrend({
   rows,
