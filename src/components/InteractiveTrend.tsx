@@ -50,7 +50,7 @@ export function InteractiveTrend({
 }) {
   const initial = available[0] ?? "items";
   const [metric, setMetric] = useState<MetricKey>(initial);
-  const [win, setWin] = useState<PeriodWindow>(12 as PeriodWindow);
+  const [win, setWin] = useState<PeriodWindow>(12);
 
   const def = MET[metric];
 
