@@ -1,4 +1,5 @@
 // Scotland — Prescriptions in the Community (monthly).
+import { authorizeHookRequest } from "@/lib/hook-auth.server";
 // Dataset 1 of the GP ingestion plan.
 // Files: "Data by Prescriber Location" (GP prescribing) + "Data by Dispenser Location" (pharmacy dispensing).
 import { createFileRoute } from "@tanstack/react-router";

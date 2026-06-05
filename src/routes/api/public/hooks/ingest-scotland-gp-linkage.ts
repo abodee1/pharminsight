@@ -1,4 +1,5 @@
 // Scotland — Prescribed and Dispensed (quarterly GP→pharmacy linkage).
+import { authorizeHookRequest } from "@/lib/hook-auth.server";
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {

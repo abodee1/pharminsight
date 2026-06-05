@@ -1,4 +1,5 @@
 // England — practice directory (epraccur.zip) + Patients Registered at a GP Practice (quarterly CSV).
+import { authorizeHookRequest } from "@/lib/hook-auth.server";
 import { createFileRoute } from "@tanstack/react-router";
 import { unzipSync, strFromU8 } from "fflate";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
