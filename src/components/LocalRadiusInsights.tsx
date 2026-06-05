@@ -59,7 +59,7 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
   );
   const [radius, setRadius] = useState<number>(3200);
   const [metric, setMetric] = useState<MetricKey>("items");
-  const [win, setWin] = useState<PeriodWindow>(3 as PeriodWindow);
+  const [win, setWin] = useState<PeriodWindow>(3);
   const [nearby, setNearby] = useState<Nearby[]>([]);
   const [perPharm, setPerPharm] = useState<Map<string, number>>(new Map());
   const [period, setPeriod] = useState<string>("");
