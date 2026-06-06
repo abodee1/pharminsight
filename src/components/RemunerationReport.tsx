@@ -457,6 +457,18 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         </div>
       </div>
 
+      {/* Key Takeaways — quantified opportunities and priority actions */}
+      <KeyTakeaways
+        streams={streams}
+        totalRev={totalRev}
+        serviceShare={serviceShare}
+        epsRate={analysis.epsRate}
+        isScot={isScot}
+        itemsTrend={analysis.itemsTrend}
+        pharmacyName={pharmacy.name}
+      />
+
+
       <p className="flex items-start gap-2 text-[11px] text-muted-foreground">
         <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <span>
