@@ -9,6 +9,7 @@ import { X, ArrowUpRight, ArrowDownRight, Minus, Trophy } from "lucide-react";
 import { PharmacySearch } from "@/components/PharmacySearch";
 import { CountryBadge } from "@/components/CountryBadge";
 import { Badge } from "@/components/ui/badge";
+import { GpFeederOverlap } from "@/components/GpFeederOverlap";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   LineChart, Line, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
@@ -572,6 +573,15 @@ function Compare() {
               </div>
             ))}
           </div>
+
+          {/* GP feeder overlap & catchment analysis (≥2 selected) */}
+          {selectedPharms.length >= 2 && (
+            <GpFeederOverlap
+              pharms={selectedPharms.map((p) => ({ id: p.id, name: p.name, country: p.country }))}
+              colorFor={colorFor}
+              monthsWindow={12}
+            />
+          )}
 
           {selectedPharms.length >= 2 && (
             <>
