@@ -491,3 +491,183 @@ function Stat({ label, value, tone = "neutral" }: { label: string; value: string
     </div>
   );
 }
+
+// -------------------- Key Takeaways: quantified opportunities + priority actions --------------------
+function KeyTakeaways({
+  streams, totalRev, serviceShare, epsRate, isScot, itemsTrend, pharmacyName,
+}: {
+  streams: Stream[]; totalRev: number; serviceShare: number; epsRate: number;
+  isScot: boolean; itemsTrend: number; pharmacyName: string;
+}) {
+  // OPPORTUNITIES — quantify in £ the gap to a "peer-parity" benchmark for each underdelivered service
+  type Opp = { label: string; uplift: number; rationale: string };
+  const opportunities: Opp[] = [];
+
+  const dispensing = streams.find((s) => s.label.toLowerCase().includes("dispensing"));
+  const items = dispensing ? dispensing.value / RATES.itemFee : 0;
+
+  if (!isScot) {
+    const pf = streams.find((s) => s.label.startsWith("Pharmacy First"));
+    if (pf && items > 0) {
+      // Strong sites convert ~3 PF per 100 items dispensed. Quantify the gap.
+      const benchmarkPf = items * 0.03;
+      const actualPf = pf.value / RATES.pfConsult;
+      if (actualPf < benchmarkPf) {
+        const extra = benchmarkPf - actualPf;
+        opportunities.push({
+          label: "Pharmacy First — close the gap to peer activity",
+          uplift: extra * RATES.pfConsult,
+          rationale: `Top-quartile sites run ~3 consultations per 100 items. At ${Math.round(items).toLocaleString()} items this implies ~${Math.round(benchmarkPf)} consultations/year vs ${Math.round(actualPf)} delivered — an extra ${Math.round(extra)} at ~£15 each.`,
+        });
+      }
+    }
+    const nms = streams.find((s) => s.label.includes("NMS"));
+    if (nms && items > 0) {
+      // Strong sites convert ~0.8 NMS per 100 items
+      const benchmarkNms = items * 0.008;
+      const actualNms = nms.value / RATES.nms;
+      if (actualNms < benchmarkNms) {
+        const extra = benchmarkNms - actualNms;
+        opportunities.push({
+          label: "New Medicine Service — capture eligible patients",
+          uplift: extra * RATES.nms,
+          rationale: `Peer sites convert ~0.8% of items into NMS interventions (~${Math.round(benchmarkNms)} cases). You delivered ${Math.round(actualNms)} — closing the gap is ~£${Math.round(extra * RATES.nms).toLocaleString()} of additional fee income.`,
+        });
+      }
+    }
+    const flu = streams.find((s) => s.label.includes("Flu"));
+    if (flu && flu.value === 0) {
+      opportunities.push({
+        label: "Seasonal flu programme",
+        uplift: 500 * RATES.flu,
+        rationale: `No flu activity recorded. A modest 500-jab season is worth ~£${Math.round(500 * RATES.flu).toLocaleString()} and concentrates in Oct–Dec to boost Q4 cash.`,
+      });
+    }
+    if (epsRate > 0 && epsRate < 95) {
+      // Each 1pp of EPS rate saves ~3 mins of manual work per 100 scripts; quantify only as efficiency note
+      opportunities.push({
+        label: "EPS migration — operational efficiency",
+        uplift: 0,
+        rationale: `Lift EPS rate from ${epsRate.toFixed(1)}% to >95% to remove paper handling, accelerate reimbursement and reduce lost-script risk. No direct fee, but compresses staff time on every prescription.`,
+      });
+    }
+  } else {
+    const pf = streams.find((s) => s.label.startsWith("Pharmacy First (Scotland)"));
+    if (pf && items > 0) {
+      const benchmarkPf = items * 0.04;
+      const actualPf = pf.value / RATES.pfConsult;
+      if (actualPf < benchmarkPf) {
+        const extra = benchmarkPf - actualPf;
+        opportunities.push({
+          label: "Pharmacy First (Scotland) — meet activity thresholds",
+          uplift: extra * RATES.pfConsult,
+          rationale: `Active Scottish sites deliver ~4 consultations per 100 items. The fixed monthly fee is unlocked only above minimum thresholds, so closing this gap is doubly valuable.`,
+        });
+      }
+    }
+    const mcr = streams.find((s) => s.label.startsWith("MCR"));
+    if (mcr && mcr.trendPct < 0) {
+      opportunities.push({
+        label: "MCR caseload — re-grow the active register",
+        uplift: Math.abs(mcr.value * (mcr.trendPct / 100)),
+        rationale: `MCR is your most defensible recurring revenue. A ${mcr.trendPct.toFixed(1)}% 6-month decline implies leaking caseload — direct GP outreach and serial-script renewal recovers this fastest.`,
+      });
+    }
+    const ehc = streams.find((s) => s.label.startsWith("EHC"));
+    if (ehc && ehc.value === 0) {
+      opportunities.push({
+        label: "EHC supplies — re-establish PGD",
+        uplift: 80 * RATES.ehcItem,
+        rationale: `No EHC activity recorded. ~80 supplies/year is realistic for a community site and adds ~£${Math.round(80 * RATES.ehcItem).toLocaleString()} of fee income.`,
+      });
+    }
+  }
+
+  opportunities.sort((a, b) => b.uplift - a.uplift);
+  const totalUplift = opportunities.reduce((s, o) => s + o.uplift, 0);
+
+  // RISKS
+  const risks: { label: string; severity: "high" | "medium" }[] = [];
+  const top = [...streams].sort((a, b) => b.value - a.value)[0];
+  if (top && top.share >= 70) risks.push({ label: `Revenue concentration — ${top.label} is ${top.share.toFixed(0)}% of remuneration. A tariff change to that line would compress income immediately.`, severity: "high" });
+  if (serviceShare < 8 && totalRev > 0) risks.push({ label: `Service-income mix only ${serviceShare.toFixed(1)}% — heavy exposure to category-M clawback and item-fee renegotiation.`, severity: "high" });
+  if (itemsTrend <= -5) risks.push({ label: `Item volumes contracting (${itemsTrend.toFixed(1)}% vs prior 6m). Investigate GP-list changes, local nursing-home contracts, and online-pharmacy switching.`, severity: "high" });
+  streams.forEach((s) => {
+    if (s.status === "weak" && s.value > 0 && s.share > 3) {
+      risks.push({ label: `${s.label} weakening — ${s.trendPct.toFixed(1)}% 6m trend on a line worth ${gbp(s.value)}.`, severity: "medium" });
+    }
+  });
+  if (!isScot && epsRate > 0 && epsRate < 80) risks.push({ label: `EPS rate ${epsRate.toFixed(1)}% — paper-script exposure increases lost-script and reimbursement-delay risk.`, severity: "medium" });
+
+  // 90-DAY ACTION PLAN — concrete next steps tied to the top opportunities/risks
+  const actions: string[] = [];
+  if (opportunities[0]) actions.push(`Run a 30-day sprint on "${opportunities[0].label}". Target the activity gap quantified above — most stores see uptake by week 3 once SOP and patient-identification triggers are in place.`);
+  if (risks.find((r) => r.label.startsWith("Revenue concentration"))) actions.push(`Reduce concentration risk by deliberately growing the #2 and #3 lines. Even a modest +10% on the second-largest stream materially diversifies remuneration.`);
+  if (!isScot && epsRate > 0 && epsRate < 95) actions.push(`Switch every remaining paper prescriber to EPS within 90 days. Pull the latest practice-by-practice EPS report from your PMR and contact GP managers directly.`);
+  if (isScot) actions.push(`Reconcile every PHS payment file against your dispensing records monthly — incorrect MCR claim coding is the most common cause of silent revenue leakage.`);
+  actions.push(`Upload your latest FP34C schedule (or PHS payment file) in the Acquisition tab so this report swaps every estimate for the verified figure.`);
+
+  return (
+    <div className="rounded-xl border border-gold/40 bg-gold/5 p-5">
+      <div className="flex items-start gap-3 mb-4">
+        <div className="rounded-lg bg-gold/15 p-2 shrink-0"><Info className="h-5 w-5 text-gold" /></div>
+        <div>
+          <h3 className="text-base font-semibold">Key Takeaways · {pharmacyName}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Quantified opportunities, prioritised risks, and a 90-day action plan derived from the data above.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-4">
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-emerald-800 font-semibold mb-2">Quantified opportunities</p>
+          {opportunities.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No material activity gaps versus peer benchmarks — operating close to potential.</p>
+          ) : (
+            <>
+              <p className="text-2xl font-bold tabular-nums text-emerald-800 mb-2">{gbp(totalUplift)}<span className="text-xs font-normal text-muted-foreground ml-1">/yr potential</span></p>
+              <ul className="space-y-2.5">
+                {opportunities.slice(0, 4).map((o, i) => (
+                  <li key={i} className="text-sm">
+                    <p className="font-medium">{o.label}{o.uplift > 0 && <span className="text-emerald-700 ml-1 tabular-nums">+{gbp(o.uplift)}</span>}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{o.rationale}</p>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-rose-800 font-semibold mb-2">Prioritised risks</p>
+          {risks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No material structural risks detected in the current remuneration profile.</p>
+          ) : (
+            <ul className="space-y-2.5">
+              {risks.slice(0, 5).map((r, i) => (
+                <li key={i} className="text-sm flex items-start gap-2">
+                  <span className={`text-[9px] uppercase tracking-wider font-semibold rounded-full px-1.5 py-0.5 mt-0.5 shrink-0 ${r.severity === "high" ? "bg-rose-200 text-rose-900" : "bg-amber-200 text-amber-900"}`}>{r.severity}</span>
+                  <span className="leading-snug">{r.label}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-foreground/80 font-semibold mb-2">90-day action plan</p>
+          <ol className="space-y-2.5">
+            {actions.map((a, i) => (
+              <li key={i} className="text-sm flex items-start gap-2">
+                <span className="rounded-full bg-foreground text-background h-5 w-5 text-[11px] font-semibold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                <span className="leading-snug">{a}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    </div>
+  );
+}
+
