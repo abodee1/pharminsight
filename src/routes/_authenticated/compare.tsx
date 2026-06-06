@@ -574,6 +574,15 @@ function Compare() {
             ))}
           </div>
 
+          {/* GP feeder overlap & catchment analysis (≥2 selected) */}
+          {selectedPharms.length >= 2 && (
+            <GpFeederOverlap
+              pharms={selectedPharms.map((p) => ({ id: p.id, name: p.name, country: p.country }))}
+              colorFor={colorFor}
+              monthsWindow={12}
+            />
+          )}
+
           {selectedPharms.length >= 2 && (
             <>
               {/* Market share donut + 12-month items totals */}
