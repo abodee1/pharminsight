@@ -164,22 +164,25 @@ export function AnalysisPanel({ pharmacy, open, onClose }: { pharmacy: Pharmacy;
     <div className="fixed inset-0 z-50 flex">
       <div className="flex-1 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose} />
       <aside className="w-full md:w-[85%] bg-background border-l border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-        <header className="flex items-center gap-3 border-b border-border px-4 md:px-6 py-3 sticky top-0 bg-background z-10">
+        <header className="flex items-center gap-2 border-b border-border px-3 md:px-6 py-2.5 sticky top-0 bg-background z-10">
           <div className="min-w-0 flex-1">
-            <h2 className="font-bold text-lg truncate">{pharmacy.name}</h2>
-            <p className="text-xs text-muted-foreground truncate">{pharmacy.address} · {pharmacy.postcode}</p>
+            <h2 className="font-bold text-base md:text-lg truncate">{pharmacy.name}</h2>
+            <p className="text-[11px] md:text-xs text-muted-foreground truncate">{pharmacy.address} · {pharmacy.postcode}</p>
           </div>
-          <Button variant="outline" size="sm" onClick={saveAnalysis}>{saved ? "Saved" : "Save Analysis"}</Button>
-          <Button variant={saved?.is_shortlisted ? "default" : "outline"} size="sm" onClick={toggleShortlist} className="gap-1.5">
+          <Button variant="outline" size="sm" onClick={saveAnalysis} className="hidden sm:inline-flex">{saved ? "Saved" : "Save"}</Button>
+          <Button variant={saved?.is_shortlisted ? "default" : "outline"} size="sm" onClick={toggleShortlist} className="gap-1.5 px-2 sm:px-3">
             <Star className={"h-4 w-4 " + (saved?.is_shortlisted ? "fill-current" : "")} />
-            <span className="hidden sm:inline">Shortlist</span>
+            <span className="hidden md:inline">Shortlist</span>
           </Button>
+          <button onClick={saveAnalysis} className="sm:hidden p-2 rounded-md hover:bg-secondary" aria-label="Save">
+            <FileText className="h-5 w-5" />
+          </button>
           <button onClick={onClose} className="p-2 rounded-md hover:bg-secondary" aria-label="Close"><X className="h-5 w-5" /></button>
         </header>
-        <div className="border-b border-border px-4 md:px-6 flex gap-1 overflow-x-auto sticky top-[57px] bg-background z-10">
+        <div className="border-b border-border px-3 md:px-6 flex gap-1 overflow-x-auto sticky top-[49px] md:top-[57px] bg-background z-10">
           {(["overview","financials","benchmarking","acquisition"] as Tab[]).map((t) => (
             <button key={t} onClick={() => setTab(t)}
-              className={["px-4 py-3 text-sm font-medium capitalize whitespace-nowrap transition-colors border-b-2",
+              className={["px-3 md:px-4 py-2.5 md:py-3 text-xs md:text-sm font-medium capitalize whitespace-nowrap transition-colors border-b-2",
                 tab === t ? "border-gold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"].join(" ")}>
               {t}
             </button>
