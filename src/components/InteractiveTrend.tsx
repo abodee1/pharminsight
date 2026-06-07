@@ -37,20 +37,24 @@ const MET: Record<MetricKey, MetricDef> = {
   final: { key: "final", label: "Final NHS payment (£)", short: "Final £", field: (r) => Number(r.final_payment) || 0, format: (n) => "£" + Math.round(n).toLocaleString(), color: "var(--chart-1)" },
 };
 
-const EXT_WINDOWS: PeriodWindow[] = [3, 6, 12, 24];
+const DEFAULT_WINDOWS: PeriodWindow[] = [6, 12, 18, 24];
 
 export function InteractiveTrend({
   rows,
   available,
   title = "Performance over time",
+  windows = DEFAULT_WINDOWS,
+  initialWindow = 12,
 }: {
   rows: TrendRow[];
   available: MetricKey[];
   title?: string;
+  windows?: PeriodWindow[];
+  initialWindow?: PeriodWindow;
 }) {
   const initial = available[0] ?? "items";
   const [metric, setMetric] = useState<MetricKey>(initial);
-  const [win, setWin] = useState<PeriodWindow>(12);
+  const [win, setWin] = useState<PeriodWindow>(initialWindow);
 
   const def = MET[metric];
 
