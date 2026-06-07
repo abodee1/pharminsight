@@ -710,13 +710,13 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
       const codes = (nearGp || []).map((g: any) => g.practice_code);
       if (codes.length) {
         const { data: ls } = await supabase.from("gp_list_sizes")
-          .select("practice_code,list_size,year,month").in("practice_code", codes)
-          .order("year", { ascending: false }).order("month", { ascending: false }).limit(codes.length * 3);
+          .select("practice_code,registered_patients,list_size_date").in("practice_code", codes)
+          .order("list_size_date", { ascending: false }).limit(codes.length * 3);
         const seen = new Set<string>();
-        for (const r of (ls || [])) {
+        for (const r of ((ls as any[]) || [])) {
           if (seen.has(r.practice_code)) continue;
           seen.add(r.practice_code);
-          listSizeTotal += r.list_size || 0;
+          listSizeTotal += r.registered_patients || 0;
         }
       }
 
