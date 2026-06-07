@@ -826,7 +826,34 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-5 md:space-y-6">
+      <Section title="Acquisition intelligence — at a glance">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Cell label="Local competitors (1mi)" v={catchment ? String(catchment.competitors) : "…"} />
+          <Cell label="GP feeders (1mi)" v={catchment ? String(catchment.gpFeeders) : "…"} />
+          <Cell label="Catchment list size" v={catchment && catchment.listSizeTotal ? catchment.listSizeTotal.toLocaleString() : "—"} />
+          <Cell label="Peer rank (5mi)" v={catchment?.peerRankPct != null ? `${catchment.peerRankPct}th pct` : "—"} />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+          <Cell label="Services share of revenue" v={`${servicesShare.toFixed(1)}%`} />
+          <Cell label="Item volatility (CV)" v={`${(cv * 100).toFixed(1)}%`} />
+          <Cell label="Peak month" v={peakMonth} />
+          <Cell label="Trough month" v={troughMonth} />
+        </div>
+        {catchment?.nearest && (
+          <p className="text-[11px] text-muted-foreground mt-3">
+            Nearest competitor: <span className="font-medium text-foreground">{catchment.nearest.name}</span> ·
+            {" "}{Math.round(catchment.nearest.distance_m)}m away
+            {incomePerListMember != null && (
+              <> · NHS income per catchment patient: <span className="font-medium text-foreground">£{incomePerListMember.toFixed(2)}</span></>
+            )}
+          </p>
+        )}
+        <p className="text-[11px] text-muted-foreground mt-2 italic">
+          Computed from public NHS dispensing data, registered GP list sizes, and pharmacy geocoding — no uploads required.
+        </p>
+      </Section>
+
       <Section title={`Section 1 — ${incomeLabel}`}>
         <FlipCard
           title={incomeLabel}
