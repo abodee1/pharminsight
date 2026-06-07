@@ -174,7 +174,7 @@ const SERIES_COLORS = [
   "var(--cmp-4)",
 ];
 
-type Pharm = { id: string; name: string; region: string | null; country: string | null; postcode: string | null };
+type Pharm = { id: string; name: string; region: string | null; country: string | null; postcode: string | null; lat?: number | null; lng?: number | null };
 type Row = {
   pharmacy_id: string; month: number; year: number;
   items_dispensed: number; nms_count: number; pharmacy_first_count: number;
