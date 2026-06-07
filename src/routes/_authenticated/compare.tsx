@@ -174,7 +174,7 @@ const SERIES_COLORS = [
   "var(--cmp-4)",
 ];
 
-type Pharm = { id: string; name: string; region: string | null; country: string | null; postcode: string | null };
+type Pharm = { id: string; name: string; region: string | null; country: string | null; postcode: string | null; lat?: number | null; lng?: number | null };
 type Row = {
   pharmacy_id: string; month: number; year: number;
   items_dispensed: number; nms_count: number; pharmacy_first_count: number;
@@ -206,7 +206,7 @@ function Compare() {
         .from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle();
       if (!up?.pharmacy_id) return;
       const { data: ph } = await supabase
-        .from("pharmacies").select("id,name,region,country,postcode")
+        .from("pharmacies").select("id,name,region,country,postcode,lat,lng")
         .eq("id", up.pharmacy_id).maybeSingle();
       if (ph) {
         setPharms((cur) => (cur.some((x) => x.id === ph.id) ? cur : [...cur, ph as Pharm]));
@@ -421,7 +421,7 @@ function Compare() {
   const colorFor = (id: string) => SERIES_COLORS[selected.indexOf(id) % SERIES_COLORS.length];
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto">
+    <div className="p-3 sm:p-6 md:p-10 max-w-7xl mx-auto">
       <PageHeader
         title="Compare pharmacies"
         subtitle="Pick up to 4 pharmacies to see them side by side across every NHS service."
@@ -574,6 +574,39 @@ function Compare() {
             ))}
           </div>
 
+          {/* Head-to-head edge scorecard */}
+          {selectedPharms.length >= 2 && (
+            <div className="rounded-xl bg-card border border-border p-5 md:p-6 shadow-sm mb-6">
+              <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
+                <div>
+                  <h2 className="text-sm font-semibold">Head-to-head edge scorecard</h2>
+                  <p className="text-xs text-muted-foreground mt-1">Wins per dimension across volumes, service intensity and payments.</p>
+                </div>
+                <Badge variant="secondary" className="text-[10px]">Higher score = stronger overall</Badge>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {selectedPharms.map((ph) => {
+                  const wins = winsCount[ph.id] ?? 0;
+                  const total = activeMetrics.length;
+                  const groupWins = (g: "volume" | "rate" | "money") =>
+                    activeMetrics.filter((m) => m.group === g && winners[m.key] === ph.id).length;
+                  return (
+                    <div key={ph.id} className="rounded-lg border border-border bg-secondary/30 p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="h-2 w-2 rounded-full shrink-0" style={{ background: colorFor(ph.id) }} />
+                        <p className="text-xs font-semibold truncate">{ph.name}</p>
+                      </div>
+                      <p className="text-2xl font-bold tabular-nums">{wins}<span className="text-xs text-muted-foreground font-normal">/{total}</span></p>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Volumes {groupWins("volume")} · Rates {groupWins("rate")} · £ {groupWins("money")}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* GP feeder overlap & catchment analysis (≥2 selected) */}
           {selectedPharms.length >= 2 && (
             <GpFeederOverlap
@@ -582,6 +615,7 @@ function Compare() {
               monthsWindow={12}
             />
           )}
+
 
           {selectedPharms.length >= 2 && (
             <>

@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { confirmCompany, rejectCandidate, searchCompany } from "@/lib/companiesHouse.functions";
 import { RemunerationReport } from "@/components/RemunerationReport";
+import { InteractiveTrend } from "@/components/InteractiveTrend";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -263,28 +264,20 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
   if (!latest) return <div className="p-10 text-center text-sm text-muted-foreground">No dispensing data yet.</div>;
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-5 md:space-y-6">
       <div className="flex items-center gap-2">
-        <span className="inline-flex items-center text-xs rounded-full bg-secondary px-2.5 py-1">Data current to {MONTHS[latest.month - 1]} {latest.year}</span>
+        <span className="inline-flex items-center text-[11px] md:text-xs rounded-full bg-secondary px-2.5 py-1">Data current to {MONTHS[latest.month - 1]} {latest.year}</span>
       </div>
 
-
-      <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-semibold mb-3">12-month items dispensed</h3>
-        <div className="h-56">
-          <ResponsiveContainer><LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: -10 }}>
-            <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-            <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
-            <YAxis tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
-            <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
-            <Line type="monotone" dataKey="items" stroke="var(--gold)" strokeWidth={2.5}
-              dot={(p: any) => p.payload.flag
-                ? <circle key={p.key} cx={p.cx} cy={p.cy} r={5} fill="var(--rose-600,#e11d48)" stroke="var(--background)" strokeWidth={2} />
-                : <circle key={p.key} cx={p.cx} cy={p.cy} r={2} fill="var(--gold)" />} />
-          </LineChart></ResponsiveContainer>
-        </div>
-        <p className="text-[11px] text-muted-foreground mt-1">Red dots mark months where change vs prior month exceeds 15%.</p>
-      </div>
+      <InteractiveTrend
+        rows={rows as any}
+        available={isScot
+          ? ["items", "pf", "eps", "final"]
+          : ["items", "pf", "nms", "eps", "final"]}
+        windows={[6, 12, 18, 24]}
+        initialWindow={12}
+        title="Performance over time"
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {cards.map((c) => {
@@ -658,6 +651,13 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
   const { user } = useAuth();
   const [company, setCompany] = useState<Company | null>(null);
   const [fp34c, setFp34c] = useState<{ actualMonthly: number[]; total: number } | null>(null);
+  const [catchment, setCatchment] = useState<{
+    competitors: number;
+    gpFeeders: number;
+    listSizeTotal: number;
+    peerRankPct: number | null;
+    nearest: { name: string; distance_m: number } | null;
+  } | null>(null);
 
   useEffect(() => {
     supabase.from("companies").select("*").eq("pharmacy_id", pharmacy.id).maybeSingle()
@@ -674,6 +674,61 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
         if (parsed?.monthly_payments) setFp34c({ actualMonthly: parsed.monthly_payments, total: parsed.monthly_payments.reduce((a: number, b: number) => a + b, 0) });
       });
   }, [user, pharmacy.id]);
+
+  // Catchment intelligence (works without uploads)
+  useEffect(() => {
+    (async () => {
+      const { data: ph } = await supabase.from("pharmacies").select("lat,lng,country,region").eq("id", pharmacy.id).maybeSingle();
+      if (!ph?.lat || !ph?.lng) return;
+      const [{ data: nearPh }, { data: nearGp }, { data: peers }] = await Promise.all([
+        supabase.rpc("pharmacies_near", { p_lat: ph.lat, p_lng: ph.lng, p_radius_m: 1600, p_limit: 50 }),
+        supabase.rpc("gp_practices_near", { p_lat: ph.lat, p_lng: ph.lng, p_radius_m: 1600, p_limit: 30 }),
+        supabase.rpc("pharmacies_near", { p_lat: ph.lat, p_lng: ph.lng, p_radius_m: 5000, p_limit: 200 }),
+      ]);
+      const compRows = (nearPh || []).filter((p: any) => p.id !== pharmacy.id);
+      const nearest = compRows.length ? { name: compRows[0].name, distance_m: compRows[0].distance_m } : null;
+
+      // peer ranking by latest items vs peers within 5km
+      const peerIds = (peers || []).map((p: any) => p.id);
+      let peerRankPct: number | null = null;
+      if (peerIds.length > 5 && rows.length) {
+        const latestRow = [...rows].reverse().find((r) => r.items_dispensed > 0);
+        if (latestRow) {
+          const { data: peerData } = await supabase.from("dispensing_data")
+            .select("pharmacy_id,items_dispensed")
+            .in("pharmacy_id", peerIds).eq("year", latestRow.year).eq("month", latestRow.month);
+          const vals = (peerData || []).map((d: any) => d.items_dispensed || 0).filter((v) => v > 0);
+          if (vals.length > 3) {
+            const below = vals.filter((v) => v < latestRow.items_dispensed).length;
+            peerRankPct = Math.round((below / vals.length) * 100);
+          }
+        }
+      }
+
+      // GP list-size sum (latest)
+      let listSizeTotal = 0;
+      const codes = (nearGp || []).map((g: any) => g.practice_code);
+      if (codes.length) {
+        const { data: ls } = await supabase.from("gp_list_sizes")
+          .select("practice_code,registered_patients,list_size_date").in("practice_code", codes)
+          .order("list_size_date", { ascending: false }).limit(codes.length * 3);
+        const seen = new Set<string>();
+        for (const r of ((ls as any[]) || [])) {
+          if (seen.has(r.practice_code)) continue;
+          seen.add(r.practice_code);
+          listSizeTotal += r.registered_patients || 0;
+        }
+      }
+
+      setCatchment({
+        competitors: compRows.length,
+        gpFeeders: (nearGp || []).length,
+        listSizeTotal,
+        peerRankPct,
+        nearest,
+      });
+    })().catch(() => {});
+  }, [pharmacy.id, rows]);
 
   const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
   const last12 = rows.slice(-12);
@@ -699,6 +754,23 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
     label: `${MONTHS[r.month - 1]}`,
     v: Math.round(r.items_dispensed * 1.27 + r.pharmacy_first_count * 15 + r.nms_count * 28 + r.flu_vaccinations * 12.58),
   }));
+
+  // Service mix + volatility (works without uploads)
+  const dispensingRevenue = itemsTotal * 1.27;
+  const servicesRevenue = pfTotal * 15 + nmsTotal * 28 + fluTotal * 12.58;
+  const servicesShare = (dispensingRevenue + servicesRevenue) > 0
+    ? (servicesRevenue / (dispensingRevenue + servicesRevenue)) * 100 : 0;
+  const monthlyItems = last12.map((r) => r.items_dispensed).filter((v) => v > 0);
+  const mean = monthlyItems.reduce((a, b) => a + b, 0) / (monthlyItems.length || 1);
+  const variance = monthlyItems.reduce((a, b) => a + (b - mean) ** 2, 0) / (monthlyItems.length || 1);
+  const cv = mean > 0 ? Math.sqrt(variance) / mean : 0;
+  const peakIdx = monthlyItems.length ? monthlyItems.indexOf(Math.max(...monthlyItems)) : -1;
+  const troughIdx = monthlyItems.length ? monthlyItems.indexOf(Math.min(...monthlyItems)) : -1;
+  const peakMonth = peakIdx >= 0 ? MONTHS[last12[peakIdx].month - 1] : "—";
+  const troughMonth = troughIdx >= 0 ? MONTHS[last12[troughIdx].month - 1] : "—";
+
+  const incomePerListMember = catchment && catchment.listSizeTotal > 0
+    ? nhsIncome / catchment.listSizeTotal : null;
 
   // Valuation
   const turnover = company?.turnover || null;
@@ -754,7 +826,34 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-5 md:space-y-6">
+      <Section title="Acquisition intelligence — at a glance">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Cell label="Local competitors (1mi)" v={catchment ? String(catchment.competitors) : "…"} />
+          <Cell label="GP feeders (1mi)" v={catchment ? String(catchment.gpFeeders) : "…"} />
+          <Cell label="Catchment list size" v={catchment && catchment.listSizeTotal ? catchment.listSizeTotal.toLocaleString() : "—"} />
+          <Cell label="Peer rank (5mi)" v={catchment?.peerRankPct != null ? `${catchment.peerRankPct}th pct` : "—"} />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+          <Cell label="Services share of revenue" v={`${servicesShare.toFixed(1)}%`} />
+          <Cell label="Item volatility (CV)" v={`${(cv * 100).toFixed(1)}%`} />
+          <Cell label="Peak month" v={peakMonth} />
+          <Cell label="Trough month" v={troughMonth} />
+        </div>
+        {catchment?.nearest && (
+          <p className="text-[11px] text-muted-foreground mt-3">
+            Nearest competitor: <span className="font-medium text-foreground">{catchment.nearest.name}</span> ·
+            {" "}{Math.round(catchment.nearest.distance_m)}m away
+            {incomePerListMember != null && (
+              <> · NHS income per catchment patient: <span className="font-medium text-foreground">£{incomePerListMember.toFixed(2)}</span></>
+            )}
+          </p>
+        )}
+        <p className="text-[11px] text-muted-foreground mt-2 italic">
+          Computed from public NHS dispensing data, registered GP list sizes, and pharmacy geocoding — no uploads required.
+        </p>
+      </Section>
+
       <Section title={`Section 1 — ${incomeLabel}`}>
         <FlipCard
           title={incomeLabel}
