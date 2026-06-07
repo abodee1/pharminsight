@@ -264,28 +264,20 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
   if (!latest) return <div className="p-10 text-center text-sm text-muted-foreground">No dispensing data yet.</div>;
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-5 md:space-y-6">
       <div className="flex items-center gap-2">
-        <span className="inline-flex items-center text-xs rounded-full bg-secondary px-2.5 py-1">Data current to {MONTHS[latest.month - 1]} {latest.year}</span>
+        <span className="inline-flex items-center text-[11px] md:text-xs rounded-full bg-secondary px-2.5 py-1">Data current to {MONTHS[latest.month - 1]} {latest.year}</span>
       </div>
 
-
-      <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-semibold mb-3">12-month items dispensed</h3>
-        <div className="h-56">
-          <ResponsiveContainer><LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: -10 }}>
-            <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-            <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
-            <YAxis tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
-            <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
-            <Line type="monotone" dataKey="items" stroke="var(--gold)" strokeWidth={2.5}
-              dot={(p: any) => p.payload.flag
-                ? <circle key={p.key} cx={p.cx} cy={p.cy} r={5} fill="var(--rose-600,#e11d48)" stroke="var(--background)" strokeWidth={2} />
-                : <circle key={p.key} cx={p.cx} cy={p.cy} r={2} fill="var(--gold)" />} />
-          </LineChart></ResponsiveContainer>
-        </div>
-        <p className="text-[11px] text-muted-foreground mt-1">Red dots mark months where change vs prior month exceeds 15%.</p>
-      </div>
+      <InteractiveTrend
+        rows={rows as any}
+        available={isScot
+          ? ["items", "pf", "eps", "final"]
+          : ["items", "pf", "nms", "eps", "final"]}
+        windows={[6, 12, 18, 24]}
+        initialWindow={12}
+        title="Performance over time"
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {cards.map((c) => {
