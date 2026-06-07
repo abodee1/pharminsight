@@ -651,6 +651,13 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
   const { user } = useAuth();
   const [company, setCompany] = useState<Company | null>(null);
   const [fp34c, setFp34c] = useState<{ actualMonthly: number[]; total: number } | null>(null);
+  const [catchment, setCatchment] = useState<{
+    competitors: number;
+    gpFeeders: number;
+    listSizeTotal: number;
+    peerRankPct: number | null;
+    nearest: { name: string; distance_m: number } | null;
+  } | null>(null);
 
   useEffect(() => {
     supabase.from("companies").select("*").eq("pharmacy_id", pharmacy.id).maybeSingle()
@@ -667,6 +674,61 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
         if (parsed?.monthly_payments) setFp34c({ actualMonthly: parsed.monthly_payments, total: parsed.monthly_payments.reduce((a: number, b: number) => a + b, 0) });
       });
   }, [user, pharmacy.id]);
+
+  // Catchment intelligence (works without uploads)
+  useEffect(() => {
+    (async () => {
+      const { data: ph } = await supabase.from("pharmacies").select("lat,lng,country,region").eq("id", pharmacy.id).maybeSingle();
+      if (!ph?.lat || !ph?.lng) return;
+      const [{ data: nearPh }, { data: nearGp }, { data: peers }] = await Promise.all([
+        supabase.rpc("pharmacies_near", { p_lat: ph.lat, p_lng: ph.lng, p_radius_m: 1600, p_limit: 50 }),
+        supabase.rpc("gp_practices_near", { p_lat: ph.lat, p_lng: ph.lng, p_radius_m: 1600, p_limit: 30 }),
+        supabase.rpc("pharmacies_near", { p_lat: ph.lat, p_lng: ph.lng, p_radius_m: 5000, p_limit: 200 }),
+      ]);
+      const compRows = (nearPh || []).filter((p: any) => p.id !== pharmacy.id);
+      const nearest = compRows.length ? { name: compRows[0].name, distance_m: compRows[0].distance_m } : null;
+
+      // peer ranking by latest items vs peers within 5km
+      const peerIds = (peers || []).map((p: any) => p.id);
+      let peerRankPct: number | null = null;
+      if (peerIds.length > 5 && rows.length) {
+        const latestRow = [...rows].reverse().find((r) => r.items_dispensed > 0);
+        if (latestRow) {
+          const { data: peerData } = await supabase.from("dispensing_data")
+            .select("pharmacy_id,items_dispensed")
+            .in("pharmacy_id", peerIds).eq("year", latestRow.year).eq("month", latestRow.month);
+          const vals = (peerData || []).map((d: any) => d.items_dispensed || 0).filter((v) => v > 0);
+          if (vals.length > 3) {
+            const below = vals.filter((v) => v < latestRow.items_dispensed).length;
+            peerRankPct = Math.round((below / vals.length) * 100);
+          }
+        }
+      }
+
+      // GP list-size sum (latest)
+      let listSizeTotal = 0;
+      const codes = (nearGp || []).map((g: any) => g.practice_code);
+      if (codes.length) {
+        const { data: ls } = await supabase.from("gp_list_sizes")
+          .select("practice_code,list_size,year,month").in("practice_code", codes)
+          .order("year", { ascending: false }).order("month", { ascending: false }).limit(codes.length * 3);
+        const seen = new Set<string>();
+        for (const r of (ls || [])) {
+          if (seen.has(r.practice_code)) continue;
+          seen.add(r.practice_code);
+          listSizeTotal += r.list_size || 0;
+        }
+      }
+
+      setCatchment({
+        competitors: compRows.length,
+        gpFeeders: (nearGp || []).length,
+        listSizeTotal,
+        peerRankPct,
+        nearest,
+      });
+    })().catch(() => {});
+  }, [pharmacy.id, rows]);
 
   const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
   const last12 = rows.slice(-12);
@@ -692,6 +754,23 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
     label: `${MONTHS[r.month - 1]}`,
     v: Math.round(r.items_dispensed * 1.27 + r.pharmacy_first_count * 15 + r.nms_count * 28 + r.flu_vaccinations * 12.58),
   }));
+
+  // Service mix + volatility (works without uploads)
+  const dispensingRevenue = itemsTotal * 1.27;
+  const servicesRevenue = pfTotal * 15 + nmsTotal * 28 + fluTotal * 12.58;
+  const servicesShare = (dispensingRevenue + servicesRevenue) > 0
+    ? (servicesRevenue / (dispensingRevenue + servicesRevenue)) * 100 : 0;
+  const monthlyItems = last12.map((r) => r.items_dispensed).filter((v) => v > 0);
+  const mean = monthlyItems.reduce((a, b) => a + b, 0) / (monthlyItems.length || 1);
+  const variance = monthlyItems.reduce((a, b) => a + (b - mean) ** 2, 0) / (monthlyItems.length || 1);
+  const cv = mean > 0 ? Math.sqrt(variance) / mean : 0;
+  const peakIdx = monthlyItems.length ? monthlyItems.indexOf(Math.max(...monthlyItems)) : -1;
+  const troughIdx = monthlyItems.length ? monthlyItems.indexOf(Math.min(...monthlyItems)) : -1;
+  const peakMonth = peakIdx >= 0 ? MONTHS[last12[peakIdx].month - 1] : "—";
+  const troughMonth = troughIdx >= 0 ? MONTHS[last12[troughIdx].month - 1] : "—";
+
+  const incomePerListMember = catchment && catchment.listSizeTotal > 0
+    ? nhsIncome / catchment.listSizeTotal : null;
 
   // Valuation
   const turnover = company?.turnover || null;
