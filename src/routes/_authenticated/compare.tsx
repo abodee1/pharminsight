@@ -206,7 +206,7 @@ function Compare() {
         .from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle();
       if (!up?.pharmacy_id) return;
       const { data: ph } = await supabase
-        .from("pharmacies").select("id,name,region,country,postcode")
+        .from("pharmacies").select("id,name,region,country,postcode,lat,lng")
         .eq("id", up.pharmacy_id).maybeSingle();
       if (ph) {
         setPharms((cur) => (cur.some((x) => x.id === ph.id) ? cur : [...cur, ph as Pharm]));
