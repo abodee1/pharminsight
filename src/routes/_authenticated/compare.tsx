@@ -421,7 +421,7 @@ function Compare() {
   const colorFor = (id: string) => SERIES_COLORS[selected.indexOf(id) % SERIES_COLORS.length];
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto">
+    <div className="p-3 sm:p-6 md:p-10 max-w-7xl mx-auto">
       <PageHeader
         title="Compare pharmacies"
         subtitle="Pick up to 4 pharmacies to see them side by side across every NHS service."
