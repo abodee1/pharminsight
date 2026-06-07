@@ -90,7 +90,7 @@ export function InteractiveTrend({
             Pick a metric and window. Dashed line marks the {Number(win)}-month average.
           </p>
         </div>
-        <PeriodPills value={win} onChange={setWin} options={EXT_WINDOWS} />
+        <PeriodPills value={win} onChange={setWin} options={windows} />
       </div>
 
       <div className="flex flex-wrap gap-1 mb-3">
