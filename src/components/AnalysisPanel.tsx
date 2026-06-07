@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { confirmCompany, rejectCandidate, searchCompany } from "@/lib/companiesHouse.functions";
 import { RemunerationReport } from "@/components/RemunerationReport";
+import { InteractiveTrend } from "@/components/InteractiveTrend";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
