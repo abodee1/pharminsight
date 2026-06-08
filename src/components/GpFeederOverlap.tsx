@@ -135,14 +135,24 @@ export function GpFeederOverlap({
 
     // Top feeder concentration (HHI proxy): share of pharmacy items coming from its top feeder
     const topFeederShare: Record<string, { name: string; pct: number } | null> = {};
+    // Top N feeders per pharmacy with name + items + share (major feeders only)
+    const topFeedersPerPh: Record<string, { code: string; name: string; postcode: string; items: number; share: number }[]> = {};
     pharms.forEach((p) => {
-      const phRows = rows.filter((r) => (r.vals[p.id] || 0) > 0).map((r) => ({ name: r.name, v: r.vals[p.id] }));
-      phRows.sort((a, b) => b.v - a.v);
-      const t = totalsPerPh[p.id];
-      topFeederShare[p.id] = phRows[0] && t > 0 ? { name: phRows[0].name, pct: (phRows[0].v / t) * 100 } : null;
+      const phRows = rows
+        .filter((r) => (r.vals[p.id] || 0) > 0)
+        .map((r) => ({ code: r.code, name: r.name, postcode: r.postcode, items: r.vals[p.id] }));
+      phRows.sort((a, b) => b.items - a.items);
+      const t = totalsPerPh[p.id] || 0;
+      topFeederShare[p.id] = phRows[0] && t > 0 ? { name: phRows[0].name, pct: (phRows[0].items / t) * 100 } : null;
+      // Major = top 6 OR contributes ≥3% of items (whichever yields the smaller, more meaningful list)
+      topFeedersPerPh[p.id] = phRows
+        .map((r) => ({ ...r, share: t > 0 ? (r.items / t) * 100 : 0 }))
+        .filter((r, i) => i < 6 && r.share >= 1)
+        .slice(0, 6);
     });
 
-    return { rows, shared, exclusiveByPh, totalsPerPh, overlapPct, overlapItems, distinctPractices, topFeederShare };
+    return { rows, shared, exclusiveByPh, totalsPerPh, overlapPct, overlapItems, distinctPractices, topFeederShare, topFeedersPerPh };
+
   }, [links, odsByPh, pharms, practices]);
 
   if (pharms.length < 2) return null;
