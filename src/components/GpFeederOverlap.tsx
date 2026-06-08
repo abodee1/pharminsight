@@ -99,8 +99,12 @@ export function GpFeederOverlap({
       const sharePerPh: Record<string, number> = {};
       Object.entries(vals).forEach(([phId, v]) => { sharePerPh[phId] = total > 0 ? (v / total) * 100 : 0; });
       const practiceInfo = practices[code];
-      return { code, name: practiceInfo?.practice_name || code, postcode: practiceInfo?.postcode || "", vals, total, phsServed, sharePerPh };
+      const displayName = practiceInfo?.practice_name
+        ? practiceInfo.practice_name.replace(/\b\w/g, (c) => c.toUpperCase())
+        : `GP Practice ${code}`;
+      return { code, name: displayName, postcode: practiceInfo?.postcode || "", vals, total, phsServed, sharePerPh };
     });
+
 
     // Sort by total items desc
     rows.sort((a, b) => b.total - a.total);
