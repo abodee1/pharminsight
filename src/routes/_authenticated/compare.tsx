@@ -10,6 +10,8 @@ import { PharmacySearch } from "@/components/PharmacySearch";
 import { CountryBadge } from "@/components/CountryBadge";
 import { Badge } from "@/components/ui/badge";
 import { GpFeederOverlap } from "@/components/GpFeederOverlap";
+import { CompetitorHeatmap } from "@/components/CompetitorHeatmap";
+
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   LineChart, Line, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
@@ -615,6 +617,15 @@ function Compare() {
               monthsWindow={12}
             />
           )}
+
+          {/* Competitor geography heatmap (≥1 selected, needs lat/lng) */}
+          {selectedPharms.length >= 1 && selectedPharms.some((p) => p.lat != null && p.lng != null) && (
+            <CompetitorHeatmap
+              pharms={selectedPharms.map((p) => ({ id: p.id, name: p.name, country: p.country, lat: p.lat, lng: p.lng }))}
+              colorFor={colorFor}
+            />
+          )}
+
 
 
           {selectedPharms.length >= 2 && (
