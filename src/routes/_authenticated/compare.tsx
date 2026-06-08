@@ -877,9 +877,9 @@ function Compare() {
                   <table className="w-full text-sm">
                     <thead className="bg-secondary text-muted-foreground">
                       <tr>
-                        <th className="text-left px-6 py-3 font-medium">Metric</th>
+                        <th className="text-left px-3 sm:px-6 py-3 font-medium">Metric</th>
                         {selectedPharms.map((ph) => (
-                          <th key={ph.id} className="text-right px-6 py-3 font-medium">
+                          <th key={ph.id} className="text-right px-3 sm:px-6 py-3 font-medium">
                             <div className="flex items-center justify-end gap-2">
                               <span className="h-2 w-2 rounded-full" style={{ background: colorFor(ph.id) }} />
                               <span className="truncate max-w-[140px]">{ph.name}</span>
@@ -895,7 +895,7 @@ function Compare() {
                         return (
                           <Fragment key={group}>
                             <tr className="bg-secondary/40 border-t border-border">
-                              <td colSpan={selectedPharms.length + 1} className="px-6 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                              <td colSpan={selectedPharms.length + 1} className="px-3 sm:px-6 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                                 {group === "volume" ? "Monthly volumes" : group === "rate" ? "Service intensity (size-adjusted)" : "Payments (£)"}
                               </td>
                             </tr>
@@ -903,7 +903,7 @@ function Compare() {
                               const winnerId = winners[mt.key];
                               return (
                                 <tr key={mt.key} className="border-t border-border">
-                                  <td className="px-6 py-3 font-medium">
+                                  <td className="px-3 sm:px-6 py-3 font-medium">
                                     <div className="flex items-center gap-2">
                                       <span>{mt.label}</span>
                                       {mt.applies !== "all" && (
@@ -917,7 +917,7 @@ function Compare() {
                                     const supported = appliesToCountry(mt.applies, ph.country);
                                     if (!supported) {
                                       return (
-                                        <td key={ph.id} className="px-6 py-3 text-right text-muted-foreground/60 italic">
+                                        <td key={ph.id} className="px-3 sm:px-6 py-3 text-right text-muted-foreground/60 italic">
                                           n/a
                                         </td>
                                       );
