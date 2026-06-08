@@ -438,9 +438,12 @@ function Compare() {
                 placeholder="Search by name, postcode (e.g. KY11), or ODS code…"
                 excludeIds={selected}
                 clearOnSelect
-                onSelect={(p) => {
+                onSelect={async (p) => {
                   if (selected.includes(p.id)) return;
                   if (selected.length >= MAX_SELECT) return;
+                  // Fetch lat/lng for heatmap (not surfaced by PharmacySearch)
+                  const { data: geo } = await supabase
+                    .from("pharmacies").select("lat,lng").eq("id", p.id).maybeSingle();
                   setPharms((cur) =>
                     cur.some((x) => x.id === p.id)
                       ? cur
@@ -452,11 +455,14 @@ function Compare() {
                             region: p.region ?? null,
                             country: p.country ?? null,
                             postcode: p.postcode ?? null,
+                            lat: geo?.lat ?? null,
+                            lng: geo?.lng ?? null,
                           },
                         ],
                   );
                   setSelected((cur) => [...cur, p.id]);
                 }}
+
               />
             ) : (
               <p className="text-sm text-muted-foreground italic">
