@@ -343,49 +343,52 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
 
       {/* Stream breakdown table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="p-5 pb-3">
+        <div className="p-4 sm:p-5 pb-3">
           <h4 className="text-sm font-semibold">Revenue stream breakdown</h4>
           <p className="text-xs text-muted-foreground mt-1">Each line is rated against its share of total remuneration and its 12-month direction of travel.</p>
         </div>
-        <table className="w-full text-sm">
-          <thead className="bg-secondary text-muted-foreground text-xs">
-            <tr>
-              <th className="text-left px-4 py-2 font-medium">Stream</th>
-              <th className="text-right px-4 py-2 font-medium">12m £</th>
-              <th className="text-right px-4 py-2 font-medium">Share</th>
-              <th className="text-right px-4 py-2 font-medium">12m trend</th>
-              <th className="text-left px-4 py-2 font-medium">Rating</th>
-              <th className="text-left px-4 py-2 font-medium">Source</th>
-            </tr>
-          </thead>
-          <tbody>
-            {streams.map((s) => (
-              <tr key={s.label} className="border-t border-border align-top">
-                <td className="px-4 py-2.5">
-                  <div className="font-medium">{s.label}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5 max-w-md">{s.note}</div>
-                </td>
-                <td className="px-4 py-2.5 text-right tabular-nums font-medium">{gbp(s.value)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{s.share.toFixed(1)}%</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">
-                  <span className="inline-flex items-center gap-1 justify-end">
-                    {trendIcon(s.trendPct)}
-                    <span className={s.trendPct > 0 ? "text-emerald-700" : s.trendPct < 0 ? "text-rose-700" : "text-muted-foreground"}>
-                      {s.value > 0 ? `${s.trendPct > 0 ? "+" : ""}${s.trendPct.toFixed(1)}%` : "—"}
-                    </span>
-                  </span>
-                </td>
-                <td className="px-4 py-2.5">{statusChip(s.status)}</td>
-                <td className="px-4 py-2.5">
-                  <span className={`text-[10px] uppercase tracking-wide ${s.basis === "actual" ? "text-emerald-700" : "text-muted-foreground"}`}>
-                    {s.basis}
-                  </span>
-                </td>
+        <div className="overflow-x-auto -mx-px">
+          <table className="w-full text-sm min-w-[640px]">
+            <thead className="bg-secondary text-muted-foreground text-xs">
+              <tr>
+                <th className="text-left px-3 sm:px-4 py-2 font-medium">Stream</th>
+                <th className="text-right px-3 sm:px-4 py-2 font-medium">12m £</th>
+                <th className="text-right px-3 sm:px-4 py-2 font-medium">Share</th>
+                <th className="text-right px-3 sm:px-4 py-2 font-medium">12m trend</th>
+                <th className="text-left px-3 sm:px-4 py-2 font-medium">Rating</th>
+                <th className="text-left px-3 sm:px-4 py-2 font-medium">Source</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {streams.map((s) => (
+                <tr key={s.label} className="border-t border-border align-top">
+                  <td className="px-3 sm:px-4 py-2.5">
+                    <div className="font-medium">{s.label}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5 max-w-md">{s.note}</div>
+                  </td>
+                  <td className="px-3 sm:px-4 py-2.5 text-right tabular-nums font-medium whitespace-nowrap">{gbp(s.value)}</td>
+                  <td className="px-3 sm:px-4 py-2.5 text-right tabular-nums text-muted-foreground whitespace-nowrap">{s.share.toFixed(1)}%</td>
+                  <td className="px-3 sm:px-4 py-2.5 text-right tabular-nums whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1 justify-end">
+                      {trendIcon(s.trendPct)}
+                      <span className={s.trendPct > 0 ? "text-emerald-700" : s.trendPct < 0 ? "text-rose-700" : "text-muted-foreground"}>
+                        {s.value > 0 ? `${s.trendPct > 0 ? "+" : ""}${s.trendPct.toFixed(1)}%` : "—"}
+                      </span>
+                    </span>
+                  </td>
+                  <td className="px-3 sm:px-4 py-2.5">{statusChip(s.status)}</td>
+                  <td className="px-3 sm:px-4 py-2.5">
+                    <span className={`text-[10px] uppercase tracking-wide ${s.basis === "actual" ? "text-emerald-700" : "text-muted-foreground"}`}>
+                      {s.basis}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
+
 
       {/* Composition chart */}
       <div className="rounded-xl border border-border bg-card p-5">
