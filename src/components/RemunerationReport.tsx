@@ -266,7 +266,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
     const weaknesses: string[] = [];
 
     streams.forEach((s) => {
-      if (s.status === "strong") strengths.push(`${s.label}: ${gbp(s.value)} (${s.share.toFixed(1)}% of remuneration) with a ${s.trendPct > 0 ? "+" : ""}${s.trendPct.toFixed(1)}% 6-month trajectory.`);
+      if (s.status === "strong") strengths.push(`${s.label}: ${gbp(s.value)} (${s.share.toFixed(1)}% of remuneration) with a ${s.trendPct > 0 ? "+" : ""}${s.trendPct.toFixed(1)}% 12-month trajectory.`);
       if (s.status === "weak" && s.value > 0) weaknesses.push(`${s.label}: only ${gbp(s.value)} (${s.share.toFixed(1)}%) — trend ${s.trendPct.toFixed(1)}%.`);
       if (s.status === "neutral" && s.value === 0) weaknesses.push(`${s.label}: no activity recorded. Direct revenue left on the table.`);
     });
@@ -279,8 +279,8 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
 
     // Year-on-year items trend
     const itemsTrend = trendPct(sum(last12, "items_dispensed"), sum(prior12, "items_dispensed"));
-    if (itemsTrend >= 5) strengths.push(`Item volumes up ${itemsTrend.toFixed(1)}% over the last 6 months vs the previous 6 — defensible growth in the core revenue line.`);
-    if (itemsTrend <= -5) weaknesses.push(`Item volumes down ${itemsTrend.toFixed(1)}% over the last 6 months vs the previous 6 — directly compresses dispensing remuneration.`);
+    if (itemsTrend >= 5) strengths.push(`Item volumes up ${itemsTrend.toFixed(1)}% over the last 12 months vs the previous 12 — defensible growth in the core revenue line.`);
+    if (itemsTrend <= -5) weaknesses.push(`Item volumes down ${itemsTrend.toFixed(1)}% over the last 12 months vs the previous 12 — directly compresses dispensing remuneration.`);
 
     return {
       streams, totalRev, monthlySeries, topShare, serviceShare,
@@ -345,7 +345,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="p-5 pb-3">
           <h4 className="text-sm font-semibold">Revenue stream breakdown</h4>
-          <p className="text-xs text-muted-foreground mt-1">Each line is rated against its share of total remuneration and its 6-month direction of travel.</p>
+          <p className="text-xs text-muted-foreground mt-1">Each line is rated against its share of total remuneration and its 12-month direction of travel.</p>
         </div>
         <table className="w-full text-sm">
           <thead className="bg-secondary text-muted-foreground text-xs">
@@ -353,7 +353,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
               <th className="text-left px-4 py-2 font-medium">Stream</th>
               <th className="text-right px-4 py-2 font-medium">12m £</th>
               <th className="text-right px-4 py-2 font-medium">Share</th>
-              <th className="text-right px-4 py-2 font-medium">6m trend</th>
+              <th className="text-right px-4 py-2 font-medium">12m trend</th>
               <th className="text-left px-4 py-2 font-medium">Rating</th>
               <th className="text-left px-4 py-2 font-medium">Source</th>
             </tr>
@@ -573,7 +573,7 @@ function KeyTakeaways({
       opportunities.push({
         label: "MCR caseload — re-grow the active register",
         uplift: Math.abs(mcr.value * (mcr.trendPct / 100)),
-        rationale: `MCR is your most defensible recurring revenue. A ${mcr.trendPct.toFixed(1)}% 6-month decline implies leaking caseload — direct GP outreach and serial-script renewal recovers this fastest.`,
+        rationale: `MCR is your most defensible recurring revenue. A ${mcr.trendPct.toFixed(1)}% 12-month decline implies leaking caseload — direct GP outreach and serial-script renewal recovers this fastest.`,
       });
     }
     const ehc = streams.find((s) => s.label.startsWith("EHC"));
@@ -597,7 +597,7 @@ function KeyTakeaways({
   if (itemsTrend <= -5) risks.push({ label: `Item volumes contracting (${itemsTrend.toFixed(1)}% vs prior 6m). Investigate GP-list changes, local nursing-home contracts, and online-pharmacy switching.`, severity: "high" });
   streams.forEach((s) => {
     if (s.status === "weak" && s.value > 0 && s.share > 3) {
-      risks.push({ label: `${s.label} weakening — ${s.trendPct.toFixed(1)}% 6m trend on a line worth ${gbp(s.value)}.`, severity: "medium" });
+      risks.push({ label: `${s.label} weakening — ${s.trendPct.toFixed(1)}% 12m trend on a line worth ${gbp(s.value)}.`, severity: "medium" });
     }
   });
   if (!isScot && epsRate > 0 && epsRate < 80) risks.push({ label: `EPS rate ${epsRate.toFixed(1)}% — paper-script exposure increases lost-script and reimbursement-delay risk.`, severity: "medium" });
