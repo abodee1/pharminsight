@@ -36,11 +36,12 @@ type Stream = {
   label: string;
   value: number;
   share: number;        // % of total remuneration
-  trendPct: number;     // 6m vs prior 6m %
+  trendPct: number;     // 12m vs prior 12m %
   status: "strong" | "average" | "weak" | "neutral";
   note: string;
   basis: "actual" | "estimate";
 };
+
 
 function bandFor(share: number, trendPct: number, value: number): Stream["status"] {
   if (value <= 0) return "neutral";
@@ -86,8 +87,10 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
     ) endIdx--;
 
     const last12 = rows.slice(Math.max(0, endIdx - 11), endIdx + 1);
-    const prior6 = rows.slice(Math.max(0, endIdx - 17), Math.max(0, endIdx - 5));
+    const prior12 = rows.slice(Math.max(0, endIdx - 23), Math.max(0, endIdx - 11));
     const last6 = last12.slice(-6);
+    const prior6 = rows.slice(Math.max(0, endIdx - 17), Math.max(0, endIdx - 5));
+
 
     const sum = <K extends keyof DRow>(arr: DRow[], k: K) =>
       arr.reduce((s, r) => s + num(r[k] as any), 0);
