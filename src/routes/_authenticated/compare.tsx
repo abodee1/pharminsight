@@ -869,7 +869,7 @@ function Compare() {
 
               {/* Comparison table */}
               <div className="rounded-xl bg-card border border-border shadow-sm overflow-hidden mb-6">
-                <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+                <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center justify-between gap-2 flex-wrap">
                   <h2 className="text-sm font-semibold">Side-by-side numbers · latest reported</h2>
                   <span className="text-xs text-muted-foreground">Best per row highlighted · n/a = service not offered in that country</span>
                 </div>
@@ -928,7 +928,7 @@ function Compare() {
                                       <td
                                         key={ph.id}
                                         className={[
-                                          "px-6 py-3 text-right tabular-nums",
+                                          "px-3 sm:px-6 py-3 text-right tabular-nums",
                                           isWin ? "font-semibold text-foreground" : "text-muted-foreground",
                                         ].join(" ")}
                                       >
