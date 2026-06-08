@@ -125,7 +125,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
       label: "Dispensing fees (item-based)",
       value: itemFeeValue,
       share: 0,
-      trendPct: trendPct(sum(last6, "items_dispensed"), sum(prior6, "items_dispensed")),
+      trendPct: trendPct(sum(last12, "items_dispensed"), sum(prior12, "items_dispensed")),
       status: "neutral",
       basis: "estimate",
       note: `${tot.items.toLocaleString()} items over 12 months at the indicative Single Activity Fee. The dominant baseline revenue stream — protect at all costs.`,
@@ -138,7 +138,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "Pharmacy First (Scotland)",
         value: pfValue,
         share: 0,
-        trendPct: trendPct(sum(last6, "pharmacy_first_count"), sum(prior6, "pharmacy_first_count")),
+        trendPct: trendPct(sum(last12, "pharmacy_first_count"), sum(prior12, "pharmacy_first_count")),
         status: "neutral",
         basis: tot.pfPay > 0 ? "actual" : "estimate",
         note: tot.pf > 0
@@ -151,7 +151,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "MCR (chronic medication)",
         value: mcrValue,
         share: 0,
-        trendPct: trendPct(sum(last6, "mcr_items"), sum(prior6, "mcr_items")),
+        trendPct: trendPct(sum(last12, "mcr_items"), sum(prior12, "mcr_items")),
         status: "neutral",
         basis: tot.mcrPay > 0 ? "actual" : "estimate",
         note: `${tot.mcrReg.toLocaleString()} registered patients · ${tot.mcrItems.toLocaleString()} serial items. Caseload-driven and highly predictable — the most defensible recurring revenue line.`,
@@ -162,7 +162,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "Methadone supervision (PHS)",
         value: methValue,
         share: 0,
-        trendPct: trendPct(sum(last6, "supervised_methadone_doses"), sum(prior6, "supervised_methadone_doses")),
+        trendPct: trendPct(sum(last12, "supervised_methadone_doses"), sum(prior12, "supervised_methadone_doses")),
         status: "neutral",
         basis: "estimate",
         note: `${tot.methSup.toLocaleString()} supervised doses + ${tot.methItems.toLocaleString()} OST items. Material if the active caseload is large; otherwise treat as supplemental.`,
@@ -173,7 +173,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "Smoking cessation (PHS)",
         value: smkValue,
         share: 0,
-        trendPct: trendPct(sum(last6, "smoking_cessation"), sum(prior6, "smoking_cessation")),
+        trendPct: trendPct(sum(last12, "smoking_cessation"), sum(prior12, "smoking_cessation")),
         status: "neutral",
         basis: tot.smkPay > 0 ? "actual" : "estimate",
         note: `${tot.smk.toLocaleString()} completed episodes in 12m.`,
@@ -184,7 +184,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "EHC supplies (PHS)",
         value: ehcValue,
         share: 0,
-        trendPct: trendPct(sum(last6, "ehc_items"), sum(prior6, "ehc_items")),
+        trendPct: trendPct(sum(last12, "ehc_items"), sum(prior12, "ehc_items")),
         status: "neutral",
         basis: "estimate",
         note: `${tot.ehc.toLocaleString()} EHC supplies in 12m.`,
@@ -195,7 +195,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "Pharmacy First consultations",
         value: tot.pf * RATES.pfConsult,
         share: 0,
-        trendPct: trendPct(sum(last6, "pharmacy_first_count"), sum(prior6, "pharmacy_first_count")),
+        trendPct: trendPct(sum(last12, "pharmacy_first_count"), sum(prior12, "pharmacy_first_count")),
         status: "neutral",
         basis: "estimate",
         note: tot.pf > 0
@@ -207,7 +207,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "New Medicine Service (NMS)",
         value: tot.nms * RATES.nms,
         share: 0,
-        trendPct: trendPct(sum(last6, "nms_count"), sum(prior6, "nms_count")),
+        trendPct: trendPct(sum(last12, "nms_count"), sum(prior12, "nms_count")),
         status: "neutral",
         basis: "estimate",
         note: tot.nms > 0
@@ -219,7 +219,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "Flu vaccinations",
         value: tot.flu * RATES.flu,
         share: 0,
-        trendPct: trendPct(sum(last6, "flu_vaccinations"), sum(prior6, "flu_vaccinations")),
+        trendPct: trendPct(sum(last12, "flu_vaccinations"), sum(prior12, "flu_vaccinations")),
         status: "neutral",
         basis: "estimate",
         note: `${tot.flu.toLocaleString()} jabs in 12m — concentrated Oct–Dec, materially boosting Q3/Q4 cash.`,
@@ -278,7 +278,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
     if (!isScot && epsRate > 0 && epsRate < 85) weaknesses.push(`EPS rate ${epsRate.toFixed(1)}% — below the 95% best-practice threshold. Paper handling is slowing reimbursement and increasing exception risk.`);
 
     // Year-on-year items trend
-    const itemsTrend = trendPct(sum(last6, "items_dispensed"), sum(prior6, "items_dispensed"));
+    const itemsTrend = trendPct(sum(last12, "items_dispensed"), sum(prior12, "items_dispensed"));
     if (itemsTrend >= 5) strengths.push(`Item volumes up ${itemsTrend.toFixed(1)}% over the last 6 months vs the previous 6 — defensible growth in the core revenue line.`);
     if (itemsTrend <= -5) weaknesses.push(`Item volumes down ${itemsTrend.toFixed(1)}% over the last 6 months vs the previous 6 — directly compresses dispensing remuneration.`);
 
