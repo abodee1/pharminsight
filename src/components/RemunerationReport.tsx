@@ -36,11 +36,12 @@ type Stream = {
   label: string;
   value: number;
   share: number;        // % of total remuneration
-  trendPct: number;     // 6m vs prior 6m %
+  trendPct: number;     // 12m vs prior 12m %
   status: "strong" | "average" | "weak" | "neutral";
   note: string;
   basis: "actual" | "estimate";
 };
+
 
 function bandFor(share: number, trendPct: number, value: number): Stream["status"] {
   if (value <= 0) return "neutral";
@@ -86,8 +87,10 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
     ) endIdx--;
 
     const last12 = rows.slice(Math.max(0, endIdx - 11), endIdx + 1);
-    const prior6 = rows.slice(Math.max(0, endIdx - 17), Math.max(0, endIdx - 5));
+    const prior12 = rows.slice(Math.max(0, endIdx - 23), Math.max(0, endIdx - 11));
     const last6 = last12.slice(-6);
+    const prior6 = rows.slice(Math.max(0, endIdx - 17), Math.max(0, endIdx - 5));
+
 
     const sum = <K extends keyof DRow>(arr: DRow[], k: K) =>
       arr.reduce((s, r) => s + num(r[k] as any), 0);
@@ -122,7 +125,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
       label: "Dispensing fees (item-based)",
       value: itemFeeValue,
       share: 0,
-      trendPct: trendPct(sum(last6, "items_dispensed"), sum(prior6, "items_dispensed")),
+      trendPct: trendPct(sum(last12, "items_dispensed"), sum(prior12, "items_dispensed")),
       status: "neutral",
       basis: "estimate",
       note: `${tot.items.toLocaleString()} items over 12 months at the indicative Single Activity Fee. The dominant baseline revenue stream — protect at all costs.`,
@@ -135,7 +138,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "Pharmacy First (Scotland)",
         value: pfValue,
         share: 0,
-        trendPct: trendPct(sum(last6, "pharmacy_first_count"), sum(prior6, "pharmacy_first_count")),
+        trendPct: trendPct(sum(last12, "pharmacy_first_count"), sum(prior12, "pharmacy_first_count")),
         status: "neutral",
         basis: tot.pfPay > 0 ? "actual" : "estimate",
         note: tot.pf > 0
@@ -148,7 +151,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "MCR (chronic medication)",
         value: mcrValue,
         share: 0,
-        trendPct: trendPct(sum(last6, "mcr_items"), sum(prior6, "mcr_items")),
+        trendPct: trendPct(sum(last12, "mcr_items"), sum(prior12, "mcr_items")),
         status: "neutral",
         basis: tot.mcrPay > 0 ? "actual" : "estimate",
         note: `${tot.mcrReg.toLocaleString()} registered patients · ${tot.mcrItems.toLocaleString()} serial items. Caseload-driven and highly predictable — the most defensible recurring revenue line.`,
@@ -159,7 +162,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "Methadone supervision (PHS)",
         value: methValue,
         share: 0,
-        trendPct: trendPct(sum(last6, "supervised_methadone_doses"), sum(prior6, "supervised_methadone_doses")),
+        trendPct: trendPct(sum(last12, "supervised_methadone_doses"), sum(prior12, "supervised_methadone_doses")),
         status: "neutral",
         basis: "estimate",
         note: `${tot.methSup.toLocaleString()} supervised doses + ${tot.methItems.toLocaleString()} OST items. Material if the active caseload is large; otherwise treat as supplemental.`,
@@ -170,7 +173,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "Smoking cessation (PHS)",
         value: smkValue,
         share: 0,
-        trendPct: trendPct(sum(last6, "smoking_cessation"), sum(prior6, "smoking_cessation")),
+        trendPct: trendPct(sum(last12, "smoking_cessation"), sum(prior12, "smoking_cessation")),
         status: "neutral",
         basis: tot.smkPay > 0 ? "actual" : "estimate",
         note: `${tot.smk.toLocaleString()} completed episodes in 12m.`,
@@ -181,7 +184,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "EHC supplies (PHS)",
         value: ehcValue,
         share: 0,
-        trendPct: trendPct(sum(last6, "ehc_items"), sum(prior6, "ehc_items")),
+        trendPct: trendPct(sum(last12, "ehc_items"), sum(prior12, "ehc_items")),
         status: "neutral",
         basis: "estimate",
         note: `${tot.ehc.toLocaleString()} EHC supplies in 12m.`,
@@ -192,7 +195,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "Pharmacy First consultations",
         value: tot.pf * RATES.pfConsult,
         share: 0,
-        trendPct: trendPct(sum(last6, "pharmacy_first_count"), sum(prior6, "pharmacy_first_count")),
+        trendPct: trendPct(sum(last12, "pharmacy_first_count"), sum(prior12, "pharmacy_first_count")),
         status: "neutral",
         basis: "estimate",
         note: tot.pf > 0
@@ -204,7 +207,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "New Medicine Service (NMS)",
         value: tot.nms * RATES.nms,
         share: 0,
-        trendPct: trendPct(sum(last6, "nms_count"), sum(prior6, "nms_count")),
+        trendPct: trendPct(sum(last12, "nms_count"), sum(prior12, "nms_count")),
         status: "neutral",
         basis: "estimate",
         note: tot.nms > 0
@@ -216,7 +219,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
         label: "Flu vaccinations",
         value: tot.flu * RATES.flu,
         share: 0,
-        trendPct: trendPct(sum(last6, "flu_vaccinations"), sum(prior6, "flu_vaccinations")),
+        trendPct: trendPct(sum(last12, "flu_vaccinations"), sum(prior12, "flu_vaccinations")),
         status: "neutral",
         basis: "estimate",
         note: `${tot.flu.toLocaleString()} jabs in 12m — concentrated Oct–Dec, materially boosting Q3/Q4 cash.`,
@@ -263,7 +266,7 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
     const weaknesses: string[] = [];
 
     streams.forEach((s) => {
-      if (s.status === "strong") strengths.push(`${s.label}: ${gbp(s.value)} (${s.share.toFixed(1)}% of remuneration) with a ${s.trendPct > 0 ? "+" : ""}${s.trendPct.toFixed(1)}% 6-month trajectory.`);
+      if (s.status === "strong") strengths.push(`${s.label}: ${gbp(s.value)} (${s.share.toFixed(1)}% of remuneration) with a ${s.trendPct > 0 ? "+" : ""}${s.trendPct.toFixed(1)}% 12-month trajectory.`);
       if (s.status === "weak" && s.value > 0) weaknesses.push(`${s.label}: only ${gbp(s.value)} (${s.share.toFixed(1)}%) — trend ${s.trendPct.toFixed(1)}%.`);
       if (s.status === "neutral" && s.value === 0) weaknesses.push(`${s.label}: no activity recorded. Direct revenue left on the table.`);
     });
@@ -275,9 +278,9 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
     if (!isScot && epsRate > 0 && epsRate < 85) weaknesses.push(`EPS rate ${epsRate.toFixed(1)}% — below the 95% best-practice threshold. Paper handling is slowing reimbursement and increasing exception risk.`);
 
     // Year-on-year items trend
-    const itemsTrend = trendPct(sum(last6, "items_dispensed"), sum(prior6, "items_dispensed"));
-    if (itemsTrend >= 5) strengths.push(`Item volumes up ${itemsTrend.toFixed(1)}% over the last 6 months vs the previous 6 — defensible growth in the core revenue line.`);
-    if (itemsTrend <= -5) weaknesses.push(`Item volumes down ${itemsTrend.toFixed(1)}% over the last 6 months vs the previous 6 — directly compresses dispensing remuneration.`);
+    const itemsTrend = trendPct(sum(last12, "items_dispensed"), sum(prior12, "items_dispensed"));
+    if (itemsTrend >= 5) strengths.push(`Item volumes up ${itemsTrend.toFixed(1)}% over the last 12 months vs the previous 12 — defensible growth in the core revenue line.`);
+    if (itemsTrend <= -5) weaknesses.push(`Item volumes down ${itemsTrend.toFixed(1)}% over the last 12 months vs the previous 12 — directly compresses dispensing remuneration.`);
 
     return {
       streams, totalRev, monthlySeries, topShare, serviceShare,
@@ -340,49 +343,52 @@ export function RemunerationReport({ pharmacy, rows }: { pharmacy: Pharmacy; row
 
       {/* Stream breakdown table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="p-5 pb-3">
+        <div className="p-4 sm:p-5 pb-3">
           <h4 className="text-sm font-semibold">Revenue stream breakdown</h4>
-          <p className="text-xs text-muted-foreground mt-1">Each line is rated against its share of total remuneration and its 6-month direction of travel.</p>
+          <p className="text-xs text-muted-foreground mt-1">Each line is rated against its share of total remuneration and its 12-month direction of travel.</p>
         </div>
-        <table className="w-full text-sm">
-          <thead className="bg-secondary text-muted-foreground text-xs">
-            <tr>
-              <th className="text-left px-4 py-2 font-medium">Stream</th>
-              <th className="text-right px-4 py-2 font-medium">12m £</th>
-              <th className="text-right px-4 py-2 font-medium">Share</th>
-              <th className="text-right px-4 py-2 font-medium">6m trend</th>
-              <th className="text-left px-4 py-2 font-medium">Rating</th>
-              <th className="text-left px-4 py-2 font-medium">Source</th>
-            </tr>
-          </thead>
-          <tbody>
-            {streams.map((s) => (
-              <tr key={s.label} className="border-t border-border align-top">
-                <td className="px-4 py-2.5">
-                  <div className="font-medium">{s.label}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5 max-w-md">{s.note}</div>
-                </td>
-                <td className="px-4 py-2.5 text-right tabular-nums font-medium">{gbp(s.value)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{s.share.toFixed(1)}%</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">
-                  <span className="inline-flex items-center gap-1 justify-end">
-                    {trendIcon(s.trendPct)}
-                    <span className={s.trendPct > 0 ? "text-emerald-700" : s.trendPct < 0 ? "text-rose-700" : "text-muted-foreground"}>
-                      {s.value > 0 ? `${s.trendPct > 0 ? "+" : ""}${s.trendPct.toFixed(1)}%` : "—"}
-                    </span>
-                  </span>
-                </td>
-                <td className="px-4 py-2.5">{statusChip(s.status)}</td>
-                <td className="px-4 py-2.5">
-                  <span className={`text-[10px] uppercase tracking-wide ${s.basis === "actual" ? "text-emerald-700" : "text-muted-foreground"}`}>
-                    {s.basis}
-                  </span>
-                </td>
+        <div className="overflow-x-auto -mx-px">
+          <table className="w-full text-sm min-w-[640px]">
+            <thead className="bg-secondary text-muted-foreground text-xs">
+              <tr>
+                <th className="text-left px-3 sm:px-4 py-2 font-medium">Stream</th>
+                <th className="text-right px-3 sm:px-4 py-2 font-medium">12m £</th>
+                <th className="text-right px-3 sm:px-4 py-2 font-medium">Share</th>
+                <th className="text-right px-3 sm:px-4 py-2 font-medium">12m trend</th>
+                <th className="text-left px-3 sm:px-4 py-2 font-medium">Rating</th>
+                <th className="text-left px-3 sm:px-4 py-2 font-medium">Source</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {streams.map((s) => (
+                <tr key={s.label} className="border-t border-border align-top">
+                  <td className="px-3 sm:px-4 py-2.5">
+                    <div className="font-medium">{s.label}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5 max-w-md">{s.note}</div>
+                  </td>
+                  <td className="px-3 sm:px-4 py-2.5 text-right tabular-nums font-medium whitespace-nowrap">{gbp(s.value)}</td>
+                  <td className="px-3 sm:px-4 py-2.5 text-right tabular-nums text-muted-foreground whitespace-nowrap">{s.share.toFixed(1)}%</td>
+                  <td className="px-3 sm:px-4 py-2.5 text-right tabular-nums whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1 justify-end">
+                      {trendIcon(s.trendPct)}
+                      <span className={s.trendPct > 0 ? "text-emerald-700" : s.trendPct < 0 ? "text-rose-700" : "text-muted-foreground"}>
+                        {s.value > 0 ? `${s.trendPct > 0 ? "+" : ""}${s.trendPct.toFixed(1)}%` : "—"}
+                      </span>
+                    </span>
+                  </td>
+                  <td className="px-3 sm:px-4 py-2.5">{statusChip(s.status)}</td>
+                  <td className="px-3 sm:px-4 py-2.5">
+                    <span className={`text-[10px] uppercase tracking-wide ${s.basis === "actual" ? "text-emerald-700" : "text-muted-foreground"}`}>
+                      {s.basis}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
+
 
       {/* Composition chart */}
       <div className="rounded-xl border border-border bg-card p-5">
@@ -570,7 +576,7 @@ function KeyTakeaways({
       opportunities.push({
         label: "MCR caseload — re-grow the active register",
         uplift: Math.abs(mcr.value * (mcr.trendPct / 100)),
-        rationale: `MCR is your most defensible recurring revenue. A ${mcr.trendPct.toFixed(1)}% 6-month decline implies leaking caseload — direct GP outreach and serial-script renewal recovers this fastest.`,
+        rationale: `MCR is your most defensible recurring revenue. A ${mcr.trendPct.toFixed(1)}% 12-month decline implies leaking caseload — direct GP outreach and serial-script renewal recovers this fastest.`,
       });
     }
     const ehc = streams.find((s) => s.label.startsWith("EHC"));
@@ -594,7 +600,7 @@ function KeyTakeaways({
   if (itemsTrend <= -5) risks.push({ label: `Item volumes contracting (${itemsTrend.toFixed(1)}% vs prior 6m). Investigate GP-list changes, local nursing-home contracts, and online-pharmacy switching.`, severity: "high" });
   streams.forEach((s) => {
     if (s.status === "weak" && s.value > 0 && s.share > 3) {
-      risks.push({ label: `${s.label} weakening — ${s.trendPct.toFixed(1)}% 6m trend on a line worth ${gbp(s.value)}.`, severity: "medium" });
+      risks.push({ label: `${s.label} weakening — ${s.trendPct.toFixed(1)}% 12m trend on a line worth ${gbp(s.value)}.`, severity: "medium" });
     }
   });
   if (!isScot && epsRate > 0 && epsRate < 80) risks.push({ label: `EPS rate ${epsRate.toFixed(1)}% — paper-script exposure increases lost-script and reimbursement-delay risk.`, severity: "medium" });

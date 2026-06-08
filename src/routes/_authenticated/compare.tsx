@@ -10,6 +10,8 @@ import { PharmacySearch } from "@/components/PharmacySearch";
 import { CountryBadge } from "@/components/CountryBadge";
 import { Badge } from "@/components/ui/badge";
 import { GpFeederOverlap } from "@/components/GpFeederOverlap";
+import { CompetitorHeatmap } from "@/components/CompetitorHeatmap";
+
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   LineChart, Line, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
@@ -436,9 +438,12 @@ function Compare() {
                 placeholder="Search by name, postcode (e.g. KY11), or ODS code…"
                 excludeIds={selected}
                 clearOnSelect
-                onSelect={(p) => {
+                onSelect={async (p) => {
                   if (selected.includes(p.id)) return;
                   if (selected.length >= MAX_SELECT) return;
+                  // Fetch lat/lng for heatmap (not surfaced by PharmacySearch)
+                  const { data: geo } = await supabase
+                    .from("pharmacies").select("lat,lng").eq("id", p.id).maybeSingle();
                   setPharms((cur) =>
                     cur.some((x) => x.id === p.id)
                       ? cur
@@ -450,11 +455,14 @@ function Compare() {
                             region: p.region ?? null,
                             country: p.country ?? null,
                             postcode: p.postcode ?? null,
+                            lat: geo?.lat ?? null,
+                            lng: geo?.lng ?? null,
                           },
                         ],
                   );
                   setSelected((cur) => [...cur, p.id]);
                 }}
+
               />
             ) : (
               <p className="text-sm text-muted-foreground italic">
@@ -615,6 +623,15 @@ function Compare() {
               monthsWindow={12}
             />
           )}
+
+          {/* Competitor geography heatmap (≥1 selected, needs lat/lng) */}
+          {selectedPharms.length >= 1 && selectedPharms.some((p) => p.lat != null && p.lng != null) && (
+            <CompetitorHeatmap
+              pharms={selectedPharms.map((p) => ({ id: p.id, name: p.name, country: p.country, lat: p.lat, lng: p.lng }))}
+              colorFor={colorFor}
+            />
+          )}
+
 
 
           {selectedPharms.length >= 2 && (
@@ -852,7 +869,7 @@ function Compare() {
 
               {/* Comparison table */}
               <div className="rounded-xl bg-card border border-border shadow-sm overflow-hidden mb-6">
-                <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+                <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center justify-between gap-2 flex-wrap">
                   <h2 className="text-sm font-semibold">Side-by-side numbers · latest reported</h2>
                   <span className="text-xs text-muted-foreground">Best per row highlighted · n/a = service not offered in that country</span>
                 </div>
@@ -860,9 +877,9 @@ function Compare() {
                   <table className="w-full text-sm">
                     <thead className="bg-secondary text-muted-foreground">
                       <tr>
-                        <th className="text-left px-6 py-3 font-medium">Metric</th>
+                        <th className="text-left px-3 sm:px-6 py-3 font-medium">Metric</th>
                         {selectedPharms.map((ph) => (
-                          <th key={ph.id} className="text-right px-6 py-3 font-medium">
+                          <th key={ph.id} className="text-right px-3 sm:px-6 py-3 font-medium">
                             <div className="flex items-center justify-end gap-2">
                               <span className="h-2 w-2 rounded-full" style={{ background: colorFor(ph.id) }} />
                               <span className="truncate max-w-[140px]">{ph.name}</span>
@@ -878,7 +895,7 @@ function Compare() {
                         return (
                           <Fragment key={group}>
                             <tr className="bg-secondary/40 border-t border-border">
-                              <td colSpan={selectedPharms.length + 1} className="px-6 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                              <td colSpan={selectedPharms.length + 1} className="px-3 sm:px-6 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                                 {group === "volume" ? "Monthly volumes" : group === "rate" ? "Service intensity (size-adjusted)" : "Payments (£)"}
                               </td>
                             </tr>
@@ -886,7 +903,7 @@ function Compare() {
                               const winnerId = winners[mt.key];
                               return (
                                 <tr key={mt.key} className="border-t border-border">
-                                  <td className="px-6 py-3 font-medium">
+                                  <td className="px-3 sm:px-6 py-3 font-medium">
                                     <div className="flex items-center gap-2">
                                       <span>{mt.label}</span>
                                       {mt.applies !== "all" && (
@@ -900,7 +917,7 @@ function Compare() {
                                     const supported = appliesToCountry(mt.applies, ph.country);
                                     if (!supported) {
                                       return (
-                                        <td key={ph.id} className="px-6 py-3 text-right text-muted-foreground/60 italic">
+                                        <td key={ph.id} className="px-3 sm:px-6 py-3 text-right text-muted-foreground/60 italic">
                                           n/a
                                         </td>
                                       );
@@ -911,7 +928,7 @@ function Compare() {
                                       <td
                                         key={ph.id}
                                         className={[
-                                          "px-6 py-3 text-right tabular-nums",
+                                          "px-3 sm:px-6 py-3 text-right tabular-nums",
                                           isWin ? "font-semibold text-foreground" : "text-muted-foreground",
                                         ].join(" ")}
                                       >

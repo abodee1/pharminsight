@@ -99,8 +99,12 @@ export function GpFeederOverlap({
       const sharePerPh: Record<string, number> = {};
       Object.entries(vals).forEach(([phId, v]) => { sharePerPh[phId] = total > 0 ? (v / total) * 100 : 0; });
       const practiceInfo = practices[code];
-      return { code, name: practiceInfo?.practice_name || code, postcode: practiceInfo?.postcode || "", vals, total, phsServed, sharePerPh };
+      const displayName = practiceInfo?.practice_name
+        ? practiceInfo.practice_name.replace(/\b\w/g, (c) => c.toUpperCase())
+        : `GP Practice ${code}`;
+      return { code, name: displayName, postcode: practiceInfo?.postcode || "", vals, total, phsServed, sharePerPh };
     });
+
 
     // Sort by total items desc
     rows.sort((a, b) => b.total - a.total);
@@ -131,14 +135,24 @@ export function GpFeederOverlap({
 
     // Top feeder concentration (HHI proxy): share of pharmacy items coming from its top feeder
     const topFeederShare: Record<string, { name: string; pct: number } | null> = {};
+    // Top N feeders per pharmacy with name + items + share (major feeders only)
+    const topFeedersPerPh: Record<string, { code: string; name: string; postcode: string; items: number; share: number }[]> = {};
     pharms.forEach((p) => {
-      const phRows = rows.filter((r) => (r.vals[p.id] || 0) > 0).map((r) => ({ name: r.name, v: r.vals[p.id] }));
-      phRows.sort((a, b) => b.v - a.v);
-      const t = totalsPerPh[p.id];
-      topFeederShare[p.id] = phRows[0] && t > 0 ? { name: phRows[0].name, pct: (phRows[0].v / t) * 100 } : null;
+      const phRows = rows
+        .filter((r) => (r.vals[p.id] || 0) > 0)
+        .map((r) => ({ code: r.code, name: r.name, postcode: r.postcode, items: r.vals[p.id] }));
+      phRows.sort((a, b) => b.items - a.items);
+      const t = totalsPerPh[p.id] || 0;
+      topFeederShare[p.id] = phRows[0] && t > 0 ? { name: phRows[0].name, pct: (phRows[0].items / t) * 100 } : null;
+      // Major = top 6 OR contributes ≥3% of items (whichever yields the smaller, more meaningful list)
+      topFeedersPerPh[p.id] = phRows
+        .map((r) => ({ ...r, share: t > 0 ? (r.items / t) * 100 : 0 }))
+        .filter((r, i) => i < 6 && r.share >= 1)
+        .slice(0, 6);
     });
 
-    return { rows, shared, exclusiveByPh, totalsPerPh, overlapPct, overlapItems, distinctPractices, topFeederShare };
+    return { rows, shared, exclusiveByPh, totalsPerPh, overlapPct, overlapItems, distinctPractices, topFeederShare, topFeedersPerPh };
+
   }, [links, odsByPh, pharms, practices]);
 
   if (pharms.length < 2) return null;
@@ -272,6 +286,51 @@ export function GpFeederOverlap({
           })}
         </div>
       </div>
+
+      {/* Major feeders per pharmacy — top GP practices by name */}
+      <div className="rounded-xl bg-card border border-border p-5 md:p-6 shadow-sm">
+        <h3 className="text-sm font-semibold mb-1">Major GP feeders · top practices by name</h3>
+        <p className="text-xs text-muted-foreground mb-4">The largest prescribing practices feeding each pharmacy over the last {monthsWindow} months. Share = % of that pharmacy's total items.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {pharms.map((p) => {
+            const feeders = summary.topFeedersPerPh[p.id] || [];
+            return (
+              <div key={p.id} className="rounded-lg border border-border p-3" style={{ borderTop: `3px solid ${colorFor(p.id)}` }}>
+                <div className="flex items-baseline justify-between gap-2 mb-2">
+                  <p className="text-sm font-semibold truncate">{p.name}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">
+                    {summary.distinctPractices[p.id]} feeders
+                  </p>
+                </div>
+                {feeders.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">No prescribing linkage available.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {feeders.map((f, i) => (
+                      <li key={f.code} className="text-xs">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="font-medium truncate min-w-0" title={`${f.name}${f.postcode ? ` · ${f.postcode}` : ""}`}>
+                            <span className="inline-block w-4 text-muted-foreground">{i + 1}.</span>
+                            {f.name}
+                          </span>
+                          <span className="tabular-nums font-semibold shrink-0">{fmtPct(f.share)}</span>
+                        </div>
+                        <div className="mt-1 flex items-center gap-2">
+                          <div className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${Math.min(100, f.share)}%`, background: colorFor(p.id) }} />
+                          </div>
+                          <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{fmtInt(f.items)} items</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
 
       {/* Exclusive feeders per pharmacy (where each pharmacy has its OWN moat) */}
       <div className="rounded-xl bg-card border border-border p-5 md:p-6 shadow-sm">
