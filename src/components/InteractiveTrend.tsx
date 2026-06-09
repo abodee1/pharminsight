@@ -164,7 +164,7 @@ export function InteractiveTrend({
 
       <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
         <Stat label="Avg / month" value={def.format(avg)} />
-        <Stat label={`${Number(win)}M total`} value={def.format(points.reduce((a, p) => a + p.value, 0))} />
+        <Stat label={win >= ALL_PERIOD ? "All-time total" : `${Number(win)}M total`} value={def.format(points.reduce((a, p) => a + p.value, 0))} />
         <Stat label="Window start" value={points[0]?.label ?? "—"} />
       </div>
     </div>
