@@ -231,10 +231,10 @@ export function CompetitorHeatmap({
 
             {/* Distance band legend */}
             <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-rose-600" /> ≤1 km</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-rose-600" /> &lt;500 m</span>
               <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" /> 1–2 km</span>
               <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> 2–3 km</span>
-              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> 3–5 km</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> 3–4 km</span>
               <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" style={{ color: colorFor(focusPharm.id) }} /> Focus pharmacy at (0,0)</span>
             </div>
           </div>
