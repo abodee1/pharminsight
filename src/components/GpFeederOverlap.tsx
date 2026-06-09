@@ -6,7 +6,7 @@ import { Loader2, Users, Share2, Target, AlertTriangle } from "lucide-react";
 
 type Pharm = { id: string; name: string; ods_code?: string | null; country: string | null };
 type LinkRow = { practice_code: string; pharmacy_ods_code: string; year: number; month: number; items_dispensed: number };
-type Practice = { practice_code: string; practice_name: string | null; postcode: string | null; address_line1: string | null };
+type Practice = { practice_code: string; practice_name: string | null; google_name: string | null; postcode: string | null; address_line1: string | null };
 
 const fmtInt = (n: number) => Math.round(n).toLocaleString();
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
