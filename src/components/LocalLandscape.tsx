@@ -22,10 +22,15 @@ type NearbyPharmacy = {
 type NearbyGP = {
   practice_code: string;
   practice_name: string;
+  google_name: string | null;
   postcode: string | null;
   address_line: string | null;
   distance_m: number;
 };
+
+function displayPracticeName(g: { google_name?: string | null; practice_name?: string | null; practice_code?: string }) {
+  return g.google_name || g.practice_name || g.practice_code || "GP Practice";
+}
 
 function fmtDist(m: number | null) {
   if (m == null) return "";
