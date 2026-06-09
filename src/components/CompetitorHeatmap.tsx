@@ -121,10 +121,10 @@ export function CompetitorHeatmap({
 
   if (focal.length === 0) return null;
 
-  // Scatter colour ramp by distance band
+  // Scatter colour ramp by distance band: <500m, 1–2km, 2–3km, 3–4km
   const colourFor = (c: typeof local[number]) => {
     if (c.isSelected) return colorFor(c.id);
-    if (c.distance <= 1) return "#dc2626";
+    if (c.distance <= 0.5) return "#dc2626";
     if (c.distance <= 2) return "#f97316";
     if (c.distance <= 3) return "#f59e0b";
     return "#0ea5e9";
