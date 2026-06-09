@@ -8,11 +8,14 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 
 export type PeriodWindow = number;
-export const PERIOD_OPTIONS: PeriodWindow[] = [3, 6, 12, 24];
+/** Sentinel value meaning "all available history". Large enough that
+ *  `Array.prototype.slice(-ALL_PERIOD)` returns the entire series. */
+export const ALL_PERIOD: PeriodWindow = 9999;
+export const PERIOD_OPTIONS: PeriodWindow[] = [3, 6, 12, 24, ALL_PERIOD];
 
 /* ----------------------------------------------------------------
  * PeriodPills
- * 1M / 3M / 6M / 12M selector pills, used to scope every chart.
+ * 3M / 6M / 12M / 24M / All selector pills, used to scope every chart.
  * ---------------------------------------------------------------- */
 export function PeriodPills({
   value,
@@ -39,7 +42,7 @@ export function PeriodPills({
               : "text-muted-foreground hover:text-foreground",
           ].join(" ")}
         >
-          {opt}M
+          {opt >= ALL_PERIOD ? "All" : `${opt}M`}
         </button>
       ))}
     </div>
