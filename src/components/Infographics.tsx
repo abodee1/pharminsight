@@ -352,7 +352,7 @@ export function GpPrescribingCard({
         front={
           <TrendCard
             title={title}
-            subtitle={loading ? "Loading…" : `${avgGps} GP practices · ${totalItems.toLocaleString()} items over ${win}M`}
+            subtitle={loading ? "Loading…" : `${avgGps} GP practices · ${totalItems.toLocaleString()} items over ${win >= ALL_PERIOD ? "all time" : `${win}M`}`}
             caption="From official England, Scotland and NI linkage data — items dispensed against scripts issued by each GP practice."
             points={points}
             window={win}
