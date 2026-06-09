@@ -3,7 +3,7 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine,
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { PeriodPills, type PeriodWindow } from "@/components/Infographics";
+import { PeriodPills, type PeriodWindow, ALL_PERIOD } from "@/components/Infographics";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
