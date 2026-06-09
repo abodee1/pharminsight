@@ -872,6 +872,7 @@ export type Database = {
         Returns: {
           address_line: string
           distance_m: number
+          google_name: string
           google_place_id: string
           lat: number
           lng: number
