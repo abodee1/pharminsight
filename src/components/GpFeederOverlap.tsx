@@ -102,9 +102,11 @@ export function GpFeederOverlap({
         const sharePerPh: Record<string, number> = {};
         Object.entries(vals).forEach(([phId, v]) => { sharePerPh[phId] = total > 0 ? (v / total) * 100 : 0; });
         const practiceInfo = practices[code];
-        const realName = practiceInfo?.practice_name ? titleCase(practiceInfo.practice_name) : null;
-        return {
-          code,
+        // Prefer the Google-verified name (matches what shows up if you look the practice up on Google);
+        // fall back to the official NHS practice name (title-cased).
+        const googleName = practiceInfo?.google_name?.trim() || null;
+        const officialName = practiceInfo?.practice_name ? titleCase(practiceInfo.practice_name) : null;
+        const realName = googleName ?? officialName;
           name: realName ?? `GP Practice ${code}`,
           hasName: !!realName,
           postcode: practiceInfo?.postcode || "",
