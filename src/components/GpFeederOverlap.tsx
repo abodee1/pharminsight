@@ -199,7 +199,7 @@ export function GpFeederOverlap({
   }
 
   // For the shared-feeder chart, take top 10 by combined items
-  const sharedTop = summary.shared.slice(0, 10).map((r) => {
+  const sharedTop = summary.shared.slice(0, 8).map((r) => {
     const row: Record<string, any> = { name: r.name.length > 28 ? r.name.slice(0, 26) + "…" : r.name, full: r.name };
     pharms.forEach((p) => { row[p.id] = r.vals[p.id] || 0; });
     return row;
