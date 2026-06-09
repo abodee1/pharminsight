@@ -96,7 +96,8 @@ export function CompetitorHeatmap({
       // Area in km² (annulus)
       const area = Math.PI * (r * r - inner * inner);
       const density = area > 0 ? count / area : 0;
-      return { ring: r, label: i === 0 ? `≤${r} km` : `${inner}–${r} km`, count, density };
+      const label = i === 0 ? "<500 m" : `${inner}–${r} km`;
+      return { ring: r, label, count, density };
     });
   }, [local]);
 
