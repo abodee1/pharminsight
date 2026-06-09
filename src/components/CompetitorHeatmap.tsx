@@ -10,8 +10,8 @@ type Pharm = { id: string; name: string; country: string | null; lat?: number | 
 type Comp = { id: string; name: string; postcode: string | null; lat: number; lng: number };
 
 const EARTH_KM = 6371;
-const RADIUS_KM = 5;
-const RING_KM = [1, 2, 3, 5];
+const RADIUS_KM = 4;
+const RING_KM = [0.5, 2, 3, 4];
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -96,7 +96,8 @@ export function CompetitorHeatmap({
       // Area in km² (annulus)
       const area = Math.PI * (r * r - inner * inner);
       const density = area > 0 ? count / area : 0;
-      return { ring: r, label: i === 0 ? `≤${r} km` : `${inner}–${r} km`, count, density };
+      const label = i === 0 ? "<500 m" : `${inner}–${r} km`;
+      return { ring: r, label, count, density };
     });
   }, [local]);
 
@@ -120,10 +121,10 @@ export function CompetitorHeatmap({
 
   if (focal.length === 0) return null;
 
-  // Scatter colour ramp by distance band
+  // Scatter colour ramp by distance band: <500m, 1–2km, 2–3km, 3–4km
   const colourFor = (c: typeof local[number]) => {
     if (c.isSelected) return colorFor(c.id);
-    if (c.distance <= 1) return "#dc2626";
+    if (c.distance <= 0.5) return "#dc2626";
     if (c.distance <= 2) return "#f97316";
     if (c.distance <= 3) return "#f59e0b";
     return "#0ea5e9";
@@ -165,14 +166,14 @@ export function CompetitorHeatmap({
         <>
           {/* Headline stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <Stat label="Competitors ≤5km" value={String(totalCompetitors)}
+            <Stat label={`Competitors ≤${RADIUS_KM}km`} value={String(totalCompetitors)}
               tone={totalCompetitors >= 15 ? "bad" : totalCompetitors >= 6 ? "warn" : "good"}
               sub="Other NHS pharmacies in catchment" />
             <Stat label="Nearest competitor" value={nearestKm != null ? `${nearestKm.toFixed(2)} km` : "—"}
               tone={nearestKm != null && nearestKm < 0.3 ? "bad" : nearestKm != null && nearestKm < 1 ? "warn" : "good"}
               sub="Direct walk-in overlap zone" />
-            <Stat label="Within 1 km" value={String(ringStats[0].count)}
-              tone={ringStats[0].count >= 3 ? "bad" : ringStats[0].count >= 1 ? "warn" : "good"}
+            <Stat label="Within 500 m" value={String(ringStats[0].count)}
+              tone={ringStats[0].count >= 2 ? "bad" : ringStats[0].count >= 1 ? "warn" : "good"}
               sub="Highest-pressure ring" />
             <Stat label="Market pressure" value={pressureLabel}
               toneClass={pressureTone}
@@ -230,10 +231,10 @@ export function CompetitorHeatmap({
 
             {/* Distance band legend */}
             <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-rose-600" /> ≤1 km</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-rose-600" /> &lt;500 m</span>
               <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" /> 1–2 km</span>
               <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> 2–3 km</span>
-              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> 3–5 km</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> 3–4 km</span>
               <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" style={{ color: colorFor(focusPharm.id) }} /> Focus pharmacy at (0,0)</span>
             </div>
           </div>

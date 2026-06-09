@@ -8,11 +8,14 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 
 export type PeriodWindow = number;
-export const PERIOD_OPTIONS: PeriodWindow[] = [3, 6, 12, 24];
+/** Sentinel value meaning "all available history". Large enough that
+ *  `Array.prototype.slice(-ALL_PERIOD)` returns the entire series. */
+export const ALL_PERIOD: PeriodWindow = 9999;
+export const PERIOD_OPTIONS: PeriodWindow[] = [3, 6, 12, 24, ALL_PERIOD];
 
 /* ----------------------------------------------------------------
  * PeriodPills
- * 1M / 3M / 6M / 12M selector pills, used to scope every chart.
+ * 3M / 6M / 12M / 24M / All selector pills, used to scope every chart.
  * ---------------------------------------------------------------- */
 export function PeriodPills({
   value,
@@ -39,7 +42,7 @@ export function PeriodPills({
               : "text-muted-foreground hover:text-foreground",
           ].join(" ")}
         >
-          {opt}M
+          {opt >= ALL_PERIOD ? "All" : `${opt}M`}
         </button>
       ))}
     </div>
@@ -349,7 +352,7 @@ export function GpPrescribingCard({
         front={
           <TrendCard
             title={title}
-            subtitle={loading ? "Loading…" : `${avgGps} GP practices · ${totalItems.toLocaleString()} items over ${win}M`}
+            subtitle={loading ? "Loading…" : `${avgGps} GP practices · ${totalItems.toLocaleString()} items over ${win >= ALL_PERIOD ? "all time" : `${win}M`}`}
             caption="From official England, Scotland and NI linkage data — items dispensed against scripts issued by each GP practice."
             points={points}
             window={win}
@@ -380,9 +383,9 @@ export function GpPrescribingCard({
           front={
             <div className="rounded-lg border border-border bg-card p-4 shadow-sm h-full">
               <div className="flex items-center justify-between mb-3 pr-28">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Top GP feeders · last {win} months</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Top GP feeders · {win >= ALL_PERIOD ? "all-time" : `last ${win} months`}</p>
                 <p className="text-[10px] text-muted-foreground hidden sm:block">
-                  Items · Share · Items / patient · Δ vs prior {win}M
+                  Items · Share · Items / patient · Δ vs prior {win >= ALL_PERIOD ? "window" : `${win}M`}
                 </p>
               </div>
               <ul className="space-y-2 text-xs">

@@ -92,31 +92,47 @@ export function GpFeederOverlap({
       perPractice[r.practice_code][phId] = (perPractice[r.practice_code][phId] || 0) + (r.items_dispensed || 0);
     });
 
-    // Practice-level rows
-    const rows = Object.entries(perPractice).map(([code, vals]) => {
-      const total = Object.values(vals).reduce((s, v) => s + v, 0);
-      const phsServed = Object.keys(vals).length;
-      const sharePerPh: Record<string, number> = {};
-      Object.entries(vals).forEach(([phId, v]) => { sharePerPh[phId] = total > 0 ? (v / total) * 100 : 0; });
-      const practiceInfo = practices[code];
-      const displayName = practiceInfo?.practice_name
-        ? practiceInfo.practice_name.replace(/\b\w/g, (c) => c.toUpperCase())
-        : `GP Practice ${code}`;
-      return { code, name: displayName, postcode: practiceInfo?.postcode || "", vals, total, phsServed, sharePerPh };
-    });
-
+    // Practice-level rows — only include practices we can confidently name.
+    const titleCase = (s: string) =>
+      s.toLowerCase().replace(/\b([a-z])/g, (_, c) => c.toUpperCase());
+    const rows = Object.entries(perPractice)
+      .map(([code, vals]) => {
+        const total = Object.values(vals).reduce((s, v) => s + v, 0);
+        const phsServed = Object.keys(vals).length;
+        const sharePerPh: Record<string, number> = {};
+        Object.entries(vals).forEach(([phId, v]) => { sharePerPh[phId] = total > 0 ? (v / total) * 100 : 0; });
+        const practiceInfo = practices[code];
+        const realName = practiceInfo?.practice_name ? titleCase(practiceInfo.practice_name) : null;
+        return {
+          code,
+          name: realName ?? `GP Practice ${code}`,
+          hasName: !!realName,
+          postcode: practiceInfo?.postcode || "",
+          vals,
+          total,
+          phsServed,
+          sharePerPh,
+        };
+      });
 
     // Sort by total items desc
     rows.sort((a, b) => b.total - a.total);
 
-    // Shared = practices serving ≥ 2 selected pharmacies
-    const shared = rows.filter((r) => r.phsServed >= 2);
+    // Shared = practices serving ≥ 2 selected pharmacies AND non-trivial volume
+    // (filter out long tail of one or two scripts that just adds noise).
+    const SHARED_MIN_ITEMS = 25;
+    const shared = rows.filter((r) => r.phsServed >= 2 && r.total >= SHARED_MIN_ITEMS);
+
+    // Exclusive feeders — only material, named practices
+    const EXCLUSIVE_MIN_ITEMS = 30;
     const exclusiveByPh: Record<string, typeof rows> = {};
     pharms.forEach((p) => {
-      exclusiveByPh[p.id] = rows.filter((r) => r.phsServed === 1 && r.vals[p.id] > 0).slice(0, 5);
+      exclusiveByPh[p.id] = rows
+        .filter((r) => r.phsServed === 1 && (r.vals[p.id] || 0) >= EXCLUSIVE_MIN_ITEMS && r.hasName)
+        .slice(0, 5);
     });
 
-    // Overlap stats per pharmacy pair (for ≥2): % of pharmacy's items coming from shared practices
+    // Overlap stats per pharmacy: % of pharmacy's items from shared (material) feeders
     const overlapItems: Record<string, number> = {};
     pharms.forEach((p) => {
       overlapItems[p.id] = shared.reduce((s, r) => s + (r.vals[p.id] || 0), 0);
@@ -127,28 +143,33 @@ export function GpFeederOverlap({
       overlapPct[p.id] = t > 0 ? (overlapItems[p.id] / t) * 100 : 0;
     });
 
-    // Distinct practice counts per pharmacy
+    // Distinct practice counts per pharmacy (material feeders only — ≥3% share OR ≥50 items)
     const distinctPractices: Record<string, number> = {};
     pharms.forEach((p) => {
-      distinctPractices[p.id] = rows.filter((r) => (r.vals[p.id] || 0) > 0).length;
+      const t = totalsPerPh[p.id] || 0;
+      distinctPractices[p.id] = rows.filter((r) => {
+        const items = r.vals[p.id] || 0;
+        const share = t > 0 ? (items / t) * 100 : 0;
+        return items > 0 && (share >= 3 || items >= 50);
+      }).length;
     });
 
-    // Top feeder concentration (HHI proxy): share of pharmacy items coming from its top feeder
+    // Top feeder concentration: share of pharmacy items from its top feeder
     const topFeederShare: Record<string, { name: string; pct: number } | null> = {};
-    // Top N feeders per pharmacy with name + items + share (major feeders only)
+    // Top N major feeders per pharmacy — strict thresholds, real names only
     const topFeedersPerPh: Record<string, { code: string; name: string; postcode: string; items: number; share: number }[]> = {};
     pharms.forEach((p) => {
       const phRows = rows
-        .filter((r) => (r.vals[p.id] || 0) > 0)
+        .filter((r) => (r.vals[p.id] || 0) > 0 && r.hasName)
         .map((r) => ({ code: r.code, name: r.name, postcode: r.postcode, items: r.vals[p.id] }));
       phRows.sort((a, b) => b.items - a.items);
       const t = totalsPerPh[p.id] || 0;
       topFeederShare[p.id] = phRows[0] && t > 0 ? { name: phRows[0].name, pct: (phRows[0].items / t) * 100 } : null;
-      // Major = top 6 OR contributes ≥3% of items (whichever yields the smaller, more meaningful list)
+      // Major = top 5 only, must be ≥3% of items OR ≥50 items in window — drop the long tail.
       topFeedersPerPh[p.id] = phRows
         .map((r) => ({ ...r, share: t > 0 ? (r.items / t) * 100 : 0 }))
-        .filter((r, i) => i < 6 && r.share >= 1)
-        .slice(0, 6);
+        .filter((r) => r.share >= 3 || r.items >= 50)
+        .slice(0, 5);
     });
 
     return { rows, shared, exclusiveByPh, totalsPerPh, overlapPct, overlapItems, distinctPractices, topFeederShare, topFeedersPerPh };
@@ -178,7 +199,7 @@ export function GpFeederOverlap({
   }
 
   // For the shared-feeder chart, take top 10 by combined items
-  const sharedTop = summary.shared.slice(0, 10).map((r) => {
+  const sharedTop = summary.shared.slice(0, 8).map((r) => {
     const row: Record<string, any> = { name: r.name.length > 28 ? r.name.slice(0, 26) + "…" : r.name, full: r.name };
     pharms.forEach((p) => { row[p.id] = r.vals[p.id] || 0; });
     return row;
@@ -198,10 +219,10 @@ export function GpFeederOverlap({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <Stat label="Shared GP practices" value={summary.shared.length.toString()}
-            sub="Practices prescribing to ≥2 of the selected pharmacies"
+            sub="Material feeders (≥25 items) prescribing to ≥2 of the selected pharmacies"
             icon={<Users className="h-4 w-4" />} tone={summary.shared.length > 5 ? "warn" : "neutral"} />
-          <Stat label="Total practices feeding cohort" value={summary.rows.length.toString()}
-            sub="Distinct GPs across all selected pharmacies"
+          <Stat label="Material feeders in cohort" value={Object.values(summary.distinctPractices).reduce((a, b) => Math.max(a, b), 0).toString()}
+            sub="Largest count of meaningful GP feeders for any one selected pharmacy"
             icon={<Target className="h-4 w-4" />} />
           {pharms.slice(0, 2).map((p) => (
             <Stat

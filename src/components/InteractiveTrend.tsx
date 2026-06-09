@@ -3,7 +3,7 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine,
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { PeriodPills, type PeriodWindow } from "@/components/Infographics";
+import { PeriodPills, type PeriodWindow, ALL_PERIOD } from "@/components/Infographics";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -37,7 +37,7 @@ const MET: Record<MetricKey, MetricDef> = {
   final: { key: "final", label: "Final NHS payment (£)", short: "Final £", field: (r) => Number(r.final_payment) || 0, format: (n) => "£" + Math.round(n).toLocaleString(), color: "var(--chart-1)" },
 };
 
-const DEFAULT_WINDOWS: PeriodWindow[] = [6, 12, 18, 24];
+const DEFAULT_WINDOWS: PeriodWindow[] = [6, 12, 18, 24, ALL_PERIOD];
 
 export function InteractiveTrend({
   rows,
@@ -87,7 +87,7 @@ export function InteractiveTrend({
         <div className="min-w-0">
           <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Pick a metric and window. Dashed line marks the {Number(win)}-month average.
+            Pick a metric and window. Dashed line marks the {win >= ALL_PERIOD ? `all-time (${points.length}-month)` : `${Number(win)}-month`} average.
           </p>
         </div>
         <PeriodPills value={win} onChange={setWin} options={windows} />
@@ -164,7 +164,7 @@ export function InteractiveTrend({
 
       <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
         <Stat label="Avg / month" value={def.format(avg)} />
-        <Stat label={`${Number(win)}M total`} value={def.format(points.reduce((a, p) => a + p.value, 0))} />
+        <Stat label={win >= ALL_PERIOD ? "All-time total" : `${Number(win)}M total`} value={def.format(points.reduce((a, p) => a + p.value, 0))} />
         <Stat label="Window start" value={points[0]?.label ?? "—"} />
       </div>
     </div>
