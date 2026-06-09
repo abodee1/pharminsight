@@ -166,14 +166,14 @@ export function CompetitorHeatmap({
         <>
           {/* Headline stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <Stat label="Competitors ≤5km" value={String(totalCompetitors)}
+            <Stat label={`Competitors ≤${RADIUS_KM}km`} value={String(totalCompetitors)}
               tone={totalCompetitors >= 15 ? "bad" : totalCompetitors >= 6 ? "warn" : "good"}
               sub="Other NHS pharmacies in catchment" />
             <Stat label="Nearest competitor" value={nearestKm != null ? `${nearestKm.toFixed(2)} km` : "—"}
               tone={nearestKm != null && nearestKm < 0.3 ? "bad" : nearestKm != null && nearestKm < 1 ? "warn" : "good"}
               sub="Direct walk-in overlap zone" />
-            <Stat label="Within 1 km" value={String(ringStats[0].count)}
-              tone={ringStats[0].count >= 3 ? "bad" : ringStats[0].count >= 1 ? "warn" : "good"}
+            <Stat label="Within 500 m" value={String(ringStats[0].count)}
+              tone={ringStats[0].count >= 2 ? "bad" : ringStats[0].count >= 1 ? "warn" : "good"}
               sub="Highest-pressure ring" />
             <Stat label="Market pressure" value={pressureLabel}
               toneClass={pressureTone}
