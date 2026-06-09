@@ -22,10 +22,15 @@ type NearbyPharmacy = {
 type NearbyGP = {
   practice_code: string;
   practice_name: string;
+  google_name: string | null;
   postcode: string | null;
   address_line: string | null;
   distance_m: number;
 };
+
+function displayPracticeName(g: { google_name?: string | null; practice_name?: string | null; practice_code?: string }) {
+  return g.google_name || g.practice_name || g.practice_code || "GP Practice";
+}
 
 function fmtDist(m: number | null) {
   if (m == null) return "";
@@ -191,21 +196,23 @@ export function LocalLandscape({ pharmacyName, postcode, address }: Props) {
                 No GP surgeries within 1 mile.
               </li>
             )}
-            {doctors.map((p) => (
+            {doctors.map((p) => {
+              const displayName = displayPracticeName(p);
+              return (
               <li key={p.practice_code}>
                 <button
                   type="button"
                   onClick={() =>
                     setOpenPractice({
                       code: p.practice_code,
-                      name: p.practice_name,
+                      name: displayName,
                       address: p.address_line ?? undefined,
                     })
                   }
                   className="w-full text-left border border-border/60 rounded-md p-3 hover:bg-secondary/40 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <p className="font-medium text-sm">{p.practice_name}</p>
+                    <p className="font-medium text-sm">{displayName}</p>
                     <span className="text-xs text-muted-foreground shrink-0 flex items-center gap-1">
                       <MapPin className="h-3 w-3" /> {fmtDist(p.distance_m)}
                     </span>
@@ -216,7 +223,7 @@ export function LocalLandscape({ pharmacyName, postcode, address }: Props) {
                   <p className="text-xs text-primary font-medium mt-1">View details →</p>
                 </button>
               </li>
-            ))}
+            );})}
           </ul>
         </div>
       </div>

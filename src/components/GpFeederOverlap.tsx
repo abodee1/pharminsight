@@ -6,7 +6,7 @@ import { Loader2, Users, Share2, Target, AlertTriangle } from "lucide-react";
 
 type Pharm = { id: string; name: string; ods_code?: string | null; country: string | null };
 type LinkRow = { practice_code: string; pharmacy_ods_code: string; year: number; month: number; items_dispensed: number };
-type Practice = { practice_code: string; practice_name: string | null; postcode: string | null; address_line1: string | null };
+type Practice = { practice_code: string; practice_name: string | null; google_name: string | null; postcode: string | null; address_line1: string | null };
 
 const fmtInt = (n: number) => Math.round(n).toLocaleString();
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
@@ -67,7 +67,7 @@ export function GpFeederOverlap({
         const slice = codes.slice(i, i + 500);
         const { data: pr } = await supabase
           .from("gp_practices")
-          .select("practice_code,practice_name,postcode,address_line1")
+          .select("practice_code,practice_name,google_name,postcode,address_line1")
           .in("practice_code", slice);
         (pr || []).forEach((p: any) => { out[p.practice_code] = p; });
       }
@@ -102,7 +102,11 @@ export function GpFeederOverlap({
         const sharePerPh: Record<string, number> = {};
         Object.entries(vals).forEach(([phId, v]) => { sharePerPh[phId] = total > 0 ? (v / total) * 100 : 0; });
         const practiceInfo = practices[code];
-        const realName = practiceInfo?.practice_name ? titleCase(practiceInfo.practice_name) : null;
+        // Prefer the Google-verified name (matches what shows up if you look the practice up on Google);
+        // fall back to the official NHS practice name (title-cased).
+        const googleName = practiceInfo?.google_name?.trim() || null;
+        const officialName = practiceInfo?.practice_name ? titleCase(practiceInfo.practice_name) : null;
+        const realName = googleName ?? officialName;
         return {
           code,
           name: realName ?? `GP Practice ${code}`,
