@@ -253,15 +253,15 @@ export function GpPrescribingCard({
           const slice = codeArr.slice(i, i + 200);
           const [{ data: gps }, { data: ls }] = await Promise.all([
             supabase.from("gp_practices")
-              .select("practice_code,practice_name,postcode,address_line")
+              .select("practice_code,practice_name,google_name,postcode,address_line")
               .in("practice_code", slice),
             supabase.from("gp_list_sizes")
               .select("practice_code,registered_patients,list_size_date")
               .in("practice_code", slice)
               .order("list_size_date", { ascending: false }),
           ]);
-          (gps || []).forEach((g: { practice_code: string; practice_name: string | null; postcode: string | null; address_line: string | null }) => {
-            meta.set(g.practice_code, { name: g.practice_name, postcode: g.postcode, address: g.address_line });
+          (gps || []).forEach((g: { practice_code: string; practice_name: string | null; google_name: string | null; postcode: string | null; address_line: string | null }) => {
+            meta.set(g.practice_code, { name: g.google_name || g.practice_name, postcode: g.postcode, address: g.address_line });
           });
           (ls || []).forEach((l: { practice_code: string; registered_patients: number }) => {
             if (!sizes.has(l.practice_code)) sizes.set(l.practice_code, l.registered_patients);
