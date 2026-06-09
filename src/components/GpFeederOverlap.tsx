@@ -219,10 +219,10 @@ export function GpFeederOverlap({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <Stat label="Shared GP practices" value={summary.shared.length.toString()}
-            sub="Practices prescribing to ≥2 of the selected pharmacies"
+            sub="Material feeders (≥25 items) prescribing to ≥2 of the selected pharmacies"
             icon={<Users className="h-4 w-4" />} tone={summary.shared.length > 5 ? "warn" : "neutral"} />
-          <Stat label="Total practices feeding cohort" value={summary.rows.length.toString()}
-            sub="Distinct GPs across all selected pharmacies"
+          <Stat label="Material feeders in cohort" value={Object.values(summary.distinctPractices).reduce((a, b) => Math.max(a, b), 0).toString()}
+            sub="Largest count of meaningful GP feeders for any one selected pharmacy"
             icon={<Target className="h-4 w-4" />} />
           {pharms.slice(0, 2).map((p) => (
             <Stat
