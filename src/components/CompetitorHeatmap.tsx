@@ -10,8 +10,8 @@ type Pharm = { id: string; name: string; country: string | null; lat?: number | 
 type Comp = { id: string; name: string; postcode: string | null; lat: number; lng: number };
 
 const EARTH_KM = 6371;
-const RADIUS_KM = 5;
-const RING_KM = [1, 2, 3, 5];
+const RADIUS_KM = 4;
+const RING_KM = [0.5, 2, 3, 4];
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
   const toRad = (d: number) => (d * Math.PI) / 180;
