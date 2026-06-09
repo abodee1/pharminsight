@@ -107,6 +107,8 @@ export function GpFeederOverlap({
         const googleName = practiceInfo?.google_name?.trim() || null;
         const officialName = practiceInfo?.practice_name ? titleCase(practiceInfo.practice_name) : null;
         const realName = googleName ?? officialName;
+        return {
+          code,
           name: realName ?? `GP Practice ${code}`,
           hasName: !!realName,
           postcode: practiceInfo?.postcode || "",
