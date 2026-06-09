@@ -37,7 +37,7 @@ const MET: Record<MetricKey, MetricDef> = {
   final: { key: "final", label: "Final NHS payment (£)", short: "Final £", field: (r) => Number(r.final_payment) || 0, format: (n) => "£" + Math.round(n).toLocaleString(), color: "var(--chart-1)" },
 };
 
-const DEFAULT_WINDOWS: PeriodWindow[] = [6, 12, 18, 24];
+const DEFAULT_WINDOWS: PeriodWindow[] = [6, 12, 18, 24, ALL_PERIOD];
 
 export function InteractiveTrend({
   rows,
