@@ -87,7 +87,7 @@ export function InteractiveTrend({
         <div className="min-w-0">
           <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Pick a metric and window. Dashed line marks the {Number(win)}-month average.
+            Pick a metric and window. Dashed line marks the {win >= ALL_PERIOD ? `all-time (${points.length}-month)` : `${Number(win)}-month`} average.
           </p>
         </div>
         <PeriodPills value={win} onChange={setWin} options={windows} />
