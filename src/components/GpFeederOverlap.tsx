@@ -67,7 +67,7 @@ export function GpFeederOverlap({
         const slice = codes.slice(i, i + 500);
         const { data: pr } = await supabase
           .from("gp_practices")
-          .select("practice_code,practice_name,postcode,address_line1")
+          .select("practice_code,practice_name,google_name,postcode,address_line1")
           .in("practice_code", slice);
         (pr || []).forEach((p: any) => { out[p.practice_code] = p; });
       }
