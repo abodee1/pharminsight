@@ -383,9 +383,9 @@ export function GpPrescribingCard({
           front={
             <div className="rounded-lg border border-border bg-card p-4 shadow-sm h-full">
               <div className="flex items-center justify-between mb-3 pr-28">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Top GP feeders · last {win} months</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Top GP feeders · {win >= ALL_PERIOD ? "all-time" : `last ${win} months`}</p>
                 <p className="text-[10px] text-muted-foreground hidden sm:block">
-                  Items · Share · Items / patient · Δ vs prior {win}M
+                  Items · Share · Items / patient · Δ vs prior {win >= ALL_PERIOD ? "window" : `${win}M`}
                 </p>
               </div>
               <ul className="space-y-2 text-xs">
