@@ -74,6 +74,10 @@ function Dashboard() {
   const [intensityRates, setIntensityRates] = useState<IntensityRate[]>([]);
   const [revenueMix, setRevenueMix] = useState<{ label: string; value: number }[]>([]);
 
+  // Dashboard always shows the user's saved home pharmacy — clear any
+  // "browsed pharmacy" override so Compare/Benchmarking revert to the saved one.
+  useEffect(() => { clearViewedPharmacy(); }, []);
+
   useEffect(() => {
     (async () => {
       if (!user) return;
