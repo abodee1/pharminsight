@@ -20,6 +20,7 @@ import { AnalysisPanel } from "@/components/AnalysisPanel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetchAll } from "@/lib/fetchAll";
 import { cn } from "@/lib/utils";
+import { setViewedPharmacy, clearViewedPharmacy } from "@/lib/viewedPharmacy";
 
 type WindowKey = 1 | 3 | 6 | 12;
 
@@ -131,6 +132,18 @@ function PharmacyProfile() {
       setHasUserPharmacy(!!data);
     })();
   }, [user]);
+
+  // Track the "browsed" pharmacy so Compare/Benchmarking can switch its subject
+  // to whichever pharmacy the user is currently viewing — and revert when they
+  // return to their saved home pharmacy.
+  useEffect(() => {
+    if (!pharmacy) return;
+    if (myPharmacyId && pharmacy.id === myPharmacyId) {
+      clearViewedPharmacy();
+    } else {
+      setViewedPharmacy({ id: pharmacy.id, ods_code: pharmacy.ods_code, name: pharmacy.name });
+    }
+  }, [pharmacy, myPharmacyId]);
 
   // National rank for latest month across the key metrics
   useEffect(() => {

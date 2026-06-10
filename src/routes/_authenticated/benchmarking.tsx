@@ -9,6 +9,7 @@ import { PercentileRail, GpPrescribingCard } from "@/components/Infographics";
 import { PharmacySearch } from "@/components/PharmacySearch";
 import { CountryBadge } from "@/components/CountryBadge";
 import { fmtGbpCompact } from "@/lib/utils";
+import { getViewedPharmacy } from "@/lib/viewedPharmacy";
 
 export const Route = createFileRoute("/_authenticated/benchmarking")({ component: Benchmarking });
 
@@ -85,24 +86,30 @@ function Benchmarking() {
   const [snapshots, setSnapshots] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
-  // Load default pharmacy from user_pharmacy (only if no override is active)
+  // Load the SUBJECT pharmacy. Priority: in-page override > "browsed" pharmacy
+  // (set when the user opens another pharmacy via the search bar) > saved
+  // home pharmacy. Returning to the saved pharmacy clears the override.
   useEffect(() => {
     if (pharmacyOverride) return;
     (async () => {
       if (!user) return;
-      const { data: up } = await supabase
-        .from("user_pharmacy")
-        .select("pharmacy_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (!up) {
-        setLoading(false);
-        return;
+      const viewed = getViewedPharmacy();
+      let subjectId: string | null = viewed?.id ?? null;
+
+      if (!subjectId) {
+        const { data: up } = await supabase
+          .from("user_pharmacy")
+          .select("pharmacy_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        subjectId = up?.pharmacy_id ?? null;
       }
+      if (!subjectId) { setLoading(false); return; }
+
       const { data: ph } = await supabase
         .from("pharmacies")
         .select("*")
-        .eq("id", up.pharmacy_id)
+        .eq("id", subjectId)
         .maybeSingle();
       if (ph) setPharmacy(ph);
       else setLoading(false);

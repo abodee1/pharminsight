@@ -11,6 +11,7 @@ import { CountryBadge } from "@/components/CountryBadge";
 import { Badge } from "@/components/ui/badge";
 import { GpFeederOverlap } from "@/components/GpFeederOverlap";
 import { CompetitorHeatmap } from "@/components/CompetitorHeatmap";
+import { getViewedPharmacy } from "@/lib/viewedPharmacy";
 
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -209,19 +210,32 @@ function Compare() {
   const [gpFeederWindow, setGpFeederWindow] = useState<0 | 3 | 6 | 12 | 24>(12);
   const [, setLoading] = useState(false);
 
-  // Preload the user's primary pharmacy as the first selection.
+  // Preload the SUBJECT pharmacy as the first selection. The subject is the
+  // pharmacy the user is currently "browsing" (set when they open a pharmacy
+  // profile via the search bar). When no override is active, fall back to the
+  // user's saved home pharmacy.
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data: up } = await supabase
-        .from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle();
-      if (!up?.pharmacy_id) return;
+      const viewed = getViewedPharmacy();
+      let subjectId: string | null = null;
+
+      if (viewed?.id) {
+        subjectId = viewed.id;
+      } else {
+        const { data: up } = await supabase
+          .from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle();
+        subjectId = up?.pharmacy_id ?? null;
+      }
+      if (!subjectId) return;
+
       const { data: ph } = await supabase
         .from("pharmacies").select("id,name,region,country,postcode,lat,lng")
-        .eq("id", up.pharmacy_id).maybeSingle();
+        .eq("id", subjectId).maybeSingle();
       if (ph) {
         setPharms((cur) => (cur.some((x) => x.id === ph.id) ? cur : [...cur, ph as Pharm]));
-        setSelected((cur) => (cur.includes(ph.id) ? cur : [...cur, ph.id]));
+        // Subject always sits in the FIRST slot — comparators are benchmarked against it.
+        setSelected((cur) => (cur.includes(ph.id) ? cur : [ph.id, ...cur]));
       }
     })();
   }, [user]);

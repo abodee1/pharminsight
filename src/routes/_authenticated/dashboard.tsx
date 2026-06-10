@@ -21,6 +21,7 @@ import {
 } from "@/components/Infographics";
 import { LocalLandscape } from "@/components/LocalLandscape";
 import { fmtGbpCompact } from "@/lib/utils";
+import { clearViewedPharmacy } from "@/lib/viewedPharmacy";
 
 import {
   Trophy, BarChart2, GitCompare, Package, Stethoscope, ClipboardCheck, Medal,
@@ -72,6 +73,10 @@ function Dashboard() {
   const [peerPfPeriod, setPeerPfPeriod] = useState<string>("");
   const [intensityRates, setIntensityRates] = useState<IntensityRate[]>([]);
   const [revenueMix, setRevenueMix] = useState<{ label: string; value: number }[]>([]);
+
+  // Dashboard always shows the user's saved home pharmacy — clear any
+  // "browsed pharmacy" override so Compare/Benchmarking revert to the saved one.
+  useEffect(() => { clearViewedPharmacy(); }, []);
 
   useEffect(() => {
     (async () => {
