@@ -311,7 +311,8 @@ export function InteractiveTrend({
             )}
             {activeMetrics.map((k) => {
               const m = M[k];
-              const isMoney = k === "gross" || k === "final";
+              const isMoney = k === "gross" || k === "final" || (k === "pf" && pfUnit === "money");
+
               return (
                 <Line
                   key={k}
