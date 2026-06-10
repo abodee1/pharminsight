@@ -248,11 +248,17 @@ export function InteractiveTrend({
             <div key={k} className="rounded-md border border-border bg-secondary/30 px-2 py-1.5" style={{ borderLeft: `3px solid ${m.color}` }}>
               <p className="text-[9px] uppercase tracking-wider text-muted-foreground truncate">{m.short} · latest</p>
               <p className="text-sm font-bold tabular-nums leading-tight">{m.format(pm.latest)}</p>
-              {k === "pf" && pfPaymentInfo && (
+              {k === "pf" && pfPaymentInfo && pfUnit === "count" && (
                 <p className="text-[10px] font-semibold tabular-nums text-emerald-700 leading-tight">
                   {fmtGbpCompact(pfPaymentInfo.latest)} paid
                 </p>
               )}
+              {k === "pf" && pfPaymentInfo && pfUnit === "money" && (
+                <p className="text-[10px] font-semibold tabular-nums text-muted-foreground leading-tight">
+                  {pfPaymentInfo.total > 0 ? `${fmtGbpCompact(pfPaymentInfo.total)} total` : ""}
+                </p>
+              )}
+
               <p className={`text-[10px] font-semibold inline-flex items-center gap-0.5 ${tone}`}>
                 <Trend className="h-3 w-3" />
                 {pm.delta >= 0 ? "+" : ""}{pm.delta.toFixed(1)}%
