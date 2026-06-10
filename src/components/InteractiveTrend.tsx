@@ -239,7 +239,7 @@ export function InteractiveTrend({
       {/* Headline strip — per active metric */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-3">
         {activeMetrics.map((k) => {
-          const m = MET[k];
+          const m = M[k];
           const pm = perMetric[k];
           if (!pm) return null;
           const Trend = pm.delta > 1 ? TrendingUp : pm.delta < -1 ? TrendingDown : Minus;
@@ -295,7 +295,7 @@ export function InteractiveTrend({
             <Tooltip
               contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12 }}
               formatter={(v: number, name: string) => {
-                const m = MET[name as MetricKey];
+                const m = M[name as MetricKey];
                 return [m ? m.format(v) : v, m?.label ?? name];
               }}
             />
@@ -304,7 +304,7 @@ export function InteractiveTrend({
               <ReferenceLine yAxisId="left" y={singleAvg} stroke="var(--muted-foreground)" strokeDasharray="4 4" strokeOpacity={0.5} />
             )}
             {activeMetrics.map((k) => {
-              const m = MET[k];
+              const m = M[k];
               const isMoney = k === "gross" || k === "final";
               return (
                 <Line
@@ -327,8 +327,8 @@ export function InteractiveTrend({
 
       {singleMetric && perMetric[singleMetric] && (
         <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
-          <Stat label="Avg / month" value={MET[singleMetric].format(perMetric[singleMetric].avg)} />
-          <Stat label={win >= ALL_PERIOD ? "All-time total" : `${Number(win)}M total`} value={MET[singleMetric].format(perMetric[singleMetric].total)} />
+          <Stat label="Avg / month" value={M[singleMetric].format(perMetric[singleMetric].avg)} />
+          <Stat label={win >= ALL_PERIOD ? "All-time total" : `${Number(win)}M total`} value={M[singleMetric].format(perMetric[singleMetric].total)} />
           <Stat label="Window start" value={perMetric[singleMetric].firstLabel} />
         </div>
       )}
