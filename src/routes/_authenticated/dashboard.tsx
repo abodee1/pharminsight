@@ -333,6 +333,12 @@ function Dashboard() {
     [trendKeys, myByKey, aggByKey, pharmacy],
   );
 
+  const pfPaymentSeries = useMemo(
+    () => trendKeys.map((k) => Number(myByKey.get(k)?.pharmacy_first_payment) || 0),
+    [trendKeys, myByKey],
+  );
+
+
   const costPoints = useMemo(
     () => trendKeys.map((k) => {
       const y = Math.floor(k / 12);
