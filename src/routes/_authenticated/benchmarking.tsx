@@ -9,6 +9,7 @@ import { PercentileRail, GpPrescribingCard } from "@/components/Infographics";
 import { PharmacySearch } from "@/components/PharmacySearch";
 import { CountryBadge } from "@/components/CountryBadge";
 import { fmtGbpCompact } from "@/lib/utils";
+import { getViewedPharmacy } from "@/lib/viewedPharmacy";
 
 export const Route = createFileRoute("/_authenticated/benchmarking")({ component: Benchmarking });
 
