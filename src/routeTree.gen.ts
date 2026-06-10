@@ -36,6 +36,7 @@ import { Route as ApiPublicHooksIngestNiRouteImport } from './routes/api/public/
 import { Route as ApiPublicHooksIngestEnglandGpListsizeRouteImport } from './routes/api/public/hooks/ingest-england-gp-listsize'
 import { Route as ApiPublicHooksIngestEnglandGpRouteImport } from './routes/api/public/hooks/ingest-england-gp'
 import { Route as ApiPublicHooksIngestEnglandRouteImport } from './routes/api/public/hooks/ingest-england'
+import { Route as ApiPublicHooksCheckDataFreshnessRouteImport } from './routes/api/public/hooks/check-data-freshness'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -187,6 +188,12 @@ const ApiPublicHooksIngestEnglandRoute =
     path: '/api/public/hooks/ingest-england',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksCheckDataFreshnessRoute =
+  ApiPublicHooksCheckDataFreshnessRouteImport.update({
+    id: '/api/public/hooks/check-data-freshness',
+    path: '/api/public/hooks/check-data-freshness',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -206,6 +213,7 @@ export interface FileRoutesByFullPath {
   '/admin/gp-data': typeof AuthenticatedAdminGpDataRoute
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/gp-surgeries/$code': typeof AuthenticatedGpSurgeriesCodeRoute
+  '/api/public/hooks/check-data-freshness': typeof ApiPublicHooksCheckDataFreshnessRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-england-gp': typeof ApiPublicHooksIngestEnglandGpRoute
   '/api/public/hooks/ingest-england-gp-listsize': typeof ApiPublicHooksIngestEnglandGpListsizeRoute
@@ -234,6 +242,7 @@ export interface FileRoutesByTo {
   '/admin/gp-data': typeof AuthenticatedAdminGpDataRoute
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/gp-surgeries/$code': typeof AuthenticatedGpSurgeriesCodeRoute
+  '/api/public/hooks/check-data-freshness': typeof ApiPublicHooksCheckDataFreshnessRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-england-gp': typeof ApiPublicHooksIngestEnglandGpRoute
   '/api/public/hooks/ingest-england-gp-listsize': typeof ApiPublicHooksIngestEnglandGpListsizeRoute
@@ -264,6 +273,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/gp-data': typeof AuthenticatedAdminGpDataRoute
   '/_authenticated/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/_authenticated/gp-surgeries/$code': typeof AuthenticatedGpSurgeriesCodeRoute
+  '/api/public/hooks/check-data-freshness': typeof ApiPublicHooksCheckDataFreshnessRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-england-gp': typeof ApiPublicHooksIngestEnglandGpRoute
   '/api/public/hooks/ingest-england-gp-listsize': typeof ApiPublicHooksIngestEnglandGpListsizeRoute
@@ -294,6 +304,7 @@ export interface FileRouteTypes {
     | '/admin/gp-data'
     | '/admin/payments-import'
     | '/gp-surgeries/$code'
+    | '/api/public/hooks/check-data-freshness'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-england-gp'
     | '/api/public/hooks/ingest-england-gp-listsize'
@@ -322,6 +333,7 @@ export interface FileRouteTypes {
     | '/admin/gp-data'
     | '/admin/payments-import'
     | '/gp-surgeries/$code'
+    | '/api/public/hooks/check-data-freshness'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-england-gp'
     | '/api/public/hooks/ingest-england-gp-listsize'
@@ -351,6 +363,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/gp-data'
     | '/_authenticated/admin/payments-import'
     | '/_authenticated/gp-surgeries/$code'
+    | '/api/public/hooks/check-data-freshness'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-england-gp'
     | '/api/public/hooks/ingest-england-gp-listsize'
@@ -368,6 +381,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
   PharmacyOdsCodeRoute: typeof PharmacyOdsCodeRoute
+  ApiPublicHooksCheckDataFreshnessRoute: typeof ApiPublicHooksCheckDataFreshnessRoute
   ApiPublicHooksIngestEnglandRoute: typeof ApiPublicHooksIngestEnglandRoute
   ApiPublicHooksIngestEnglandGpRoute: typeof ApiPublicHooksIngestEnglandGpRoute
   ApiPublicHooksIngestEnglandGpListsizeRoute: typeof ApiPublicHooksIngestEnglandGpListsizeRoute
@@ -570,6 +584,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksIngestEnglandRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/check-data-freshness': {
+      id: '/api/public/hooks/check-data-freshness'
+      path: '/api/public/hooks/check-data-freshness'
+      fullPath: '/api/public/hooks/check-data-freshness'
+      preLoaderRoute: typeof ApiPublicHooksCheckDataFreshnessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -627,6 +648,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   PharmacyOdsCodeRoute: PharmacyOdsCodeRoute,
+  ApiPublicHooksCheckDataFreshnessRoute: ApiPublicHooksCheckDataFreshnessRoute,
   ApiPublicHooksIngestEnglandRoute: ApiPublicHooksIngestEnglandRoute,
   ApiPublicHooksIngestEnglandGpRoute: ApiPublicHooksIngestEnglandGpRoute,
   ApiPublicHooksIngestEnglandGpListsizeRoute:
