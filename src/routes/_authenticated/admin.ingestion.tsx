@@ -454,16 +454,30 @@ function DataIngestionAdmin() {
       const mine = logs.filter((l) => l.source === ds.source);
       const successes = mine.filter((l) => l.status === "success");
       const failures = mine.filter((l) => l.status === "failed");
+      // "Latest ingested period" must reflect the latest (year, month) actually
+      // covered — not the most recently inserted row, which can be an older
+      // backfill ingested last (e.g. Scotland list sizes inserted 2014-04 last).
+      const latestByPeriod = [...successes]
+        .filter((s) => s.year != null && s.month != null)
+        .sort((a, b) => (b.year! * 12 + b.month!) - (a.year! * 12 + a.month!))[0]
+        ?? successes[0]
+        ?? null;
       const last30 = mine.filter((l) => new Date(l.created_at).getTime() >= cutoff30);
       const pending = queue.filter((qq) => qq.source === ds.source && (qq.status === "pending" || qq.status === "processing")).length;
 
       const exp = expectedPeriods(ds.cadence);
-      const ingestedKey = new Set(successes.map((s) => `${s.year}-${s.month}`));
+      const ingestedKey = new Set(
+        successes
+          .filter((s) => s.year != null && s.month != null)
+          .map((s) => ds.cadence === "quarterly"
+            ? `${s.year}-${quarterEndMonth(s.month!)}`
+            : `${s.year}-${s.month}`),
+      );
       const covered = exp.filter((p) => ingestedKey.has(`${p.y}-${p.m}`)).length;
       const coveragePct = Math.round((covered / exp.length) * 100);
 
       out[ds.source] = {
-        latestSuccess: successes[0] ?? null,
+        latestSuccess: latestByPeriod,
         latestFailure: failures[0] ?? null,
         successes30d: last30.filter((l) => l.status === "success").length,
         failures30d: last30.filter((l) => l.status === "failed").length,
