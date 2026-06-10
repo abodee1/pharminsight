@@ -410,6 +410,12 @@ function Benchmarking() {
                     <tbody>
                       {items.map((r) => {
                         const fmt = r.metric.fmt || ((n: number) => Math.round(n).toLocaleString());
+                        const isPf = r.metric.key === "pharmacy_first_count";
+                        const myPfPay = isPf ? Number((r.snap.mine as any).pharmacy_first_payment) || 0 : 0;
+                        const countryPfPayAvg = isPf
+                          ? (r.snap.countryRows as any[]).reduce((a, x) => a + (Number(x.pharmacy_first_payment) || 0), 0) /
+                            Math.max(1, (r.snap.countryRows as any[]).length)
+                          : 0;
                         return (
                           <tr key={r.metric.key} className="border-t border-border">
                             <td className="py-2.5 px-4">
@@ -422,12 +428,22 @@ function Benchmarking() {
                             </td>
                             <td className="text-right tabular-nums font-semibold py-2.5 px-4">
                               {fmt(r.mineVal)}
+                              {isPf && (
+                                <div className="text-[11px] font-normal text-emerald-700 mt-0.5">
+                                  {fmtGbpCompact(myPfPay)} paid
+                                </div>
+                              )}
                             </td>
                             <td className="text-right tabular-nums text-muted-foreground py-2.5 px-4">
                               {fmt(r.regionAvg)}
                             </td>
                             <td className="text-right tabular-nums text-muted-foreground py-2.5 px-4">
                               {fmt(r.countryAvg)}
+                              {isPf && (
+                                <div className="text-[11px] mt-0.5">
+                                  {fmtGbpCompact(countryPfPayAvg)} avg
+                                </div>
+                              )}
                             </td>
                             <td className="text-right tabular-nums text-muted-foreground py-2.5 px-4">
                               {fmt(r.top10)}
