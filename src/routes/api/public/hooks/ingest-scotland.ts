@@ -65,9 +65,14 @@ function parseYearMonth(url: string, name: string, created?: string) {
 }
 
 function isProvisional(year: number | null, month: number | null) {
-  if (!year) return false;
-  if (year > 2023) return true;
-  if (year === 2023 && (month ?? 0) >= 5) return true;
+  if (!year || !month) return false;
+  // Provisional if within the last 3 months — PHS payment auditing lag.
+  const now = new Date();
+  const cutoffMonth = now.getUTCMonth() + 1 - 3;
+  const adjYear = cutoffMonth <= 0 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+  const adjMonth = cutoffMonth <= 0 ? cutoffMonth + 12 : cutoffMonth;
+  if (year > adjYear) return true;
+  if (year === adjYear && month >= adjMonth) return true;
   return false;
 }
 
@@ -467,8 +472,18 @@ const DATASET_PRIORITY = [
   "prescriptions-in-the-community",
 ];
 
-async function runBatch(batchSize = 3) {
+async function runBatch() {
+  // community-pharmacy-contractor-activity and prescribed-dispensed are large multi-pharmacy
+  // annual files — process 1 at a time to stay safely under the proxy timeout.
+  // prescriptions-in-the-community Dispenser Location files are small (~1,800 rows for Scotland)
+  // so 3 in parallel is safe and drains the backfill queue 3× faster.
+  const batchSizes: Record<string, number> = {
+    "community-pharmacy-contractor-activity": 1,
+    "prescribed-dispensed": 1,
+    "prescriptions-in-the-community": 3,
+  };
   for (const ds of DATASET_PRIORITY) {
+    const batchSize = batchSizes[ds] ?? 1;
     const { data: queue, error } = await supabaseAdmin
       .from("ingestion_queue")
       .select("id, dataset, resource_url, year, month")
@@ -504,9 +519,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-scotland")({
             reset = count ?? 0;
           }
           const queued = await discover();
-          // Process at most 1 item per request to stay under the proxy timeout.
-          // The button can be clicked repeatedly (or polled) to drain the queue.
-          const results = reingest ? [] : await runBatch(1);
+          const results = reingest ? [] : await runBatch();
           const { count: pending } = await supabaseAdmin
             .from("ingestion_queue")
             .select("id", { count: "exact", head: true })
