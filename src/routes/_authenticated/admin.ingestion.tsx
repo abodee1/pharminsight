@@ -335,8 +335,17 @@ function Stat({ label, value, tone = "neutral" }: { label: string; value: string
   );
 }
 
+// Map any month to its quarter-end month (1-3→3, 4-6→6, 7-9→9, 10-12→12).
+function quarterEndMonth(month: number): number {
+  return (Math.floor((month - 1) / 3) + 1) * 3;
+}
+
 function expectedPeriods(cadence: Cadence): Array<{ y: number; m: number }> {
-  // monthly: last 36 months ending last month; quarterly: last 12 quarters (mar/jun/sep/dec)
+  // monthly: last 36 calendar months ending last month.
+  // quarterly: last 12 quarters keyed by quarter-end month (3/6/9/12). We
+  // match ingested rows by quarter rather than exact month, since publishers
+  // report on different cadences within a quarter (Scotland 1/4/7/10,
+  // England's Patients-Registered extract on the 2nd month of a quarter).
   const out: Array<{ y: number; m: number }> = [];
   const now = new Date();
   if (cadence === "monthly") {
@@ -345,10 +354,12 @@ function expectedPeriods(cadence: Cadence): Array<{ y: number; m: number }> {
       out.push({ y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 });
     }
   } else {
+    const curQ = Math.floor(now.getUTCMonth() / 3); // 0..3
     for (let i = 1; i <= 12; i++) {
-      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i * 3, 1));
-      const m = [3, 6, 9, 12].reduce((p, c) => (Math.abs(c - (d.getUTCMonth() + 1)) < Math.abs(p - (d.getUTCMonth() + 1)) ? c : p), 3);
-      out.push({ y: d.getUTCFullYear(), m });
+      const qIdx = curQ - i;
+      const yearShift = Math.floor(qIdx / 4);
+      const qNorm = ((qIdx % 4) + 4) % 4;
+      out.push({ y: now.getUTCFullYear() + yearShift, m: (qNorm + 1) * 3 });
     }
   }
   return out;
