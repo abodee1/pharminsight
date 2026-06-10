@@ -258,9 +258,32 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
       {origin && reporting > 0 && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4 text-xs">
-            <Tile label="You" value={fmt(yourValue)} accent />
-            <Tile label="Cohort median" value={fmt(cohortMedian)} />
-            <Tile label="Cohort average" value={fmt(cohortAvg)} />
+            <Tile
+              label="You"
+              value={fmt(yourValue)}
+              sub={metric === "pf" ? `${fmtGbpCompact(perPharmPay.get(pharmacyId) || 0)} paid` : undefined}
+              accent
+            />
+            <Tile
+              label="Cohort median"
+              value={fmt(cohortMedian)}
+              sub={metric === "pf" ? (() => {
+                const pays = rows.filter((r) => !r.isYou && r.value > 0).map((r) => perPharmPay.get(r.id) || 0).sort((a, b) => a - b);
+                if (!pays.length) return undefined;
+                const mid = Math.floor(pays.length / 2);
+                const med = pays.length % 2 === 0 ? (pays[mid - 1] + pays[mid]) / 2 : pays[mid];
+                return `${fmtGbpCompact(med)} paid`;
+              })() : undefined}
+            />
+            <Tile
+              label="Cohort average"
+              value={fmt(cohortAvg)}
+              sub={metric === "pf" ? (() => {
+                const pays = rows.filter((r) => !r.isYou && r.value > 0).map((r) => perPharmPay.get(r.id) || 0);
+                if (!pays.length) return undefined;
+                return `${fmtGbpCompact(pays.reduce((a, b) => a + b, 0) / pays.length)} paid`;
+              })() : undefined}
+            />
             <Tile label="Your rank" value={`#${yourRank} of ${reporting}`} />
           </div>
 
