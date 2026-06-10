@@ -37,27 +37,32 @@ export function GpFeederOverlap({
     })();
   }, [pharms]);
 
-  // Load GP linkage rows for those ODS codes (last N months)
+  // Load GP linkage rows for those ODS codes (last N months, or all time if monthsWindow <= 0)
   useEffect(() => {
     const ods = Object.values(odsByPh);
     if (ods.length < 2) { setLinks([]); setLoading(false); return; }
     setLoading(true);
     (async () => {
+      const allTime = !monthsWindow || monthsWindow <= 0;
       const now = new Date();
-      const cutoff = new Date(now.getFullYear(), now.getMonth() - monthsWindow, 1);
-      const data = await fetchAll<LinkRow>((from, to) =>
-        supabase
+      const cutoff = allTime
+        ? null
+        : new Date(now.getFullYear(), now.getMonth() - monthsWindow, 1);
+      const data = await fetchAll<LinkRow>((from, to) => {
+        let q = supabase
           .from("gp_pharmacy_linkage")
           .select("practice_code,pharmacy_ods_code,year,month,items_dispensed")
-          .in("pharmacy_ods_code", ods)
-          .gte("year", cutoff.getFullYear())
-          .range(from, to)
-      );
-      // Filter strictly to window
-      const filtered = data.filter((r) => {
-        const d = new Date(r.year, r.month - 1, 1);
-        return d >= cutoff;
+          .in("pharmacy_ods_code", ods);
+        if (cutoff) q = q.gte("year", cutoff.getFullYear());
+        return q.range(from, to);
       });
+      // Filter strictly to window
+      const filtered = cutoff
+        ? data.filter((r) => {
+            const d = new Date(r.year, r.month - 1, 1);
+            return d >= cutoff;
+          })
+        : data;
       setLinks(filtered);
 
       // Load practice metadata for involved codes
