@@ -311,7 +311,7 @@ function Compare() {
   }, [selectedPharms, rows]);
   // Trend data — one chart per active metric, windowed to last N months
   const trendPeriods = useMemo(
-    () => periods.slice(-trendWindow),
+    () => (trendWindow === 0 ? periods : periods.slice(-trendWindow)),
     [periods, trendWindow],
   );
   const trendByMetric = useMemo(() => {
