@@ -9,10 +9,14 @@ const DATASET = "pharmacy-and-appliance-contractor-dispensing-data";
 type CkanResource = { id: string; name: string; url: string; format: string };
 
 function parseYearMonth(name: string, url: string) {
-  // dispensing_data_YYYYMM or DISPENSING_DATA_YYYYMM
-  const m = (url + " " + name).match(/(\d{4})(\d{2})/);
-  if (m) return { year: +m[1], month: +m[2] };
-  return { year: null as number | null, month: null as number | null };
+  // dispensing_data_YYYYMM — anchor on a real year prefix to avoid colliding
+  // with 6-digit ids elsewhere in the CKAN URL (e.g. dataset uuid 25230765…).
+  const hay = `${name} ${url}`;
+  const re = /(20\d{2})(0[1-9]|1[0-2])/g;
+  let m: RegExpExecArray | null;
+  let last: { year: number; month: number } | null = null;
+  while ((m = re.exec(hay)) !== null) last = { year: +m[1], month: +m[2] };
+  return last ?? { year: null as number | null, month: null as number | null };
 }
 
 // Streaming CSV (quoted-field aware)
