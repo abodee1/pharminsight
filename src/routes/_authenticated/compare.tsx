@@ -11,6 +11,7 @@ import { CountryBadge } from "@/components/CountryBadge";
 import { Badge } from "@/components/ui/badge";
 import { GpFeederOverlap } from "@/components/GpFeederOverlap";
 import { CompetitorHeatmap } from "@/components/CompetitorHeatmap";
+import { getViewedPharmacy } from "@/lib/viewedPharmacy";
 
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
