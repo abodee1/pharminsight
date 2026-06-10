@@ -9,12 +9,43 @@ import {
 } from "@/lib/ingest-utils.server";
 
 const SOURCE = "NHSBSA_LISTSIZE";
+// Primary directory source: NHS Spine ORD API (open JSON, no auth, not behind WAF).
+// PrimaryRoleId RO177 = "Prescribing Cost Centre" (English GP practices).
+const SPINE_ORD_URL = "https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations";
+// Legacy primary (CloudFront WAF blocks non-browser clients in 2026).
 const EPRACCUR_URL = "https://files.digital.nhs.uk/assets/ods/current/epraccur.zip";
 const PATIENT_INDEX_URL = "https://digital.nhs.uk/data-and-information/publications/statistical/patients-registered-at-a-gp-practice";
-// Fallback: OpenPrescribing's mirror of active English GP practices (no auth, CORS-open).
-const OPENPRESCRIBING_URL = "https://openprescribing.net/api/1.0/org_code/?org_type=practice&format=csv";
 
-async function fetchEpraccur(): Promise<Array<{ practice_code: string; practice_name: string; country: string; postcode: string | null; status_code: string }> | null> {
+type PracticeRow = { practice_code: string; practice_name: string; country: string; postcode: string | null; status_code: string };
+
+async function fetchSpineOrd(): Promise<PracticeRow[]> {
+  const out: PracticeRow[] = [];
+  const limit = 1000;
+  let offset = 0;
+  for (let page = 0; page < 60; page++) {
+    const url = `${SPINE_ORD_URL}?PrimaryRoleId=RO177&Status=Active&Limit=${limit}&Offset=${offset}`;
+    const res = await fetch(url, { redirect: "follow", headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error(`Spine ORD ${res.status} at offset ${offset}`);
+    const j = (await res.json()) as { Organisations?: Array<{ OrgId: string; Name: string; PostCode?: string; Status: string }> };
+    const orgs = j.Organisations ?? [];
+    if (!orgs.length) break;
+    for (const o of orgs) {
+      if (!o.OrgId) continue;
+      out.push({
+        practice_code: o.OrgId,
+        practice_name: o.Name?.trim() || o.OrgId,
+        country: "England",
+        postcode: o.PostCode?.trim() || null,
+        status_code: "A",
+      });
+    }
+    if (orgs.length < limit) break;
+    offset += limit;
+  }
+  return out;
+}
+
+async function fetchEpraccurLegacy(): Promise<PracticeRow[] | null> {
   try {
     const res = await fetch(EPRACCUR_URL, {
       redirect: "follow",
@@ -23,18 +54,14 @@ async function fetchEpraccur(): Promise<Array<{ practice_code: string; practice_
         "Accept": "application/zip,application/octet-stream,*/*",
       },
     });
-    if (!res.ok) {
-      console.warn(`[ingest-england-gp-listsize] epraccur ${res.status}; falling back to OpenPrescribing`);
-      return null;
-    }
+    if (!res.ok) return null;
     const buf = new Uint8Array(await res.arrayBuffer());
     const files = unzipSync(buf, { filter: (f) => f.name.toLowerCase().endsWith(".csv") });
     const name = Object.keys(files)[0];
     if (!name) return null;
     const text = strFromU8(files[name]);
-    const lines = text.split(/\r?\n/);
-    const out: Array<{ practice_code: string; practice_name: string; country: string; postcode: string | null; status_code: string }> = [];
-    for (const line of lines) {
+    const out: PracticeRow[] = [];
+    for (const line of text.split(/\r?\n/)) {
       if (!line) continue;
       const cells = line.split(",");
       const code = (cells[0] ?? "").trim();
@@ -49,45 +76,20 @@ async function fetchEpraccur(): Promise<Array<{ practice_code: string; practice_
       });
     }
     return out;
-  } catch (e) {
-    console.warn("[ingest-england-gp-listsize] epraccur fetch error:", e instanceof Error ? e.message : e);
+  } catch {
     return null;
   }
 }
 
-async function fetchOpenPrescribing(): Promise<Array<{ practice_code: string; practice_name: string; country: string; postcode: string | null; status_code: string }>> {
-  const res = await fetch(OPENPRESCRIBING_URL, {
-    redirect: "follow",
-    headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; PharmInsightBot/1.0; +https://pharminsight.lovable.app)",
-      "Accept": "text/csv,*/*",
-    },
-  });
-  if (!res.ok) throw new Error(`openprescribing ${res.status}`);
-  const text = await res.text();
-  const lines = text.split(/\r?\n/);
-  const header = lines[0].split(",").map((c) => c.trim().toLowerCase());
-  const codeIdx = header.findIndex((h) => h === "code" || h === "practice_code");
-  const nameIdx = header.findIndex((h) => h === "name" || h === "practice_name");
-  const out: Array<{ practice_code: string; practice_name: string; country: string; postcode: string | null; status_code: string }> = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cells = lines[i].split(",");
-    const code = (cells[codeIdx] ?? "").trim();
-    if (!code) continue;
-    out.push({
-      practice_code: code,
-      practice_name: nameIdx >= 0 ? (cells[nameIdx] ?? "").trim() : code,
-      country: "England",
-      postcode: null,
-      status_code: "A",
-    });
-  }
-  return out;
-}
-
 async function ingestPracticeDirectory() {
-  const rows = (await fetchEpraccur()) ?? (await fetchOpenPrescribing());
-  if (!rows.length) throw new Error("No practice rows from epraccur or OpenPrescribing");
+  let rows: PracticeRow[];
+  try {
+    rows = await fetchSpineOrd();
+  } catch (e) {
+    console.warn("[ingest-england-gp-listsize] Spine ORD failed, trying epraccur:", e instanceof Error ? e.message : e);
+    rows = (await fetchEpraccurLegacy()) ?? [];
+  }
+  if (!rows.length) throw new Error("No practice rows from Spine ORD or epraccur");
   for (let i = 0; i < rows.length; i += 500) {
     const { error } = await supabaseAdmin.from("gp_practices")
       .upsert(rows.slice(i, i + 500), { onConflict: "practice_code" });
