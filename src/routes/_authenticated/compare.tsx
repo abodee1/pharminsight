@@ -197,7 +197,9 @@ function Compare() {
   const [pharms, setPharms] = useState<Pharm[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
-  const [trendWindow, setTrendWindow] = useState<1 | 3 | 6 | 12>(12);
+  // 0 = all time
+  const [trendWindow, setTrendWindow] = useState<0 | 3 | 6 | 12 | 24>(12);
+  const [gpFeederWindow, setGpFeederWindow] = useState<0 | 3 | 6 | 12 | 24>(12);
   const [, setLoading] = useState(false);
 
   // Preload the user's primary pharmacy as the first selection.
@@ -223,7 +225,7 @@ function Compare() {
     setLoading(true);
     (async () => {
       const now = new Date();
-      const cutoff = new Date(now.getFullYear(), now.getMonth() - 24, 1);
+      const cutoff = new Date(now.getFullYear(), now.getMonth() - 60, 1);
       const cutoffYear = cutoff.getFullYear();
       const data = await fetchAll<Row>((from, to) =>
         supabase
@@ -309,7 +311,7 @@ function Compare() {
   }, [selectedPharms, rows]);
   // Trend data — one chart per active metric, windowed to last N months
   const trendPeriods = useMemo(
-    () => periods.slice(-trendWindow),
+    () => (trendWindow === 0 ? periods : periods.slice(-trendWindow)),
     [periods, trendWindow],
   );
   const trendByMetric = useMemo(() => {
@@ -617,11 +619,33 @@ function Compare() {
 
           {/* GP feeder overlap & catchment analysis (≥2 selected) */}
           {selectedPharms.length >= 2 && (
-            <GpFeederOverlap
-              pharms={selectedPharms.map((p) => ({ id: p.id, name: p.name, country: p.country }))}
-              colorFor={colorFor}
-              monthsWindow={12}
-            />
+            <div className="space-y-2 mb-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">GP feeder window</p>
+                <div className="inline-flex rounded-md border border-border bg-secondary/40 p-0.5 flex-wrap">
+                  {([3, 6, 12, 24, 0] as const).map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => setGpFeederWindow(w)}
+                      className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                        gpFeederWindow === w
+                          ? "bg-card text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      aria-pressed={gpFeederWindow === w}
+                    >
+                      {w === 0 ? "All" : `${w}M`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <GpFeederOverlap
+                pharms={selectedPharms.map((p) => ({ id: p.id, name: p.name, country: p.country }))}
+                colorFor={colorFor}
+                monthsWindow={gpFeederWindow}
+              />
+            </div>
           )}
 
           {/* Competitor geography heatmap (≥1 selected, needs lat/lng) */}
@@ -720,13 +744,13 @@ function Compare() {
               )}
 
               {/* Trend small multiples — one chart per active metric */}
-              <div className="rounded-xl bg-card border border-border p-6 shadow-sm mb-6">
+              <div className="rounded-xl bg-card border border-border p-4 sm:p-6 shadow-sm mb-6">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <h2 className="text-sm font-semibold">
-                    {trendWindow === 1 ? "Latest month" : `${trendWindow}-month trend`} by service
+                    {trendWindow === 0 ? "All-time trend" : `${trendWindow}-month trend`} by service
                   </h2>
-                  <div className="inline-flex rounded-md border border-border bg-secondary/40 p-0.5">
-                    {([1, 3, 6, 12] as const).map((w) => (
+                  <div className="inline-flex rounded-md border border-border bg-secondary/40 p-0.5 flex-wrap">
+                    {([3, 6, 12, 24, 0] as const).map((w) => (
                       <button
                         key={w}
                         type="button"
@@ -738,7 +762,7 @@ function Compare() {
                         }`}
                         aria-pressed={trendWindow === w}
                       >
-                        {w}M
+                        {w === 0 ? "All" : `${w}M`}
                       </button>
                     ))}
                   </div>
@@ -827,36 +851,61 @@ function Compare() {
               )}
 
               {latest && (
-                <div className="rounded-xl bg-card border border-border shadow-sm p-6 mb-6">
-                  <div className="flex items-baseline justify-between mb-4">
+                <div className="rounded-xl bg-card border border-border shadow-sm p-4 sm:p-6 mb-6">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
                     <h2 className="text-sm font-semibold tracking-tight">Metric leadership · latest reported</h2>
                     <p className="text-xs text-muted-foreground italic">Who leads, and by how wide a margin.</p>
                   </div>
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {activeMetrics.map((mt) => {
                       const vals = selectedPharms
                         .filter((ph) => appliesToCountry(mt.applies, ph.country))
                         .map((ph) => ({ ph, v: latestNonZero.get(`${ph.id}::${mt.key}`)?.value ?? 0 }))
                         .sort((a, b) => b.v - a.v);
-                      if (!vals.length) return null;
+                      if (!vals.length || vals[0].v <= 0) return null;
                       const leader = vals[0];
                       const runner = vals[1];
-                      const margin = runner && runner.v ? Math.round(((leader.v - runner.v) / runner.v) * 100) : null;
+                      const margin = runner && runner.v ? ((leader.v - runner.v) / runner.v) * 100 : null;
+                      const leaderPct = 100;
+                      const runnerPct = runner && leader.v > 0 ? (runner.v / leader.v) * 100 : 0;
                       return (
-                        <div key={mt.key} className="border-l-2 pl-3" style={{ borderColor: colorFor(leader.ph.id) }}>
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center justify-between gap-2">
-                            <span className="truncate">{mt.label}</span>
+                        <div key={mt.key} className="rounded-lg border border-border bg-secondary/30 p-3">
+                          <div className="flex items-baseline justify-between gap-2 mb-2">
+                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold truncate">{mt.label}</p>
                             {mt.applies !== "all" && (
-                              <span className="text-[9px] opacity-70">{mt.applies === "england" ? "Eng" : "Sco"}</span>
+                              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70 shrink-0">{mt.applies === "england" ? "Eng" : "Sco"}</span>
                             )}
-                          </p>
-                          <p className="text-sm font-semibold truncate" title={leader.ph.name}>{leader.ph.name}</p>
-                          <p className="text-lg font-bold tabular-nums">{leader.v > 0 ? mt.format(leader.v) : "—"}</p>
-                          {runner && (
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {margin !== null
-                                ? `${margin > 0 ? `+${margin}% ahead of` : "tied with"} ${runner.ph.name.split(" ")[0]}`
-                                : `vs ${runner.ph.name.split(" ")[0]}`}
+                          </div>
+                          <div className="space-y-2">
+                            <div>
+                              <div className="flex items-baseline justify-between gap-2">
+                                <span className="text-xs font-semibold truncate flex items-center gap-1.5 min-w-0" title={leader.ph.name}>
+                                  <Trophy className="h-3 w-3 text-amber-500 shrink-0" />
+                                  <span className="truncate">{leader.ph.name}</span>
+                                </span>
+                                <span className="text-sm font-bold tabular-nums shrink-0">{mt.format(leader.v)}</span>
+                              </div>
+                              <div className="mt-1 h-1.5 rounded-full bg-secondary overflow-hidden">
+                                <div className="h-full rounded-full" style={{ width: `${leaderPct}%`, background: colorFor(leader.ph.id) }} />
+                              </div>
+                            </div>
+                            {runner && (
+                              <div>
+                                <div className="flex items-baseline justify-between gap-2">
+                                  <span className="text-xs truncate min-w-0 text-muted-foreground" title={runner.ph.name}>{runner.ph.name}</span>
+                                  <span className="text-xs font-medium tabular-nums shrink-0 text-muted-foreground">
+                                    {runner.v > 0 ? mt.format(runner.v) : "—"}
+                                  </span>
+                                </div>
+                                <div className="mt-1 h-1.5 rounded-full bg-secondary overflow-hidden">
+                                  <div className="h-full rounded-full opacity-70" style={{ width: `${runnerPct}%`, background: colorFor(runner.ph.id) }} />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {margin !== null && (
+                            <p className="mt-2 text-[11px] text-muted-foreground">
+                              Leader is <span className="font-semibold text-foreground">{margin > 0 ? `+${Math.round(margin)}%` : "level"}</span> {margin > 0 ? "ahead" : ""}
                             </p>
                           )}
                         </div>

@@ -37,27 +37,32 @@ export function GpFeederOverlap({
     })();
   }, [pharms]);
 
-  // Load GP linkage rows for those ODS codes (last N months)
+  // Load GP linkage rows for those ODS codes (last N months, or all time if monthsWindow <= 0)
   useEffect(() => {
     const ods = Object.values(odsByPh);
     if (ods.length < 2) { setLinks([]); setLoading(false); return; }
     setLoading(true);
     (async () => {
+      const allTime = !monthsWindow || monthsWindow <= 0;
       const now = new Date();
-      const cutoff = new Date(now.getFullYear(), now.getMonth() - monthsWindow, 1);
-      const data = await fetchAll<LinkRow>((from, to) =>
-        supabase
+      const cutoff = allTime
+        ? null
+        : new Date(now.getFullYear(), now.getMonth() - monthsWindow, 1);
+      const data = await fetchAll<LinkRow>((from, to) => {
+        let q = supabase
           .from("gp_pharmacy_linkage")
           .select("practice_code,pharmacy_ods_code,year,month,items_dispensed")
-          .in("pharmacy_ods_code", ods)
-          .gte("year", cutoff.getFullYear())
-          .range(from, to)
-      );
-      // Filter strictly to window
-      const filtered = data.filter((r) => {
-        const d = new Date(r.year, r.month - 1, 1);
-        return d >= cutoff;
+          .in("pharmacy_ods_code", ods);
+        if (cutoff) q = q.gte("year", cutoff.getFullYear());
+        return q.range(from, to);
       });
+      // Filter strictly to window
+      const filtered = cutoff
+        ? data.filter((r) => {
+            const d = new Date(r.year, r.month - 1, 1);
+            return d >= cutoff;
+          })
+        : data;
       setLinks(filtered);
 
       // Load practice metadata for involved codes
@@ -160,20 +165,20 @@ export function GpFeederOverlap({
 
     // Top feeder concentration: share of pharmacy items from its top feeder
     const topFeederShare: Record<string, { name: string; pct: number } | null> = {};
-    // Top N major feeders per pharmacy — strict thresholds, real names only
+    // Top N major feeders per pharmacy — material only; fall back to practice code label when name missing.
     const topFeedersPerPh: Record<string, { code: string; name: string; postcode: string; items: number; share: number }[]> = {};
     pharms.forEach((p) => {
       const phRows = rows
-        .filter((r) => (r.vals[p.id] || 0) > 0 && r.hasName)
+        .filter((r) => (r.vals[p.id] || 0) > 0)
         .map((r) => ({ code: r.code, name: r.name, postcode: r.postcode, items: r.vals[p.id] }));
       phRows.sort((a, b) => b.items - a.items);
       const t = totalsPerPh[p.id] || 0;
       topFeederShare[p.id] = phRows[0] && t > 0 ? { name: phRows[0].name, pct: (phRows[0].items / t) * 100 } : null;
-      // Major = top 5 only, must be ≥3% of items OR ≥50 items in window — drop the long tail.
+      // Major = top 6, must be ≥3% of items OR ≥50 items in window — drop the long tail.
       topFeedersPerPh[p.id] = phRows
         .map((r) => ({ ...r, share: t > 0 ? (r.items / t) * 100 : 0 }))
         .filter((r) => r.share >= 3 || r.items >= 50)
-        .slice(0, 5);
+        .slice(0, 6);
     });
 
     return { rows, shared, exclusiveByPh, totalsPerPh, overlapPct, overlapItems, distinctPractices, topFeederShare, topFeedersPerPh };
@@ -197,7 +202,7 @@ export function GpFeederOverlap({
     return (
       <div className="rounded-xl bg-card border border-border p-6 shadow-sm mb-6">
         <h2 className="text-sm font-semibold mb-1">GP feeder overlap</h2>
-        <p className="text-xs text-muted-foreground">No GP prescribing linkage data for the selected pharmacies in the last {monthsWindow} months. (Available where NHSBSA practice-level data is published.)</p>
+        <p className="text-xs text-muted-foreground">No GP prescribing linkage data for the selected pharmacies in the {monthsWindow && monthsWindow > 0 ? `last ${monthsWindow} months` : "available history"}. (Available where NHSBSA practice-level data is published.)</p>
       </div>
     );
   }
@@ -217,7 +222,7 @@ export function GpFeederOverlap({
           <div className="rounded-lg bg-secondary p-2 shrink-0"><Share2 className="h-5 w-5" /></div>
           <div className="min-w-0">
             <h2 className="text-base font-semibold">GP feeder overlap & catchment</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Which GP practices feed both pharmacies, and where each draws its scripts from. Last {monthsWindow} months.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Which GP practices feed both pharmacies, and where each draws its scripts from. {monthsWindow && monthsWindow > 0 ? `Last ${monthsWindow} months` : "All available history"}.</p>
           </div>
         </div>
 
@@ -315,7 +320,7 @@ export function GpFeederOverlap({
       {/* Major feeders per pharmacy — top GP practices by name */}
       <div className="rounded-xl bg-card border border-border p-5 md:p-6 shadow-sm">
         <h3 className="text-sm font-semibold mb-1">Major GP feeders · top practices by name</h3>
-        <p className="text-xs text-muted-foreground mb-4">The largest prescribing practices feeding each pharmacy over the last {monthsWindow} months. Share = % of that pharmacy's total items.</p>
+        <p className="text-xs text-muted-foreground mb-4">The largest prescribing practices feeding each pharmacy over the {monthsWindow && monthsWindow > 0 ? `last ${monthsWindow} months` : "available history"}. Share = % of that pharmacy's total items.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {pharms.map((p) => {
             const feeders = summary.topFeedersPerPh[p.id] || [];
