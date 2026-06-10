@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { PercentileRail, GpPrescribingCard } from "@/components/Infographics";
 import { PharmacySearch } from "@/components/PharmacySearch";
 import { CountryBadge } from "@/components/CountryBadge";
+import { fmtGbpCompact } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/benchmarking")({ component: Benchmarking });
 
@@ -187,7 +188,7 @@ function Benchmarking() {
             supabase
               .from("dispensing_data")
               .select(
-                "pharmacy_id,items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations,methadone_items,mcr_registrations,gross_cost,final_payment",
+                "pharmacy_id,items_dispensed,nms_count,pharmacy_first_count,pharmacy_first_payment,flu_vaccinations,methadone_items,mcr_registrations,gross_cost,final_payment",
               )
               .eq("year", year)
               .eq("month", month)
