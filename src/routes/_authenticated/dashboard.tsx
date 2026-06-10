@@ -20,6 +20,7 @@ import {
   type IntensityRate,
 } from "@/components/Infographics";
 import { LocalLandscape } from "@/components/LocalLandscape";
+import { fmtGbpCompact } from "@/lib/utils";
 
 import {
   Trophy, BarChart2, GitCompare, Package, Stethoscope, ClipboardCheck, Medal,
@@ -58,11 +59,13 @@ function Dashboard() {
     items: 0, pf: 0, nms: 0, rank: 0, total: 0,
     period: "", pfPeriod: "", nmsPeriod: "",
     finalPayment: 0, grossCost: 0, mcrPayment: 0, smkPayment: 0, payPeriod: "",
+    pfPayment: 0, // £ remuneration matching pfPeriod
     itemsDelta: 0, // % vs country avg for the same month
     pfShareOfPeers: 0, // percentile 0..100 of PF vs peers
   });
   const [peerItems, setPeerItems] = useState<number[]>([]);
   const [peerPf, setPeerPf] = useState<number[]>([]);
+  const [peerPfPayment, setPeerPfPayment] = useState<number[]>([]);
   const [peerNms, setPeerNms] = useState<number[]>([]);
   const [peerFinalPay, setPeerFinalPay] = useState<number[]>([]);
   const [peerGrossCost, setPeerGrossCost] = useState<number[]>([]);
@@ -213,6 +216,7 @@ function Dashboard() {
         mcrPayment: Number(payRow?.mcr_payment) || 0,
         smkPayment: Number(payRow?.smoking_cessation_payment) || 0,
         payPeriod: payRow ? labelFor(payRow.year, payRow.month) : "",
+        pfPayment: Number(pfRow?.pharmacy_first_payment) || 0,
         itemsDelta,
         pfShareOfPeers: 0, // computed below once peerPf is known
       });
@@ -269,6 +273,7 @@ function Dashboard() {
       const pfY = pfRow?.year ?? statY; const pfM = pfRow?.month ?? statM;
       if (pfY === statY && pfM === statM) {
         setPeerPf(latestSnap.map((r) => r.pharmacy_first_count || 0));
+        setPeerPfPayment(latestSnap.map((r) => Number(r.pharmacy_first_payment) || 0));
         setPeerPfPeriod(labelFor(statY, statM));
       } else {
         const pfSnapAll = await fetchAll<Row>((from, to) =>
@@ -279,6 +284,7 @@ function Dashboard() {
         );
         const pfSnap = targetCountry ? pfSnapAll.filter((r) => countryPharmIds.has(r.pharmacy_id)) : pfSnapAll;
         setPeerPf(pfSnap.map((r) => r.pharmacy_first_count || 0));
+        setPeerPfPayment(pfSnap.map((r) => Number(r.pharmacy_first_payment) || 0));
         setPeerPfPeriod(labelFor(pfY, pfM));
       }
 
@@ -377,8 +383,12 @@ function Dashboard() {
         />
         <StatCard
           label="Pharmacy First"
-          value={stats.pf.toLocaleString()}
-          hint={stats.pfPeriod && stats.pfPeriod !== stats.period ? `Latest reported · ${stats.pfPeriod}` : stats.pfPeriod || undefined}
+          value={`${stats.pf.toLocaleString()} · ${fmtGbpCompact(stats.pfPayment)}`}
+          hint={
+            stats.pfPeriod
+              ? `Consultations · remunerated · ${stats.pfPeriod}${stats.pfPeriod !== stats.period ? " (lag)" : ""}`
+              : "Consultations · remunerated"
+          }
           icon={Stethoscope}
           accent="emerald"
         />
@@ -459,11 +469,11 @@ function Dashboard() {
         {pfPoints.length > 0 && (
           <TrendCard
             title="Pharmacy First consultations"
-            subtitle={pharmacy ? "Monthly walk-in clinical activity" : "National monthly average"}
+            subtitle={pharmacy ? `Walk-in clinical activity · latest ${fmtGbpCompact(stats.pfPayment)} remunerated` : "National monthly average"}
             points={pfPoints}
             window={trendWindow}
             onWindowChange={setTrendWindow}
-            caption="Walk-in consultations delivered through the Pharmacy First pathway."
+            caption={`Consultations delivered through the Pharmacy First pathway. Latest month: ${stats.pf.toLocaleString()} consultations · ${fmtGbpCompact(stats.pfPayment)} remuneration.`}
           />
         )}
         {pharmacy && costPoints.length > 0 && (
@@ -511,7 +521,7 @@ function Dashboard() {
             values={peerPf}
             peerLabel={`${pharmacy.country || "Country"} avg`}
             nationalLabel="Highest"
-            caption="Clinical consultations delivered through the Pharmacy First pathway."
+            caption={`${stats.pf.toLocaleString()} consultations · ${fmtGbpCompact(stats.pfPayment)} remuneration this month. Country avg remuneration ${fmtGbpCompact(peerPfPayment.length ? peerPfPayment.reduce((a,b)=>a+b,0)/peerPfPayment.length : 0)}.`}
           />
         </div>
       )}
@@ -555,6 +565,10 @@ function Dashboard() {
             values: peerPf,
             yourValue: stats.pf,
             period: peerPfPeriod || stats.period,
+            companion: {
+              label: "Remuneration this month",
+              value: `${fmtGbpCompact(stats.pfPayment)} · cohort avg ${fmtGbpCompact(peerPfPayment.length ? peerPfPayment.reduce((a,b)=>a+b,0)/peerPfPayment.length : 0)}`,
+            },
           },
           {
             key: "nms",

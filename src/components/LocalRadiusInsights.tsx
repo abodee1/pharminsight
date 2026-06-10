@@ -5,6 +5,7 @@ import {
 import { MapPin, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PeriodPills, type PeriodWindow } from "@/components/Infographics";
+import { fmtGbpCompact } from "@/lib/utils";
 
 type Props = {
   pharmacyId: string;
@@ -62,6 +63,7 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
   const [win, setWin] = useState<PeriodWindow>(3);
   const [nearby, setNearby] = useState<Nearby[]>([]);
   const [perPharm, setPerPharm] = useState<Map<string, number>>(new Map());
+  const [perPharmPay, setPerPharmPay] = useState<Map<string, number>>(new Map()); // PF £ only
   const [period, setPeriod] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
@@ -128,11 +130,16 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
       const maxYM = ly * 12 + lm;
       // 3) Fetch dispensing rows for cohort in window, chunked
       const sums = new Map<string, number>();
+      const sumsPay = new Map<string, number>(); // only populated when metric === 'pf'
+      const wantPay = metric === "pf";
+      const selectCols = wantPay
+        ? `pharmacy_id,year,month,${field},pharmacy_first_payment`
+        : `pharmacy_id,year,month,${field}`;
       for (let i = 0; i < ids.length; i += 200) {
         const chunk = ids.slice(i, i + 200);
         const { data } = await supabase
           .from("dispensing_data")
-          .select(`pharmacy_id,year,month,${field}`)
+          .select(selectCols)
           .in("pharmacy_id", chunk)
           .gte("year", months[months.length - 1].y)
           .lte("year", ly);
@@ -145,6 +152,10 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
           const v = Number(r[field]) || 0;
           const pid = r.pharmacy_id as string;
           sums.set(pid, (sums.get(pid) || 0) + v);
+          if (wantPay) {
+            const pay = Number(r.pharmacy_first_payment) || 0;
+            sumsPay.set(pid, (sumsPay.get(pid) || 0) + pay);
+          }
         }
       }
       const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -153,6 +164,7 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
         ? `${MONTHS[lm - 1]} ${ly}`
         : `${MONTHS[from.m - 1]} ${String(from.y).slice(2)} – ${MONTHS[lm - 1]} ${String(ly).slice(2)}`;
       setPerPharm(sums);
+      setPerPharmPay(sumsPay);
       setPeriod(periodLabel);
       setLoading(false);
     })();
@@ -246,9 +258,32 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
       {origin && reporting > 0 && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4 text-xs">
-            <Tile label="You" value={fmt(yourValue)} accent />
-            <Tile label="Cohort median" value={fmt(cohortMedian)} />
-            <Tile label="Cohort average" value={fmt(cohortAvg)} />
+            <Tile
+              label="You"
+              value={fmt(yourValue)}
+              sub={metric === "pf" ? `${fmtGbpCompact(perPharmPay.get(pharmacyId) || 0)} paid` : undefined}
+              accent
+            />
+            <Tile
+              label="Cohort median"
+              value={fmt(cohortMedian)}
+              sub={metric === "pf" ? (() => {
+                const pays = rows.filter((r) => !r.isYou && r.value > 0).map((r) => perPharmPay.get(r.id) || 0).sort((a, b) => a - b);
+                if (!pays.length) return undefined;
+                const mid = Math.floor(pays.length / 2);
+                const med = pays.length % 2 === 0 ? (pays[mid - 1] + pays[mid]) / 2 : pays[mid];
+                return `${fmtGbpCompact(med)} paid`;
+              })() : undefined}
+            />
+            <Tile
+              label="Cohort average"
+              value={fmt(cohortAvg)}
+              sub={metric === "pf" ? (() => {
+                const pays = rows.filter((r) => !r.isYou && r.value > 0).map((r) => perPharmPay.get(r.id) || 0);
+                if (!pays.length) return undefined;
+                return `${fmtGbpCompact(pays.reduce((a, b) => a + b, 0) / pays.length)} paid`;
+              })() : undefined}
+            />
             <Tile label="Your rank" value={`#${yourRank} of ${reporting}`} />
           </div>
 
@@ -289,7 +324,7 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
   );
 }
 
-function Tile({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Tile({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
   return (
     <div className={[
       "rounded-md border px-2.5 py-2",
@@ -297,6 +332,7 @@ function Tile({ label, value, accent }: { label: string; value: string; accent?:
     ].join(" ")}>
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className="font-semibold tabular-nums">{value}</p>
+      {sub && <p className="text-[10px] tabular-nums text-emerald-700 mt-0.5">{sub}</p>}
     </div>
   );
 }

@@ -918,6 +918,8 @@ export type SpotlightMetric = {
   yourValue: number;
   format?: (n: number) => string;
   period?: string;
+  /** Optional secondary figure to display under the main value (e.g. £ remuneration alongside a count). */
+  companion?: { label: string; value: string };
 };
 
 export function MetricSpotlight({
@@ -986,6 +988,13 @@ export function MetricSpotlight({
           highlightLabel={highlightLabel || "You"}
         />
       </div>
+
+      {active.companion && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          <span className="uppercase tracking-wider text-[10px] mr-2">{active.companion.label}</span>
+          <span className="font-semibold text-foreground tabular-nums">{active.companion.value}</span>
+        </p>
+      )}
 
       {caption && <p className="mt-3 text-xs italic text-muted-foreground border-t border-border pt-2">{caption}</p>}
     </div>
