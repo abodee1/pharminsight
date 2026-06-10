@@ -507,7 +507,10 @@ function DataIngestionAdmin() {
             All NHS open datasets we ingest and keep up to date. Internal use — not visible to public users.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="default" size="sm" onClick={triggerFreshness} disabled={checkingFreshness}>
+            {checkingFreshness ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radar className="h-4 w-4" />} Run change-detection
+          </Button>
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Refresh
           </Button>
@@ -519,6 +522,12 @@ function DataIngestionAdmin() {
           </Link>
         </div>
       </div>
+
+      {/* Per-region coverage breakdown */}
+      <RegionBreakdown statsBySource={statsBySource} />
+
+      {/* Change-detection panel */}
+      <FreshnessPanel freshness={freshness} />
 
       {/* Portfolio summary */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
