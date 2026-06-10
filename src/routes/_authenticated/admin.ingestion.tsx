@@ -354,17 +354,32 @@ function expectedPeriods(cadence: Cadence): Array<{ y: number; m: number }> {
   return out;
 }
 
+type FreshnessRow = {
+  source: string;
+  checked_at: string;
+  upstream_latest_year: number | null;
+  upstream_latest_month: number | null;
+  ingested_latest_year: number | null;
+  ingested_latest_month: number | null;
+  new_data_found: boolean;
+  items_queued: number;
+  status: string;
+  error: string | null;
+};
+
 function DataIngestionAdmin() {
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [queue, setQueue] = useState<QueueRow[]>([]);
   const [running, setRunning] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [recentEvents, setRecentEvents] = useState<LogRow[]>([]);
+  const [freshness, setFreshness] = useState<FreshnessRow[]>([]);
+  const [checkingFreshness, setCheckingFreshness] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
     const sources = DATASETS.map((d) => d.source);
-    const [{ data: lg }, { data: q }, { data: recent }] = await Promise.all([
+    const [{ data: lg }, { data: q }, { data: recent }, { data: fr }] = await Promise.all([
       supabase
         .from("ingestion_log")
         .select("source,status,year,month,rows_ingested,error,created_at")
@@ -383,14 +398,43 @@ function DataIngestionAdmin() {
         .in("source", sources)
         .order("created_at", { ascending: false })
         .limit(40),
+      supabase
+        .from("ingestion_freshness_check")
+        .select("source,checked_at,upstream_latest_year,upstream_latest_month,ingested_latest_year,ingested_latest_month,new_data_found,items_queued,status,error")
+        .order("checked_at", { ascending: false })
+        .limit(200),
     ]);
     setLogs((lg as LogRow[]) ?? []);
     setQueue((q as QueueRow[]) ?? []);
     setRecentEvents((recent as LogRow[]) ?? []);
+    setFreshness((fr as FreshnessRow[]) ?? []);
     setLoading(false);
   };
 
   useEffect(() => { refresh(); }, []);
+
+  const triggerFreshness = async () => {
+    setCheckingFreshness(true);
+    toast.info("Running change-detection sweep…");
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      const res = await fetch(`/api/public/hooks/check-data-freshness`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`);
+      const newOnes = (j.results ?? []).filter((r: any) => r.new_data_found).length;
+      toast.success(`Checked ${j.checked} sources · ${newOnes} with new data`);
+      await refresh();
+    } catch (e: any) {
+      toast.error(`Change-detection failed: ${e?.message ?? e}`);
+    } finally {
+      setCheckingFreshness(false);
+    }
+  };
+
 
   const statsBySource = useMemo(() => {
     const out: Record<string, Stats> = {};
