@@ -167,10 +167,10 @@ const DATASETS: Dataset[] = [
     country: "England",
     source: "NHSBSA_LISTSIZE",
     hook: "ingest-england-gp-listsize",
-    cadence: "quarterly",
+    cadence: "monthly",
     publisher: "NHS Digital — Patients Registered at a GP Practice",
     publisherUrl: "https://digital.nhs.uk/data-and-information/publications/statistical/patients-registered-at-a-gp-practice",
-    description: "Quarterly registered patient counts by GP practice (England), plus the epraccur directory of active practices.",
+    description: "Monthly registered patient counts by GP practice (England), published via NHS Digital Spine ORD + Patients Registered extract.",
     icon: Building2,
   },
 ];

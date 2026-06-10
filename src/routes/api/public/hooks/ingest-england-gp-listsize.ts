@@ -99,45 +99,100 @@ async function ingestPracticeDirectory() {
 }
 
 
-// Discover the latest "All patients by practice" CSV URL from the NHS Digital publications index.
-async function findLatestPatientCsv(): Promise<{ url: string; year: number | null; month: number | null } | null> {
-  const res = await fetch(PATIENT_INDEX_URL, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; PharmInsightBot/1.0; +https://pharminsight.lovable.app)",
-      "Accept": "text/html,application/xhtml+xml",
-    },
-    redirect: "follow",
-  });
-  if (!res.ok) throw new Error(`patient index ${res.status}`);
-  const html = await res.text();
-  const csvLinks = Array.from(html.matchAll(/href="([^"]+\.csv)"/gi)).map((m) => m[1]);
-  const target = csvLinks.find((u) => /gp-reg-pat|all[-_ ]?patients?[-_ ]?by[-_ ]?practice/i.test(u))
-    ?? csvLinks[0];
-  if (!target) return null;
-  const url = target.startsWith("http") ? target : new URL(target, "https://digital.nhs.uk").toString();
-  const m = url.match(/(20\d{2})[-_](\d{2})/);
-  const year = m ? +m[1] : null;
-  const month = m ? +m[2] : null;
-  return { url, year, month };
+const FETCH_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (compatible; PharmInsightBot/1.0; +https://pharminsight.lovable.app)",
+  "Accept": "text/html,application/xhtml+xml",
+};
+const NHS_BASE = "https://digital.nhs.uk";
+
+// Discover ALL historically available "all patients by practice" CSV files from the
+// NHS Digital publication index — both current and archived monthly releases.
+async function discoverAllPatientCsvs(): Promise<Array<{ url: string; year: number | null; month: number | null }>> {
+  const seen = new Set<string>();
+  const out: Array<{ url: string; year: number | null; month: number | null }> = [];
+
+  function addCsvLink(href: string): void {
+    const url = href.startsWith("http") ? href : new URL(href, NHS_BASE).toString();
+    if (seen.has(url)) return;
+    seen.add(url);
+    const dm = url.match(/(20\d{2})[-_](\d{2})/);
+    out.push({ url, year: dm ? +dm[1] : null, month: dm ? +dm[2] : null });
+  }
+
+  function parseCsvLinks(html: string): void {
+    for (const m of html.matchAll(/href="([^"]+\.csv)"/gi)) {
+      const href = m[1];
+      // Match aggregate practice-level files; skip LSOA/quintile/sex demographic breakdowns.
+      // Primary pattern: gp-reg-pat-prac-all (the canonical NHS Digital filename).
+      // Fallback pattern: any gp-reg-pat file that isn't a demographic breakdown.
+      if (
+        /gp-reg-pat[^"]*prac[-_]all/i.test(href) ||
+        (/gp-reg-pat/i.test(href) && !/lsoa|quin|sex[-_]age|age[-_]sex/i.test(href))
+      ) {
+        addCsvLink(href);
+      }
+    }
+  }
+
+  // Fetch main publication index
+  const mainRes = await fetch(PATIENT_INDEX_URL, { headers: FETCH_HEADERS, redirect: "follow" });
+  if (!mainRes.ok) throw new Error(`patient index ${mainRes.status}`);
+  const mainHtml = await mainRes.text();
+  parseCsvLinks(mainHtml);
+
+  // Collect links to individual monthly publication archive pages
+  const subPages: string[] = [];
+  const archivePath = "/data-and-information/publications/statistical/patients-registered-at-a-gp-practice/";
+  for (const m of mainHtml.matchAll(/href="([^"#?]+)"/gi)) {
+    const href = m[1];
+    if (!href.includes(archivePath)) continue;
+    const url = href.startsWith("http") ? href : new URL(href, NHS_BASE).toString();
+    if (url === PATIENT_INDEX_URL || url === PATIENT_INDEX_URL + "/") continue;
+    if (!subPages.includes(url)) subPages.push(url);
+  }
+
+  // Fetch archive pages in parallel batches of 5, up to 72 months (6 years of backfill)
+  const BATCH = 5;
+  const MAX_PAGES = 72;
+  for (let i = 0; i < Math.min(subPages.length, MAX_PAGES); i += BATCH) {
+    await Promise.all(
+      subPages.slice(i, i + BATCH).map(async (url) => {
+        try {
+          const r = await fetch(url, { headers: FETCH_HEADERS, redirect: "follow" });
+          if (r.ok) parseCsvLinks(await r.text());
+        } catch {
+          // ignore individual page failures silently
+        }
+      }),
+    );
+  }
+
+  return out;
 }
 
 async function discover() {
   const skip = await alreadyHandled(SOURCE);
   const queue: Array<{ source: string; dataset: string; resource_url: string; year: number | null; month: number | null }> = [];
-  // Always queue epraccur (we use ?v=<date>-derived url for de-duplication based on quarter)
+
+  // Practice directory — keyed by quarter so it re-ingests once per quarter
   const today = new Date();
   const epraccurKey = `${EPRACCUR_URL}#${today.getUTCFullYear()}Q${Math.floor(today.getUTCMonth() / 3) + 1}`;
   if (!skip.has(epraccurKey)) {
     queue.push({ source: SOURCE, dataset: "epraccur", resource_url: epraccurKey, year: today.getUTCFullYear(), month: today.getUTCMonth() + 1 });
   }
+
+  // All historically available patient registration CSVs
   try {
-    const latest = await findLatestPatientCsv();
-    if (latest && !skip.has(latest.url)) {
-      queue.push({ source: SOURCE, dataset: "patients-registered", resource_url: latest.url, year: latest.year, month: latest.month });
+    const allCsvs = await discoverAllPatientCsvs();
+    for (const csv of allCsvs) {
+      if (!skip.has(csv.url)) {
+        queue.push({ source: SOURCE, dataset: "patients-registered", resource_url: csv.url, year: csv.year, month: csv.month });
+      }
     }
   } catch (e) {
-    console.warn("[ingest-england-gp-listsize] patient index discovery failed:", e instanceof Error ? e.message : e);
+    console.warn("[ingest-england-gp-listsize] patient discovery failed:", e instanceof Error ? e.message : e);
   }
+
   return enqueue(queue);
 }
 
