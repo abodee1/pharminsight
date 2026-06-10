@@ -135,10 +135,9 @@ const MONTH_NAMES: Record<string, number> = {
 };
 
 export function parseYearMonth(url: string, name: string): { year: number | null; month: number | null } {
-  const m1 = (url + " " + name).match(/(\d{4})(\d{2})/);
+  const m1 = (name + " " + url).match(/(?<![0-9])(20\d{2})(0[1-9]|1[0-2])(?![0-9])/);
   if (m1) {
-    const y = +m1[1], mo = +m1[2];
-    if (y > 1990 && y < 2100 && mo >= 1 && mo <= 12) return { year: y, month: mo };
+    return { year: +m1[1], month: +m1[2] };
   }
   const m2 = name.match(/([A-Za-z]+)\s+(\d{4})/);
   if (m2) {

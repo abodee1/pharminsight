@@ -381,6 +381,9 @@ function PharmacyProfile() {
 
   const gbp = (n: number) => "£" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
   const isScotland = (pharmacy.country || "").toLowerCase() === "scotland";
+  const isEngland = (pharmacy.country || "").toLowerCase() === "england";
+  const isWales = (pharmacy.country || "").toLowerCase() === "wales";
+  const isNI = (pharmacy.country || "").toLowerCase() === "northern ireland";
   const showVerified = isScotland;
   type MetricDef = {
     label: string;
@@ -450,7 +453,14 @@ function PharmacyProfile() {
         { label: "Final NHS payment", key: "money", field: "final_payment", format: gbp },
       ]
     : [];
-  const metrics = [...baseDefs, ...scottishDefs].map(buildMetric).filter((m) => m.value > 0);
+  const walesDefs: MetricDef[] = isWales && latest
+    ? [
+        { label: "Pharmacy First £", key: "money", field: "pharmacy_first_payment", format: gbp },
+        { label: "Gross cost", key: "money", field: "gross_cost", format: gbp },
+        { label: "Final NHS payment", key: "money", field: "final_payment", format: gbp },
+      ]
+    : [];
+  const metrics = [...baseDefs, ...scottishDefs, ...walesDefs].map(buildMetric).filter((m) => m.value > 0);
 
   const tableRows = [...trimmedRows].slice(-24).reverse();
 
@@ -582,7 +592,7 @@ function PharmacyProfile() {
             ))}
           </div>
 
-          {!showVerified && !hasFp34c && (
+          {!showVerified && !hasFp34c && !isWales && (
             <div className="mt-4 rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
               Payment data isn't publicly available for this pharmacy.
             </div>
@@ -591,7 +601,11 @@ function PharmacyProfile() {
           <div className="mt-6">
             <InteractiveTrend
               rows={trimmedRows}
-              available={isScotland ? ["items", "pf", "gross", "final"] : ["items", "eps", "nms", "pf"]}
+              available={
+                isScotland || isWales ? ["items", "pf", "gross", "final"] :
+                isNI ? ["items", "pf"] :
+                ["items", "eps", "nms", "pf"]
+              }
             />
           </div>
 
@@ -630,7 +644,7 @@ function PharmacyProfile() {
                   nationalLabel="Highest"
                   caption={`Clinical consultations under Pharmacy First versus ${peerDistribution.pharmacy_first_count.length.toLocaleString()} country peers.`}
                 />
-                {!isScotland && (
+                {isEngland && (
                   <PercentileRail
                     label={`New Medicine Service${peerPeriods.nms_count ? ` · ${peerPeriods.nms_count}` : ""}`}
                     value={latestFor("nms_count")?.row.nms_count ?? latest.nms_count}
@@ -640,7 +654,7 @@ function PharmacyProfile() {
                     caption={`NMS interventions versus ${peerDistribution.nms_count.length.toLocaleString()} country peers.`}
                   />
                 )}
-                {!isScotland && (
+                {isEngland && (
                   <PercentileRail
                     label={`EPS items${peerPeriods.eps_items ? ` · ${peerPeriods.eps_items}` : ""}`}
                     value={latestFor("eps_items")?.row.eps_items ?? latest.eps_items}
@@ -747,17 +761,17 @@ function PharmacyProfile() {
                   <tr>
                     <th className="text-left px-3 py-2 font-medium">Month</th>
                     <th className="text-right px-3 py-2 font-medium">Items</th>
-                    {!isScotland && <th className="text-right px-3 py-2 font-medium">EPS items</th>}
-                    {!isScotland && <th className="text-right px-3 py-2 font-medium">EPS nom.</th>}
-                    {!isScotland && <th className="text-right px-3 py-2 font-medium">NMS</th>}
+                    {isEngland && <th className="text-right px-3 py-2 font-medium">EPS items</th>}
+                    {isEngland && <th className="text-right px-3 py-2 font-medium">EPS nom.</th>}
+                    {isEngland && <th className="text-right px-3 py-2 font-medium">NMS</th>}
                     <th className="text-right px-3 py-2 font-medium">PF</th>
                     <th className="text-right px-3 py-2 font-medium">PF £</th>
                     {isScotland && <th className="text-right px-3 py-2 font-medium">EHC</th>}
                     {isScotland && <th className="text-right px-3 py-2 font-medium">Meth.</th>}
                     {isScotland && <th className="text-right px-3 py-2 font-medium">Smoke.</th>}
                     {isScotland && <th className="text-right px-3 py-2 font-medium">MCR £</th>}
-                    {isScotland && <th className="text-right px-3 py-2 font-medium">Gross £</th>}
-                    {isScotland && <th className="text-right px-3 py-2 font-medium">Final £</th>}
+                    {(isScotland || isWales) && <th className="text-right px-3 py-2 font-medium">Gross £</th>}
+                    {(isScotland || isWales) && <th className="text-right px-3 py-2 font-medium">Final £</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -767,17 +781,17 @@ function PharmacyProfile() {
                       <tr key={`${r.year}-${r.month}`} className="border-t border-border">
                         <td className="px-3 py-2 whitespace-nowrap">{MONTHS[r.month - 1]} {r.year}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{r.items_dispensed.toLocaleString()}</td>
-                        {!isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.eps_items.toLocaleString()}</td>}
-                        {!isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.eps_nominations.toLocaleString()}</td>}
-                        {!isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.nms_count.toLocaleString()}</td>}
+                        {isEngland && <td className="px-3 py-2 text-right tabular-nums">{r.eps_items.toLocaleString()}</td>}
+                        {isEngland && <td className="px-3 py-2 text-right tabular-nums">{r.eps_nominations.toLocaleString()}</td>}
+                        {isEngland && <td className="px-3 py-2 text-right tabular-nums">{r.nms_count.toLocaleString()}</td>}
                         <td className="px-3 py-2 text-right tabular-nums">{r.pharmacy_first_count.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.pharmacy_first_payment)}</td>
                         {isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.ehc_items.toLocaleString()}</td>}
                         {isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.methadone_items.toLocaleString()}</td>}
                         {isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.smoking_cessation.toLocaleString()}</td>}
                         {isScotland && <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.mcr_payment)}</td>}
-                        {isScotland && <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.gross_cost)}</td>}
-                        {isScotland && <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.final_payment)}</td>}
+                        {(isScotland || isWales) && <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.gross_cost)}</td>}
+                        {(isScotland || isWales) && <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.final_payment)}</td>}
                       </tr>
                     );
                   })}

@@ -2,27 +2,25 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { authorizeHookRequest } from "@/lib/hook-auth.server";
 
-const SOURCE = "HSCNI_BSO";
+const SOURCE = "NWSSP_WALES";
 
 type CkanResource = { id: string; name: string; url: string; format: string; created?: string; last_modified?: string };
 
-// Primary dispensing source on UK gov CKAN (items_dispensed).
-// Supplementary BSO NI datasets on opendata.hscni.net provide NMS and Pharmacy First counts.
-// TODO: confirm dataset IDs at https://opendata.hscni.net — search "community pharmacy".
+// NWSSP (NHS Wales Shared Services Partnership) open data.
+// Primary dispensing data is on data.gov.uk (same CKAN as NI); contractor activity is on the
+// NWSSP open data portal.
+// TODO: verify these dataset IDs — search "nwssp dispensing" at https://ckan.publishing.service.gov.uk
+// and "pharmacy contractor activity" at https://opendata.nwssp.wales.nhs.uk/api/3/action.
 const SOURCES = [
   {
     ckanBase: "https://ckan.publishing.service.gov.uk/api/3/action",
-    dataset: "dispensing-by-contractor",
+    dataset: "dispensing-by-pharmacy-contractor-wales",
     filter: (r: CkanResource) => r.format?.toUpperCase() === "CSV",
   },
   {
-    ckanBase: "https://opendata.hscni.net/api/3/action",
-    dataset: "community-pharmacy-new-medicine-service",
-    filter: (r: CkanResource) => r.format?.toUpperCase() === "CSV",
-  },
-  {
-    ckanBase: "https://opendata.hscni.net/api/3/action",
-    dataset: "community-pharmacy-minor-ailments",
+    // NWSSP open data CKAN — contractor activity (NMS, Pharmacy First, EPS, payments)
+    ckanBase: "https://opendata.nwssp.wales.nhs.uk/api/3/action",
+    dataset: "community-pharmacy-contractor-activity",
     filter: (r: CkanResource) => r.format?.toUpperCase() === "CSV",
   },
 ] as const;
@@ -32,12 +30,23 @@ const MONTH_NAMES: Record<string, number> = {
   july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
 };
 
-function parseYearMonth(name: string, url: string) {
+function parseYearMonth(name: string, url: string, created?: string) {
   const text = (name + " " + url).toLowerCase();
-  const m1 = text.match(/(january|february|march|april|may|june|july|august|september|october|november|december)[ ,-]+(\d{4})/);
-  if (m1) return { year: +m1[2], month: MONTH_NAMES[m1[1]] };
-  const m2 = text.match(/(?<![0-9])(20\d{2})(0[1-9]|1[0-2])(?![0-9])/);
-  if (m2) return { year: +m2[1], month: +m2[2] };
+  const m1 = text.match(/(?<![0-9])(20\d{2})(0[1-9]|1[0-2])(?![0-9])/);
+  if (m1) return { year: +m1[1], month: +m1[2] };
+  const m2 = name.match(/([A-Za-z]+)\s+(\d{4})/);
+  if (m2) {
+    const monthName = m2[1].toLowerCase();
+    const month = MONTH_NAMES[monthName] ??
+      Object.entries(MONTH_NAMES).find(([k]) => k.startsWith(monthName))?.[1];
+    if (month) return { year: +m2[2], month };
+  }
+  const m3 = name.match(/(20\d{2})/) || url.match(/(20\d{2})/);
+  if (m3) return { year: +m3[1], month: null as number | null };
+  if (created) {
+    const d = new Date(created);
+    if (!isNaN(d.getTime())) return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
+  }
   return { year: null as number | null, month: null as number | null };
 }
 
@@ -93,16 +102,16 @@ async function discover() {
     let res: Response;
     try {
       res = await fetch(`${src.ckanBase}/package_show?id=${src.dataset}`);
-      if (!res.ok) { console.warn(`[ingest-ni] CKAN ${src.dataset}: ${res.status}`); continue; }
+      if (!res.ok) { console.warn(`[ingest-wales] CKAN ${src.dataset}: ${res.status}`); continue; }
     } catch {
-      console.warn(`[ingest-ni] Could not reach ${src.ckanBase} for ${src.dataset}`);
+      console.warn(`[ingest-wales] Could not reach ${src.ckanBase} for ${src.dataset}`);
       continue;
     }
     const payload = (await res.json()) as { result?: { resources?: CkanResource[] } };
     const resources = (payload.result?.resources ?? []).filter(src.filter);
     for (const r of resources) {
       if (skip.has(r.url)) continue;
-      const { year, month } = parseYearMonth(r.name, r.url);
+      const { year, month } = parseYearMonth(r.name, r.url, r.created ?? r.last_modified);
       queue.push({ source: SOURCE, dataset: src.dataset, resource_url: r.url, year, month, status: "pending", error: null });
     }
   }
@@ -129,7 +138,9 @@ async function processQueueItem(item: {
       ods_code: string; name: string;
       address: string | null; postcode: string | null; region: string | null;
       year: number; month: number;
-      items: number; nms_count: number; pharmacy_first_count: number; eps_items: number;
+      items: number; eps_items: number; nms_count: number; pharmacy_first_count: number;
+      flu_vaccinations: number; gross_cost: number; final_payment: number;
+      pharmacy_first_payment: number;
     };
     const agg = new Map<string, Agg>();
     let headers: string[] = [];
@@ -154,48 +165,59 @@ async function processQueueItem(item: {
       }
       if (cells.length < 3) return;
 
-      const odsRaw = (cells[find("Chemist", "ContractorCode", "Contractor_Code", "ChemistCode", "PharmacyCode")] ?? "").trim();
-      if (!odsRaw || odsRaw === "0") return;
-      const ods = odsRaw.startsWith("NI") ? odsRaw : `NI${odsRaw}`;
+      const ods = (cells[find("ContractorCode", "Contractor_Code", "PAIDAT_CODE", "PharmacyCode", "GPhCNumber")] ?? "").trim();
+      if (!ods) return;
 
       let year = item.year ?? 0;
       let month = item.month ?? 0;
-      const ys = (cells[find("Year")] ?? "").trim();
-      const ms = (cells[find("Month")] ?? "").trim();
-      const yms = (cells[find("YearMonth", "Year_Month")] ?? "").trim();
-      if (/^\d{4}$/.test(ys)) year = +ys;
-      if (/^\d{1,2}$/.test(ms)) month = +ms;
-      if (/^\d{6}$/.test(yms)) { year = +yms.slice(0, 4); month = +yms.slice(4, 6); }
-      if (!year || !month) return;
+      const yms = (cells[find("YearMonth", "Year_Month", "YEAR_MONTH")] ?? "").trim();
+      const ys = (cells[find("Year", "YEAR")] ?? "").trim();
+      const ms = (cells[find("Month", "MONTH")] ?? "").trim();
+      if (/^\d{4}-\d{2}$/.test(yms)) { year = +yms.slice(0, 4); month = +yms.slice(5, 7); }
+      else if (/^\d{6}$/.test(yms)) { year = +yms.slice(0, 4); month = +yms.slice(4, 6); }
+      else {
+        if (/^\d{4}$/.test(ys)) year = +ys;
+        if (/^\d{1,2}$/.test(ms)) month = +ms;
+      }
+      if (!year) return;
 
-      const items = num(cells[find("NumberOfItems", "NumberofItems", "Items", "ItemCount", "Quantity")]);
-      const nms = num(cells[find("NMSCount", "NMS", "NMSItems", "NewMedicineService", "NewMedicineServiceCount", "NMSConsultations")]);
-      const pf = num(cells[find("PharmacyFirstCount", "PharmacyFirst", "MinorAilmentCount", "MASCount", "PharmacyFirstItems", "PharmacyFirstConsultations", "MASConsultations")]);
-      const eps = num(cells[find("EPSItems", "EPS", "EPSCount", "ElectronicPrescriptionItems", "ElectronicItems", "NumberOfEPSItems")]);
+      const items = num(cells[find("Items", "NumberOfItems", "PrescriptionItems", "TotalItems", "PaidItems")]);
+      const eps = num(cells[find("EPSItems", "EPS_Items", "ElectronicItems", "NumberOfEPSItems", "EPSPrescriptionItems")]);
+      const nms = num(cells[find("NMSItems", "NMSCount", "NMS", "NewMedicineService", "NewMedicineServiceItems", "NMSConsultations")]);
+      const pf = num(cells[find("PharmacyFirstItems", "PharmacyFirstCount", "PF_Items", "PharmacyFirst", "PharmacyFirstConsultations")]);
+      const flu = num(cells[find("FluVaccinations", "FluItems", "InfluenzaItems", "FluAdministered")]);
+      const grossCost = num(cells[find("GrossIngredientCost", "GIC", "GrossCost", "Gross_Cost")]);
+      const finalPay = num(cells[find("FinalPayment", "NetPayment", "TotalPayment", "Final_Payment")]);
+      const pfPay = num(cells[find("PharmacyFirstPayment", "PF_Payment", "PharmacyFirstFee")]);
 
       const key = `${ods}|${year}|${month}`;
       let cur = agg.get(key);
       if (!cur) {
         cur = {
           ods_code: ods,
-          name: (cells[find("ContractorName", "Contractor_Name", "ChemistName", "PharmacyName")] ?? "").trim() || ods,
+          name: (cells[find("ContractorName", "Contractor_Name", "PharmacyName", "CONTRACTOR_NAME")] ?? "").trim() || ods,
           address: [
-            cells[find("ContractorAddressLine1", "Address1", "AddressLine1")],
-            cells[find("ContractorAddressLine2", "Address2", "AddressLine2")],
-            cells[find("ContractorAddressLine3", "Address3", "AddressLine3")],
-            cells[find("ContractorAddressLine4", "Address4", "AddressLine4")],
-          ].map((s) => (s ?? "").trim().replace(/-+$/, "").trim()).filter(Boolean).join(", ") || null,
-          postcode: (cells[find("ContractorPostcode", "Postcode")] ?? "").trim() || null,
-          region: (cells[find("Region", "Area", "CSU", "HSCT", "TrustArea", "HSCTName")] ?? "").trim() || null,
+            cells[find("Address1", "AddressLine1", "ContractorAddressLine1")],
+            cells[find("Address2", "AddressLine2", "ContractorAddressLine2")],
+            cells[find("Address3", "AddressLine3", "ContractorAddressLine3")],
+          ].map((s) => (s ?? "").trim()).filter(Boolean).join(", ") || null,
+          postcode: (cells[find("Postcode", "PostCode", "ContractorPostcode")] ?? "").trim() || null,
+          // Wales uses Local Health Boards (LHBs) instead of ICBs
+          region: (cells[find("LHBName", "LHB_Name", "HealthBoard", "HealthBoardName", "LHB")] ?? "").trim() || null,
           year, month,
-          items: 0, nms_count: 0, pharmacy_first_count: 0, eps_items: 0,
+          items: 0, eps_items: 0, nms_count: 0, pharmacy_first_count: 0,
+          flu_vaccinations: 0, gross_cost: 0, final_payment: 0, pharmacy_first_payment: 0,
         };
         agg.set(key, cur);
       }
       cur.items += items;
+      cur.eps_items += eps;
       cur.nms_count += nms;
       cur.pharmacy_first_count += pf;
-      cur.eps_items += eps;
+      cur.flu_vaccinations += flu;
+      cur.gross_cost += grossCost;
+      cur.final_payment += finalPay;
+      cur.pharmacy_first_payment += pfPay;
     });
 
     if (rowCount <= 1) throw new Error("Empty CSV");
@@ -203,7 +225,7 @@ async function processQueueItem(item: {
     const pharmacies = Array.from(
       new Map(Array.from(agg.values()).map((a) => [a.ods_code, {
         ods_code: a.ods_code, name: a.name,
-        region: a.region, country: "Northern Ireland",
+        region: a.region, country: "Wales",
         address: a.address, postcode: a.postcode,
       }])).values(),
     );
@@ -228,17 +250,21 @@ async function processQueueItem(item: {
         pharmacy_id: idMap.get(a.ods_code)!,
         year: a.year, month: a.month,
         items_dispensed: Math.round(a.items),
+        eps_items: Math.round(a.eps_items),
         nms_count: Math.round(a.nms_count),
         pharmacy_first_count: Math.round(a.pharmacy_first_count),
-        eps_items: Math.round(a.eps_items),
+        flu_vaccinations: Math.round(a.flu_vaccinations),
+        gross_cost: a.gross_cost,
+        final_payment: a.final_payment,
+        pharmacy_first_payment: a.pharmacy_first_payment,
+        is_actual_payment: a.final_payment > 0,
         data_source: SOURCE,
         is_provisional: false,
-        is_actual_payment: false,
       }));
 
-    // Primary dispensing source owns the row; supplementary sources only fill in
-    // metric columns that are zero (ignoreDuplicates prevents overwriting items_dispensed).
-    const isPrimary = item.dataset === "dispensing-by-contractor";
+    // Contractor-activity dataset is authoritative for payment/service counts; dispensing dataset
+    // owns items_dispensed. Supplementary datasets fill gaps without overwriting the primary.
+    const isPrimary = item.dataset === "dispensing-by-pharmacy-contractor-wales";
     let inserted = 0;
     for (let i = 0; i < dispRows.length; i += 500) {
       const slice = dispRows.slice(i, i + 500);
@@ -258,7 +284,7 @@ async function processQueueItem(item: {
     return { inserted };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error(`[ingest-ni] ${item.resource_url}`, msg);
+    console.error(`[ingest-wales] ${item.resource_url}`, msg);
     await supabaseAdmin.from("ingestion_log").insert({
       source: SOURCE, dataset: item.dataset, resource_url: item.resource_url,
       year: item.year, month: item.month, status: "failed", error: msg,
@@ -269,11 +295,9 @@ async function processQueueItem(item: {
   }
 }
 
-// Process dispensing-by-contractor first so items rows exist before supplementary upserts.
 const DATASET_PRIORITY = [
-  "dispensing-by-contractor",
-  "community-pharmacy-new-medicine-service",
-  "community-pharmacy-minor-ailments",
+  "dispensing-by-pharmacy-contractor-wales",
+  "community-pharmacy-contractor-activity",
 ];
 
 async function runBatch(batchSize = 1) {
@@ -289,7 +313,7 @@ async function runBatch(batchSize = 1) {
   return [];
 }
 
-export const Route = createFileRoute("/api/public/hooks/ingest-ni")({
+export const Route = createFileRoute("/api/public/hooks/ingest-wales")({
   server: {
     handlers: {
       POST: async ({ request }) => {
@@ -313,7 +337,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-ni")({
           return Response.json({ ok: true, reingest, reset, queued, processed: results.length, results, pending });
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          console.error("[ingest-ni] fatal", msg);
+          console.error("[ingest-wales] fatal", msg);
           return Response.json({ ok: false, error: msg }, { status: 500 });
         }
       },

@@ -194,7 +194,8 @@ async function processQueueItem(item: {
     type PField =
       | "pharmacy_first_payment" | "pharmacy_first_count" | "mcr_payment" | "ehc_items"
       | "methadone_items" | "smoking_cessation" | "gross_cost" | "final_payment"
-      | "mcr_registrations" | "mcr_items" | "supervised_methadone_doses" | "smoking_cessation_payment";
+      | "mcr_registrations" | "mcr_items" | "supervised_methadone_doses" | "smoking_cessation_payment"
+      | "eps_items";
     const PAYMENT_FIELDS: Record<PField, string[]> = {
       pharmacy_first_payment: ["PFPayment", "PharmacyFirstPayment", "Pharmacy_First_Payment", "PF_Payment", "PharmFirstPayment"],
       pharmacy_first_count: ["PFConsultations", "PFConsultation", "PharmacyFirstConsultations", "PFItems", "PharmacyFirstItems"],
@@ -208,6 +209,9 @@ async function processQueueItem(item: {
       smoking_cessation_payment: ["SmokingCessationPayment", "SC_Payment", "SmokingCessation_Payment"],
       gross_cost: ["GrossIngredientCost", "Gross_Cost", "GIC", "GrossIngCost", "GICTotal"],
       final_payment: ["FinalPayments", "FinalPayment", "Final_Payment", "TotalPayment", "NetPayment", "Total_Net_Payment"],
+      // Scotland uses PIS (Prescribing Information System) for all dispensing — no paper vs EPS split
+      // in published CSVs. If PHS ever adds an explicit column we pick it up; otherwise falls back to items.
+      eps_items: ["EPSItems", "EPS_Items", "ElectronicItems", "ElectronicPrescriptionItems", "NumberOfEPSItems"],
     };
     // PF service breakdown — friendly key → PHS *Consultations columns.
     // PFConsultations is the top-level acute service; PF{IPT,UTI,SIN,SHN,HAY}/BRC/EBC are sub-services.
@@ -228,6 +232,7 @@ async function processQueueItem(item: {
       pharmacy_first_payment: 0, pharmacy_first_count: 0, mcr_payment: 0, ehc_items: 0,
       methadone_items: 0, smoking_cessation: 0, gross_cost: 0, final_payment: 0,
       mcr_registrations: 0, mcr_items: 0, supervised_methadone_doses: 0, smoking_cessation_payment: 0,
+      eps_items: 0,
     });
     const blankPFServices = (): Record<PFService, number> => ({
       acute: 0, uti: 0, impetigo: 0, skin_infection: 0,
@@ -382,6 +387,9 @@ async function processQueueItem(item: {
         year: a.year,
         month: a.month,
         items_dispensed: a.items,
+        // PIS covers all Scottish dispensing electronically; use explicit column if PHS ever adds one,
+        // otherwise treat items_dispensed as the EPS equivalent (accurate for Scotland).
+        eps_items: Math.round(a.payments.eps_items || a.items),
         gross_cost: a.payments.gross_cost,
         pharmacy_first_payment: a.payments.pharmacy_first_payment,
         pharmacy_first_count: Math.round(a.payments.pharmacy_first_count),
