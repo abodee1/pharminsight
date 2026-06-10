@@ -109,19 +109,24 @@ type QItem = {
   total_bytes: number | null; chunk_size: number | null;
   total_chunks: number | null; last_completed_chunk: number;
   leftover_bytes: string; header_line: string | null;
-  status: string;
+  status: string; attempts: number;
 };
 
+const MAX_ATTEMPTS = 3;
+
 async function takeNextChunkable(): Promise<QItem | null> {
+  // Prefer in-progress files so we finish what we started before opening another.
   const { data } = await supabaseAdmin
     .from("ingestion_queue")
-    .select("id, dataset, resource_url, year, month, total_bytes, chunk_size, total_chunks, last_completed_chunk, leftover_bytes, header_line, status")
+    .select("id, dataset, resource_url, year, month, total_bytes, chunk_size, total_chunks, last_completed_chunk, leftover_bytes, header_line, status, attempts")
     .eq("source", SOURCE)
     .in("status", ["pending", "processing"])
     .order("year", { ascending: false, nullsFirst: false })
     .order("month", { ascending: false, nullsFirst: false })
-    .limit(1);
-  return (data?.[0] as QItem | undefined) ?? null;
+    .limit(20);
+  if (!data?.length) return null;
+  const processing = data.find((d) => d.status === "processing");
+  return ((processing ?? data[0]) as QItem | undefined) ?? null;
 }
 
 async function logSuccess(item: QItem, rows: number) {
@@ -135,13 +140,26 @@ async function logSuccess(item: QItem, rows: number) {
 }
 
 async function logFailure(item: QItem, error: string) {
+  const attempts = (item.attempts ?? 0) + 1;
   await supabaseAdmin.from("ingestion_log").insert({
     source: SOURCE, dataset: item.dataset, resource_url: item.resource_url,
-    year: item.year, month: item.month, status: "failed", error,
+    year: item.year, month: item.month, status: "failed",
+    error: `attempt ${attempts}/${MAX_ATTEMPTS}: ${error}`,
   });
-  await supabaseAdmin.from("ingestion_queue")
-    .update({ status: "failed", error, finished_at: new Date().toISOString() })
-    .eq("id", item.id);
+  if (attempts < MAX_ATTEMPTS) {
+    // Idempotent retry: clear chunk progress so the next first-touch deletes
+    // any partial rows for this (year, month) and restarts at chunk 0.
+    await supabaseAdmin.from("ingestion_queue").update({
+      status: "pending", attempts, error,
+      total_bytes: null, chunk_size: null, total_chunks: null,
+      last_completed_chunk: 0, leftover_bytes: "", header_line: null,
+      started_at: null, finished_at: null,
+    }).eq("id", item.id);
+  } else {
+    await supabaseAdmin.from("ingestion_queue")
+      .update({ status: "failed", attempts, error, finished_at: new Date().toISOString() })
+      .eq("id", item.id);
+  }
 }
 
 async function processChunk(item: QItem) {

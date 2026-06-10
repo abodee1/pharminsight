@@ -543,6 +543,7 @@ export type Database = {
       }
       ingestion_queue: {
         Row: {
+          attempts: number
           chunk_size: number | null
           created_at: string
           dataset: string
@@ -562,6 +563,7 @@ export type Database = {
           year: number | null
         }
         Insert: {
+          attempts?: number
           chunk_size?: number | null
           created_at?: string
           dataset: string
@@ -581,6 +583,7 @@ export type Database = {
           year?: number | null
         }
         Update: {
+          attempts?: number
           chunk_size?: number | null
           created_at?: string
           dataset?: string
