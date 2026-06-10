@@ -1,0 +1,554 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { toast } from "sonner";
+import {
+  Database, RefreshCw, ExternalLink, CheckCircle2, AlertTriangle, Clock, Activity,
+  Pill, Stethoscope, Users2, Building2, MapPinned, Loader2,
+} from "lucide-react";
+
+export const Route = createFileRoute("/_authenticated/admin/ingestion")({
+  component: DataIngestionAdmin,
+});
+
+type Cadence = "monthly" | "quarterly";
+type Group = "Pharmacy dispensing" | "GP prescribing" | "GP linkage" | "GP list sizes";
+
+type Dataset = {
+  key: string;
+  label: string;
+  group: Group;
+  country: "Scotland" | "England" | "Northern Ireland" | "Wales" | "UK-wide";
+  source: string;          // ingestion_log.source value
+  hook: string;            // /api/public/hooks/<hook>
+  cadence: Cadence;
+  publisher: string;
+  publisherUrl: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+};
+
+const DATASETS: Dataset[] = [
+  {
+    key: "scot-pharmacy",
+    label: "Scotland — community pharmacy dispensing",
+    group: "Pharmacy dispensing",
+    country: "Scotland",
+    source: "PHS_SCOTLAND",
+    hook: "ingest-scotland",
+    cadence: "monthly",
+    publisher: "Public Health Scotland (opendata.nhs.scot)",
+    publisherUrl: "https://www.opendata.nhs.scot/dataset/prescriptions-in-the-community",
+    description: "Monthly dispenser-level activity, Pharmacy First, MCR, smoking cessation, EHC, methadone supervision and contractor payment files.",
+    icon: Pill,
+  },
+  {
+    key: "england-pharmacy",
+    label: "England — pharmacy & appliance dispensing",
+    group: "Pharmacy dispensing",
+    country: "England",
+    source: "NHSBSA",
+    hook: "ingest-england",
+    cadence: "monthly",
+    publisher: "NHS Business Services Authority (opendata.nhsbsa.net)",
+    publisherUrl: "https://opendata.nhsbsa.net/dataset/pharmacy-and-appliance-contractor-dispensing-data",
+    description: "Monthly contractor-level items dispensed, EPS counts, NMS interventions, Pharmacy First consultations and flu vaccinations.",
+    icon: Pill,
+  },
+  {
+    key: "ni-pharmacy",
+    label: "Northern Ireland — dispensing by contractor",
+    group: "Pharmacy dispensing",
+    country: "Northern Ireland",
+    source: "HSCNI_BSO",
+    hook: "ingest-ni",
+    cadence: "monthly",
+    publisher: "HSC Business Services Organisation (data.gov.uk)",
+    publisherUrl: "https://www.opendatani.gov.uk/@business-services-organisation",
+    description: "Monthly community pharmacy dispensing volumes for Northern Ireland contractors.",
+    icon: Pill,
+  },
+  {
+    key: "scot-gp",
+    label: "Scotland — GP prescribing",
+    group: "GP prescribing",
+    country: "Scotland",
+    source: "NHS_SCOT_GP",
+    hook: "ingest-scotland-gp",
+    cadence: "monthly",
+    publisher: "Public Health Scotland (opendata.nhs.scot)",
+    publisherUrl: "https://www.opendata.nhs.scot/dataset/prescriptions-in-the-community",
+    description: "Monthly prescriber-location and dispenser-location files — items issued by each GP practice.",
+    icon: Stethoscope,
+  },
+  {
+    key: "england-gp",
+    label: "England — GP prescribing (EPD)",
+    group: "GP prescribing",
+    country: "England",
+    source: "NHSBSA_GP",
+    hook: "ingest-england-gp",
+    cadence: "monthly",
+    publisher: "NHS Business Services Authority (EPD / EPD-SNOMED)",
+    publisherUrl: "https://opendata.nhsbsa.net/dataset/english-prescribing-data-epd-snomed",
+    description: "Monthly English Prescribing Dataset — ~1 GB per file, streamed and aggregated per practice.",
+    icon: Stethoscope,
+  },
+  {
+    key: "scot-link",
+    label: "Scotland — GP ↔ pharmacy linkage",
+    group: "GP linkage",
+    country: "Scotland",
+    source: "NHS_SCOT_LINKAGE",
+    hook: "ingest-scotland-gp-linkage",
+    cadence: "quarterly",
+    publisher: "Public Health Scotland (opendata.nhs.scot)",
+    publisherUrl: "https://www.opendata.nhs.scot/dataset/prescribed-dispensed",
+    description: "Quarterly prescriber → dispenser linkage, identifying which pharmacies serve each GP practice.",
+    icon: MapPinned,
+  },
+  {
+    key: "scot-list",
+    label: "Scotland — GP practice list sizes",
+    group: "GP list sizes",
+    country: "Scotland",
+    source: "NHS_SCOT_LISTSIZE",
+    hook: "ingest-scotland-gp-listsize",
+    cadence: "quarterly",
+    publisher: "Public Health Scotland (opendata.nhs.scot)",
+    publisherUrl: "https://www.opendata.nhs.scot/dataset/gp-practice-populations",
+    description: "Quarterly registered patient counts by GP practice (Scotland).",
+    icon: Users2,
+  },
+  {
+    key: "england-list",
+    label: "England — GP practice list sizes",
+    group: "GP list sizes",
+    country: "England",
+    source: "NHSBSA_LISTSIZE",
+    hook: "ingest-england-gp-listsize",
+    cadence: "quarterly",
+    publisher: "NHS Digital — Patients Registered at a GP Practice",
+    publisherUrl: "https://digital.nhs.uk/data-and-information/publications/statistical/patients-registered-at-a-gp-practice",
+    description: "Quarterly registered patient counts by GP practice (England), plus the epraccur directory of active practices.",
+    icon: Building2,
+  },
+];
+
+type LogRow = {
+  source: string;
+  status: string;
+  year: number | null;
+  month: number | null;
+  rows_ingested: number | null;
+  error: string | null;
+  created_at: string;
+};
+type QueueRow = {
+  source: string;
+  status: string;
+  year: number | null;
+  month: number | null;
+};
+type Stats = {
+  latestSuccess: LogRow | null;
+  latestFailure: LogRow | null;
+  successes30d: number;
+  failures30d: number;
+  totalRecords30d: number;
+  pendingQueue: number;
+  coveragePct: number; // 0–100 over last 36 months for monthly / 12 quarters for quarterly
+};
+
+function pad(n: number) { return String(n).padStart(2, "0"); }
+function periodLabel(y: number | null, m: number | null) {
+  if (!y || !m) return "—";
+  return `${y}-${pad(m)}`;
+}
+function timeAgo(ts: string | null | undefined) {
+  if (!ts) return "—";
+  const d = new Date(ts).getTime();
+  const mins = Math.floor((Date.now() - d) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const h = Math.floor(mins / 60);
+  if (h < 24) return `${h}h ago`;
+  const days = Math.floor(h / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+}
+
+function StatusBadge({ status }: { status: string | null | undefined }) {
+  if (!status) return <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">—</span>;
+  const map: Record<string, { cls: string; label: string; Icon: any }> = {
+    success: { cls: "bg-emerald-50 text-emerald-800 border-emerald-200", label: "Healthy", Icon: CheckCircle2 },
+    failed: { cls: "bg-rose-50 text-rose-800 border-rose-200", label: "Failing", Icon: AlertTriangle },
+    pending: { cls: "bg-amber-50 text-amber-800 border-amber-200", label: "Pending", Icon: Clock },
+    processing: { cls: "bg-sky-50 text-sky-800 border-sky-200", label: "Processing", Icon: Activity },
+    skipped: { cls: "bg-secondary text-muted-foreground border-border", label: "Skipped", Icon: Clock },
+  };
+  const m = map[status] ?? { cls: "bg-secondary text-muted-foreground border-border", label: status, Icon: Clock };
+  const I = m.Icon;
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium border rounded-full px-2 py-0.5 ${m.cls}`}>
+      <I className="h-3 w-3" /> {m.label}
+    </span>
+  );
+}
+
+function DatasetCard({ ds, stats, onRun, running }: {
+  ds: Dataset;
+  stats: Stats;
+  onRun: () => void;
+  running: boolean;
+}) {
+  const Icon = ds.icon;
+  const lastSuccess = stats.latestSuccess;
+  const lastFailure = stats.latestFailure;
+  const overallStatus = lastFailure && (!lastSuccess || new Date(lastFailure.created_at) > new Date(lastSuccess.created_at))
+    ? "failed"
+    : lastSuccess ? "success" : "pending";
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="rounded-md bg-secondary p-2 shrink-0">
+              <Icon className="h-5 w-5 text-foreground" />
+            </div>
+            <div className="min-w-0">
+              <CardTitle className="text-base leading-tight truncate">{ds.label}</CardTitle>
+              <CardDescription className="text-xs mt-0.5">
+                {ds.country} · {ds.cadence} · {ds.publisher}
+              </CardDescription>
+            </div>
+          </div>
+          <StatusBadge status={overallStatus} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p className="text-muted-foreground text-xs leading-relaxed">{ds.description}</p>
+
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Latest ingested period</p>
+            <p className="font-medium tabular-nums">{periodLabel(lastSuccess?.year ?? null, lastSuccess?.month ?? null)}</p>
+            <p className="text-[10px] text-muted-foreground">{timeAgo(lastSuccess?.created_at)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Coverage (recent window)</p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
+                <div className="h-full bg-emerald-500" style={{ width: `${stats.coveragePct}%` }} />
+              </div>
+              <span className="text-xs tabular-nums">{stats.coveragePct}%</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 pt-1 text-xs">
+          <Stat label="30d runs OK" value={stats.successes30d} tone={stats.successes30d > 0 ? "good" : "neutral"} />
+          <Stat label="30d failures" value={stats.failures30d} tone={stats.failures30d > 0 ? "bad" : "good"} />
+          <Stat label="Records (30d)" value={stats.totalRecords30d.toLocaleString()} />
+        </div>
+
+        {stats.pendingQueue > 0 && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-900 text-xs px-3 py-2">
+            <Clock className="inline h-3.5 w-3.5 mr-1" /> {stats.pendingQueue} item{stats.pendingQueue === 1 ? "" : "s"} queued and waiting to be processed.
+          </div>
+        )}
+
+        {lastFailure && (!lastSuccess || new Date(lastFailure.created_at) > new Date(lastSuccess.created_at)) && (
+          <div className="rounded-md border border-rose-200 bg-rose-50 text-rose-900 text-xs px-3 py-2">
+            <AlertTriangle className="inline h-3.5 w-3.5 mr-1" />
+            Last attempt failed{lastFailure.error ? `: ${lastFailure.error.slice(0, 140)}` : ""}
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 pt-2">
+          <Button size="sm" onClick={onRun} disabled={running}>
+            {running ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Running…</> : <><RefreshCw className="h-3.5 w-3.5" /> Run now</>}
+          </Button>
+          <a
+            href={ds.publisherUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+          >
+            Source <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function Stat({ label, value, tone = "neutral" }: { label: string; value: string | number; tone?: "good" | "bad" | "neutral" }) {
+  const cls = tone === "good" ? "text-emerald-700" : tone === "bad" ? "text-rose-700" : "text-foreground";
+  return (
+    <div className="rounded-md border border-border p-2">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={`text-sm font-semibold tabular-nums ${cls}`}>{value}</p>
+    </div>
+  );
+}
+
+function expectedPeriods(cadence: Cadence): Array<{ y: number; m: number }> {
+  // monthly: last 36 months ending last month; quarterly: last 12 quarters (mar/jun/sep/dec)
+  const out: Array<{ y: number; m: number }> = [];
+  const now = new Date();
+  if (cadence === "monthly") {
+    for (let i = 1; i <= 36; i++) {
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+      out.push({ y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 });
+    }
+  } else {
+    for (let i = 1; i <= 12; i++) {
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i * 3, 1));
+      const m = [3, 6, 9, 12].reduce((p, c) => (Math.abs(c - (d.getUTCMonth() + 1)) < Math.abs(p - (d.getUTCMonth() + 1)) ? c : p), 3);
+      out.push({ y: d.getUTCFullYear(), m });
+    }
+  }
+  return out;
+}
+
+function DataIngestionAdmin() {
+  const [logs, setLogs] = useState<LogRow[]>([]);
+  const [queue, setQueue] = useState<QueueRow[]>([]);
+  const [running, setRunning] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
+  const [recentEvents, setRecentEvents] = useState<LogRow[]>([]);
+
+  const refresh = async () => {
+    setLoading(true);
+    const sources = DATASETS.map((d) => d.source);
+    const [{ data: lg }, { data: q }, { data: recent }] = await Promise.all([
+      supabase
+        .from("ingestion_log")
+        .select("source,status,year,month,rows_ingested,error,created_at")
+        .in("source", sources)
+        .gte("created_at", new Date(Date.now() - 90 * 86400000).toISOString())
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      supabase
+        .from("ingestion_queue")
+        .select("source,status,year,month")
+        .in("source", sources)
+        .limit(2000),
+      supabase
+        .from("ingestion_log")
+        .select("source,status,year,month,rows_ingested,error,created_at")
+        .in("source", sources)
+        .order("created_at", { ascending: false })
+        .limit(40),
+    ]);
+    setLogs((lg as LogRow[]) ?? []);
+    setQueue((q as QueueRow[]) ?? []);
+    setRecentEvents((recent as LogRow[]) ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => { refresh(); }, []);
+
+  const statsBySource = useMemo(() => {
+    const out: Record<string, Stats> = {};
+    const cutoff30 = Date.now() - 30 * 86400000;
+    for (const ds of DATASETS) {
+      const mine = logs.filter((l) => l.source === ds.source);
+      const successes = mine.filter((l) => l.status === "success");
+      const failures = mine.filter((l) => l.status === "failed");
+      const last30 = mine.filter((l) => new Date(l.created_at).getTime() >= cutoff30);
+      const pending = queue.filter((qq) => qq.source === ds.source && (qq.status === "pending" || qq.status === "processing")).length;
+
+      const exp = expectedPeriods(ds.cadence);
+      const ingestedKey = new Set(successes.map((s) => `${s.year}-${s.month}`));
+      const covered = exp.filter((p) => ingestedKey.has(`${p.y}-${p.m}`)).length;
+      const coveragePct = Math.round((covered / exp.length) * 100);
+
+      out[ds.source] = {
+        latestSuccess: successes[0] ?? null,
+        latestFailure: failures[0] ?? null,
+        successes30d: last30.filter((l) => l.status === "success").length,
+        failures30d: last30.filter((l) => l.status === "failed").length,
+        totalRecords30d: last30.reduce((s, l) => s + (l.rows_ingested ?? 0), 0),
+        pendingQueue: pending,
+        coveragePct,
+      };
+    }
+    return out;
+  }, [logs, queue]);
+
+  const portfolio = useMemo(() => {
+    const totals = Object.values(statsBySource);
+    const healthy = totals.filter((s) => s.latestSuccess && (!s.latestFailure || new Date(s.latestSuccess.created_at) >= new Date(s.latestFailure.created_at))).length;
+    const failing = totals.length - healthy;
+    const queued = totals.reduce((s, x) => s + x.pendingQueue, 0);
+    const records30 = totals.reduce((s, x) => s + x.totalRecords30d, 0);
+    return { total: totals.length, healthy, failing, queued, records30 };
+  }, [statsBySource]);
+
+  const triggerHook = async (ds: Dataset) => {
+    setRunning((s) => ({ ...s, [ds.source]: true }));
+    toast.info(`Triggering ${ds.label}…`);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      const res = await fetch(`/api/public/hooks/${ds.hook}`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`);
+      toast.success(`${ds.label}: queued ${j.queued ?? 0}, processed ${j.processed ?? 0}`);
+      await refresh();
+    } catch (e: any) {
+      toast.error(`${ds.label} failed: ${e?.message ?? e}`);
+    } finally {
+      setRunning((s) => ({ ...s, [ds.source]: false }));
+    }
+  };
+
+  const groups: Group[] = ["Pharmacy dispensing", "GP prescribing", "GP linkage", "GP list sizes"];
+
+  return (
+    <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Database className="h-6 w-6 text-gold" /> Data Ingestion
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            All NHS open datasets we ingest and keep up to date. Internal use — not visible to public users.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Refresh
+          </Button>
+          <Link to="/admin/gp-data" className="text-xs underline text-muted-foreground hover:text-foreground">
+            GP-data coverage grid
+          </Link>
+          <Link to="/admin/payments-import" className="text-xs underline text-muted-foreground hover:text-foreground">
+            Manual payments import
+          </Link>
+        </div>
+      </div>
+
+      {/* Portfolio summary */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <PortStat label="Datasets" value={portfolio.total} />
+        <PortStat label="Healthy" value={portfolio.healthy} tone="good" />
+        <PortStat label="Failing / stale" value={portfolio.failing} tone={portfolio.failing > 0 ? "bad" : "neutral"} />
+        <PortStat label="Queued items" value={portfolio.queued} />
+        <PortStat label="Records (30d)" value={portfolio.records30.toLocaleString()} />
+      </div>
+
+      <Tabs defaultValue="all" className="w-full">
+        <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="all">All ({DATASETS.length})</TabsTrigger>
+          {groups.map((g) => (
+            <TabsTrigger key={g} value={g}>{g} ({DATASETS.filter((d) => d.group === g).length})</TabsTrigger>
+          ))}
+          <TabsTrigger value="activity">Recent activity</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="mt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {DATASETS.map((ds) => (
+              <DatasetCard
+                key={ds.key}
+                ds={ds}
+                stats={statsBySource[ds.source] ?? emptyStats()}
+                onRun={() => triggerHook(ds)}
+                running={!!running[ds.source]}
+              />
+            ))}
+          </div>
+        </TabsContent>
+
+        {groups.map((g) => (
+          <TabsContent key={g} value={g} className="mt-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {DATASETS.filter((d) => d.group === g).map((ds) => (
+                <DatasetCard
+                  key={ds.key}
+                  ds={ds}
+                  stats={statsBySource[ds.source] ?? emptyStats()}
+                  onRun={() => triggerHook(ds)}
+                  running={!!running[ds.source]}
+                />
+              ))}
+            </div>
+          </TabsContent>
+        ))}
+
+        <TabsContent value="activity" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Recent ingestion events</CardTitle>
+              <CardDescription>Most recent 40 attempts across all datasets.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>When</TableHead>
+                    <TableHead>Dataset</TableHead>
+                    <TableHead>Period</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Records</TableHead>
+                    <TableHead>Note</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recentEvents.map((e, i) => {
+                    const ds = DATASETS.find((d) => d.source === e.source);
+                    return (
+                      <TableRow key={i}>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                          {new Date(e.created_at).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-xs">{ds?.label ?? e.source}</TableCell>
+                        <TableCell className="text-xs tabular-nums">{periodLabel(e.year, e.month)}</TableCell>
+                        <TableCell><StatusBadge status={e.status} /></TableCell>
+                        <TableCell className="text-xs text-right tabular-nums">{e.rows_ingested?.toLocaleString() ?? "—"}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[24rem] truncate">{e.error ?? ""}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {recentEvents.length === 0 && (
+                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground text-sm py-6">No events recorded.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function PortStat({ label, value, tone = "neutral" }: { label: string; value: string | number; tone?: "good" | "bad" | "neutral" }) {
+  const cls = tone === "good" ? "text-emerald-700" : tone === "bad" ? "text-rose-700" : "text-foreground";
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={`text-2xl font-bold tabular-nums mt-1 ${cls}`}>{value}</p>
+    </div>
+  );
+}
+
+function emptyStats(): Stats {
+  return {
+    latestSuccess: null, latestFailure: null,
+    successes30d: 0, failures30d: 0, totalRecords30d: 0,
+    pendingQueue: 0, coveragePct: 0,
+  };
+}
