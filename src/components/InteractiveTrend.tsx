@@ -122,6 +122,24 @@ export function InteractiveTrend({
     return { points: pts, perMetric };
   }, [rows, activeMetrics, win]);
 
+  // PF £ companion — total + latest remuneration paired with the PF count tile.
+  const pfPaymentInfo = useMemo(() => {
+    if (!activeMetrics.includes("pf")) return null;
+    let lastIdx = -1;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if ((rows[i].pharmacy_first_count || 0) > 0) { lastIdx = i; break; }
+    }
+    const trimmed = lastIdx >= 0 ? rows.slice(0, lastIdx + 1) : rows;
+    const sliced = trimmed.slice(-Number(win));
+    let total = 0; let latest = 0;
+    for (let i = 0; i < sliced.length; i++) {
+      const v = Number(sliced[i].pharmacy_first_payment) || 0;
+      total += v;
+      if (v > 0) latest = v;
+    }
+    return { total, latest };
+  }, [rows, activeMetrics, win]);
+
   // Need normalisation when mixing very different scales (e.g. Items + Final £)
   // Use a dual y-axis if mixing £ metrics with count metrics
   const hasMoney = activeMetrics.some((k) => k === "gross" || k === "final");
@@ -181,6 +199,11 @@ export function InteractiveTrend({
             <div key={k} className="rounded-md border border-border bg-secondary/30 px-2 py-1.5" style={{ borderLeft: `3px solid ${m.color}` }}>
               <p className="text-[9px] uppercase tracking-wider text-muted-foreground truncate">{m.short} · latest</p>
               <p className="text-sm font-bold tabular-nums leading-tight">{m.format(pm.latest)}</p>
+              {k === "pf" && pfPaymentInfo && (
+                <p className="text-[10px] font-semibold tabular-nums text-emerald-700 leading-tight">
+                  {fmtGbpCompact(pfPaymentInfo.latest)} paid
+                </p>
+              )}
               <p className={`text-[10px] font-semibold inline-flex items-center gap-0.5 ${tone}`}>
                 <Trend className="h-3 w-3" />
                 {pm.delta >= 0 ? "+" : ""}{pm.delta.toFixed(1)}%
