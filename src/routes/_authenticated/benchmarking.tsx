@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
 import { PercentileRail, GpPrescribingCard } from "@/components/Infographics";
+import { PharmacySearch } from "@/components/PharmacySearch";
+import { CountryBadge } from "@/components/CountryBadge";
 
 export const Route = createFileRoute("/_authenticated/benchmarking")({ component: Benchmarking });
 
@@ -74,6 +76,7 @@ function metricValue(m: MetricDef, row: any): number {
 function Benchmarking() {
   const { user } = useAuth();
   const [pharmacy, setPharmacy] = useState<any>(null);
+  const [pharmacyOverride, setPharmacyOverride] = useState<any>(null);
   const [myHistory, setMyHistory] = useState<any[]>([]);
   const [regionPharms, setRegionPharms] = useState<any[]>([]);
   const [countryPharms, setCountryPharms] = useState<any[]>([]);
@@ -81,8 +84,9 @@ function Benchmarking() {
   const [snapshots, setSnapshots] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
-  // Load pharmacy & cohorts
+  // Load default pharmacy from user_pharmacy (only if no override is active)
   useEffect(() => {
+    if (pharmacyOverride) return;
     (async () => {
       if (!user) return;
       const { data: up } = await supabase
@@ -99,33 +103,55 @@ function Benchmarking() {
         .select("*")
         .eq("id", up.pharmacy_id)
         .maybeSingle();
-      if (!ph) {
-        setLoading(false);
-        return;
-      }
-      setPharmacy(ph);
+      if (ph) setPharmacy(ph);
+      else setLoading(false);
+    })();
+  }, [user, pharmacyOverride]);
 
+  // When override is set, load its full pharmacy row
+  useEffect(() => {
+    if (!pharmacyOverride) return;
+    (async () => {
+      const { data: ph } = await supabase
+        .from("pharmacies")
+        .select("*")
+        .eq("id", pharmacyOverride.id)
+        .maybeSingle();
+      if (ph) setPharmacy(ph);
+    })();
+  }, [pharmacyOverride]);
+
+  // When the active pharmacy changes, load cohorts + history
+  useEffect(() => {
+    if (!pharmacy) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setSnapshots({});
       const country = await fetchAll<any>((from, to) =>
         supabase
           .from("pharmacies")
           .select("id,name,region,country")
-          .eq("country", ph.country ?? "")
+          .eq("country", pharmacy.country ?? "")
           .range(from, to),
       );
+      if (cancelled) return;
       setCountryPharms(country);
-      setRegionPharms(country.filter((p) => p.region === ph.region));
+      setRegionPharms(country.filter((p) => p.region === pharmacy.region));
 
-      // 12-month history for user pharmacy
       const { data: hist } = await supabase
         .from("dispensing_data")
         .select("*")
-        .eq("pharmacy_id", ph.id)
+        .eq("pharmacy_id", pharmacy.id)
         .order("year", { ascending: false })
         .order("month", { ascending: false })
         .limit(24);
-      setMyHistory(hist ?? []);
+      if (!cancelled) setMyHistory(hist ?? []);
     })();
-  }, [user]);
+    return () => {
+      cancelled = true;
+    };
+  }, [pharmacy]);
 
   // Once we have the user history + cohorts, pick a target month per metric (latest where user > 0)
   // and fetch country-wide rows for that month. Months are deduped to minimise queries.
