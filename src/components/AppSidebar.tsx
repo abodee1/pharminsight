@@ -10,7 +10,7 @@ import {
   LogOut,
   Bookmark,
   Stethoscope,
-  Database,
+  
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { PharmacySearch } from "./PharmacySearch";
