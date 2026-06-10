@@ -18,7 +18,12 @@ import {
   PieChart, Pie, Cell,
 } from "recharts";
 
-export const Route = createFileRoute("/_authenticated/compare")({ component: Compare });
+export const Route = createFileRoute("/_authenticated/compare")({
+  component: Compare,
+  validateSearch: (s: Record<string, unknown>) => ({
+    add: typeof s.add === "string" ? s.add : undefined,
+  }),
+});
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -194,6 +199,8 @@ const MAX_SELECT = 4;
 
 function Compare() {
   const { user } = useAuth();
+  const { add: addOds } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const [pharms, setPharms] = useState<Pharm[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -218,6 +225,29 @@ function Compare() {
       }
     })();
   }, [user]);
+
+  // Quick-add from Local Landscape: ?add=<ods_code>
+  useEffect(() => {
+    if (!addOds) return;
+    (async () => {
+      const { data: ph } = await supabase
+        .from("pharmacies")
+        .select("id,name,region,country,postcode,lat,lng")
+        .eq("ods_code", addOds)
+        .maybeSingle();
+      if (ph) {
+        setPharms((cur) => (cur.some((x) => x.id === ph.id) ? cur : [...cur, ph as Pharm]));
+        setSelected((cur) => {
+          if (cur.includes(ph.id)) return cur;
+          if (cur.length >= MAX_SELECT) return cur;
+          return [...cur, ph.id];
+        });
+      }
+      // Clear the param so a refresh doesn't re-add.
+      navigate({ search: { add: undefined }, replace: true });
+    })();
+  }, [addOds, navigate]);
+
 
   // Fetch dispensing data only for the selected pharmacies (last 24 months).
   useEffect(() => {
