@@ -324,7 +324,7 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
   );
 }
 
-function Tile({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Tile({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
   return (
     <div className={[
       "rounded-md border px-2.5 py-2",
@@ -332,6 +332,7 @@ function Tile({ label, value, accent }: { label: string; value: string; accent?:
     ].join(" ")}>
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className="font-semibold tabular-nums">{value}</p>
+      {sub && <p className="text-[10px] tabular-nums text-emerald-700 mt-0.5">{sub}</p>}
     </div>
   );
 }
