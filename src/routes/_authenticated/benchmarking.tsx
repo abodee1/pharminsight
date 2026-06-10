@@ -270,15 +270,44 @@ function Benchmarking() {
     <div className="p-6 md:p-10 max-w-7xl mx-auto">
       <PageHeader
         title="Benchmarking"
-        subtitle="How your pharmacy compares against local and national peers across volume, services, revenue and efficiency."
+        subtitle="How any pharmacy compares against local and national peers across volume, services, revenue and efficiency."
       />
+
+      {/* Pharmacy switcher — benchmark any pharmacy, not just your own */}
+      <div className="rounded-lg bg-card border border-border p-4 shadow-sm mb-6">
+        <div className="flex flex-col md:flex-row md:items-center gap-3">
+          <div className="md:w-[420px] shrink-0">
+            <PharmacySearch
+              placeholder="Search any pharmacy by name, postcode or ODS code…"
+              clearOnSelect
+              onSelect={(p) => setPharmacyOverride(p)}
+            />
+          </div>
+          {pharmacy && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+              <span>Benchmarking</span>
+              <span className="font-semibold text-foreground">{pharmacy.name}</span>
+              <CountryBadge country={pharmacy.country} />
+              {pharmacyOverride && (
+                <button
+                  type="button"
+                  onClick={() => { setPharmacyOverride(null); setPharmacy(null); }}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Reset to my pharmacy
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
       {!pharmacy && !loading && (
         <div className="rounded-lg border border-border bg-card p-6 shadow-sm text-sm">
-          You need to set your pharmacy first.{" "}
+          Search a pharmacy above, or{" "}
           <Link to="/settings" className="text-primary font-semibold hover:underline">
-            Go to Settings
-          </Link>
+            set your default in Settings
+          </Link>.
         </div>
       )}
 
