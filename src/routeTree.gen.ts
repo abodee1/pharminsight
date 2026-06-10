@@ -26,7 +26,6 @@ import { Route as AuthenticatedGpSurgeriesCodeRouteImport } from './routes/_auth
 import { Route as AuthenticatedAdminPaymentsImportRouteImport } from './routes/_authenticated/admin.payments-import'
 import { Route as AuthenticatedAdminIngestionRouteImport } from './routes/_authenticated/admin.ingestion'
 import { Route as AuthenticatedAdminGpDataRouteImport } from './routes/_authenticated/admin.gp-data'
-import { Route as AuthenticatedAdminDataIngestionRouteImport } from './routes/_authenticated/admin.data-ingestion'
 import { Route as AuthenticatedAcquisitionOdsCodeRouteImport } from './routes/_authenticated/acquisition.$odsCode'
 import { Route as ApiPublicIngestPharmacyPaymentsRouteImport } from './routes/api/public/ingest.pharmacy-payments'
 import { Route as ApiPublicHooksIngestScotlandGpListsizeRouteImport } from './routes/api/public/hooks/ingest-scotland-gp-listsize'
@@ -130,12 +129,6 @@ const AuthenticatedAdminGpDataRoute =
     path: '/admin/gp-data',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAdminDataIngestionRoute =
-  AuthenticatedAdminDataIngestionRouteImport.update({
-    id: '/admin/data-ingestion',
-    path: '/admin/data-ingestion',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
 const AuthenticatedAcquisitionOdsCodeRoute =
   AuthenticatedAcquisitionOdsCodeRouteImport.update({
     id: '/acquisition/$odsCode',
@@ -216,7 +209,6 @@ export interface FileRoutesByFullPath {
   '/upload': typeof AuthenticatedUploadRoute
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/acquisition/$odsCode': typeof AuthenticatedAcquisitionOdsCodeRoute
-  '/admin/data-ingestion': typeof AuthenticatedAdminDataIngestionRoute
   '/admin/gp-data': typeof AuthenticatedAdminGpDataRoute
   '/admin/ingestion': typeof AuthenticatedAdminIngestionRoute
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
@@ -246,7 +238,6 @@ export interface FileRoutesByTo {
   '/upload': typeof AuthenticatedUploadRoute
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/acquisition/$odsCode': typeof AuthenticatedAcquisitionOdsCodeRoute
-  '/admin/data-ingestion': typeof AuthenticatedAdminDataIngestionRoute
   '/admin/gp-data': typeof AuthenticatedAdminGpDataRoute
   '/admin/ingestion': typeof AuthenticatedAdminIngestionRoute
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
@@ -278,7 +269,6 @@ export interface FileRoutesById {
   '/_authenticated/upload': typeof AuthenticatedUploadRoute
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/_authenticated/acquisition/$odsCode': typeof AuthenticatedAcquisitionOdsCodeRoute
-  '/_authenticated/admin/data-ingestion': typeof AuthenticatedAdminDataIngestionRoute
   '/_authenticated/admin/gp-data': typeof AuthenticatedAdminGpDataRoute
   '/_authenticated/admin/ingestion': typeof AuthenticatedAdminIngestionRoute
   '/_authenticated/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
@@ -310,7 +300,6 @@ export interface FileRouteTypes {
     | '/upload'
     | '/pharmacy/$odsCode'
     | '/acquisition/$odsCode'
-    | '/admin/data-ingestion'
     | '/admin/gp-data'
     | '/admin/ingestion'
     | '/admin/payments-import'
@@ -340,7 +329,6 @@ export interface FileRouteTypes {
     | '/upload'
     | '/pharmacy/$odsCode'
     | '/acquisition/$odsCode'
-    | '/admin/data-ingestion'
     | '/admin/gp-data'
     | '/admin/ingestion'
     | '/admin/payments-import'
@@ -371,7 +359,6 @@ export interface FileRouteTypes {
     | '/_authenticated/upload'
     | '/pharmacy/$odsCode'
     | '/_authenticated/acquisition/$odsCode'
-    | '/_authenticated/admin/data-ingestion'
     | '/_authenticated/admin/gp-data'
     | '/_authenticated/admin/ingestion'
     | '/_authenticated/admin/payments-import'
@@ -527,13 +514,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminGpDataRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/data-ingestion': {
-      id: '/_authenticated/admin/data-ingestion'
-      path: '/admin/data-ingestion'
-      fullPath: '/admin/data-ingestion'
-      preLoaderRoute: typeof AuthenticatedAdminDataIngestionRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/acquisition/$odsCode': {
       id: '/_authenticated/acquisition/$odsCode'
       path: '/acquisition/$odsCode'
@@ -638,7 +618,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedUploadRoute: typeof AuthenticatedUploadRoute
   AuthenticatedAcquisitionOdsCodeRoute: typeof AuthenticatedAcquisitionOdsCodeRoute
-  AuthenticatedAdminDataIngestionRoute: typeof AuthenticatedAdminDataIngestionRoute
   AuthenticatedAdminGpDataRoute: typeof AuthenticatedAdminGpDataRoute
   AuthenticatedAdminIngestionRoute: typeof AuthenticatedAdminIngestionRoute
   AuthenticatedAdminPaymentsImportRoute: typeof AuthenticatedAdminPaymentsImportRoute
@@ -654,7 +633,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedUploadRoute: AuthenticatedUploadRoute,
   AuthenticatedAcquisitionOdsCodeRoute: AuthenticatedAcquisitionOdsCodeRoute,
-  AuthenticatedAdminDataIngestionRoute: AuthenticatedAdminDataIngestionRoute,
   AuthenticatedAdminGpDataRoute: AuthenticatedAdminGpDataRoute,
   AuthenticatedAdminIngestionRoute: AuthenticatedAdminIngestionRoute,
   AuthenticatedAdminPaymentsImportRoute: AuthenticatedAdminPaymentsImportRoute,
@@ -687,3 +665,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
