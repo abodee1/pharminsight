@@ -202,7 +202,7 @@ export function GpFeederOverlap({
     return (
       <div className="rounded-xl bg-card border border-border p-6 shadow-sm mb-6">
         <h2 className="text-sm font-semibold mb-1">GP feeder overlap</h2>
-        <p className="text-xs text-muted-foreground">No GP prescribing linkage data for the selected pharmacies in the {monthsWindow last {monthsWindow} monthslast {monthsWindow} months monthsWindow > 0 ? `last ${monthsWindow} months` : "all available history"}. (Available where NHSBSA practice-level data is published.)</p>
+        <p className="text-xs text-muted-foreground">No GP prescribing linkage data for the selected pharmacies in the {monthsWindow && monthsWindow > 0 ? `last ${monthsWindow} months` : "available history"}. (Available where NHSBSA practice-level data is published.)</p>
       </div>
     );
   }
