@@ -67,6 +67,7 @@ export function TrendCard({
   primaryLabel = "You",
   options = PERIOD_OPTIONS,
   height = 220,
+  altSeries,
 }: {
   title: string;
   subtitle?: string;
@@ -79,13 +80,33 @@ export function TrendCard({
   primaryLabel?: string;
   options?: PeriodWindow[];
   height?: number;
+  /** Optional second-unit toggle (e.g. £ remuneration alongside a count series).
+   *  Same length & order as `points`. When provided, a small unit selector
+   *  appears next to the period pills and swaps the displayed series. */
+  altSeries?: {
+    primaryUnitLabel: string;   // e.g. "#"
+    altUnitLabel: string;       // e.g. "£"
+    altValues: number[];        // aligned with points
+    altFormat?: (n: number) => string;
+    altTitleSuffix?: string;    // appended to subtitle when alt is active
+  };
 }) {
-  const sliced = points.slice(-window);
+  const [unit, setUnit] = useState<"primary" | "alt">("primary");
+  const activeFormat = unit === "alt" && altSeries?.altFormat ? altSeries.altFormat : formatValue;
 
-  // Trailing zero handling — many NHS metrics (Pharmacy First, NMS, MCR)
-  // are published with a lag, so the most recent months arrive as 0 before
-  // the real figure lands. Treat trailing zeros as "not reported yet" so
-  // the headline, delta and line don't get dragged to zero.
+  const seriesPoints = useMemo(() => {
+    if (unit === "alt" && altSeries) {
+      return points.map((p, i) => ({
+        label: p.label,
+        value: altSeries.altValues[i] ?? 0,
+        comparison: undefined as number | undefined,
+      }));
+    }
+    return points;
+  }, [points, unit, altSeries]);
+
+  const sliced = seriesPoints.slice(-window);
+
   let lastReportedIdx = -1;
   for (let i = sliced.length - 1; i >= 0; i--) {
     if ((sliced[i]?.value ?? 0) > 0) { lastReportedIdx = i; break; }
@@ -103,9 +124,6 @@ export function TrendCard({
   const trailingLag = hasData && lastReportedIdx < sliced.length - 1;
   const latestLabel = hasData ? sliced[lastReportedIdx].label : null;
 
-  // For the chart: convert trailing zeros to null so the line stops at the
-  // last reported month instead of crashing to the x-axis. Same for the
-  // comparison series independently.
   let cmpLastIdx = -1;
   for (let i = sliced.length - 1; i >= 0; i--) {
     if ((sliced[i]?.comparison ?? 0) > 0) { cmpLastIdx = i; break; }
@@ -118,16 +136,48 @@ export function TrendCard({
 
   return (
     <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3 mb-3">
+      <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold tracking-tight truncate">{title}</h3>
-          {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
+          {subtitle && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {subtitle}{unit === "alt" && altSeries?.altTitleSuffix ? ` · ${altSeries.altTitleSuffix}` : ""}
+            </p>
+          )}
         </div>
-        <PeriodPills value={window} onChange={onWindowChange} options={options} />
+        <div className="flex items-center gap-2 flex-wrap">
+          {altSeries && (
+            <div className="inline-flex items-center rounded-md border border-border bg-secondary/40 p-0.5">
+              <button
+                type="button"
+                onClick={() => setUnit("primary")}
+                className={[
+                  "px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+                  unit === "primary" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+                aria-pressed={unit === "primary"}
+              >
+                {altSeries.primaryUnitLabel}
+              </button>
+              <button
+                type="button"
+                onClick={() => setUnit("alt")}
+                className={[
+                  "px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+                  unit === "alt" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+                aria-pressed={unit === "alt"}
+              >
+                {altSeries.altUnitLabel}
+              </button>
+            </div>
+          )}
+          <PeriodPills value={window} onChange={onWindowChange} options={options} />
+        </div>
       </div>
 
       <div className="flex items-baseline justify-between gap-3 mb-2">
-        <p className="text-2xl font-semibold tabular-nums">{formatValue(latest)}</p>
+        <p className="text-2xl font-semibold tabular-nums">{activeFormat(latest)}</p>
         {canDelta && (
           <p className={`text-xs font-semibold ${tone}`}>
             {delta >= 0 ? "+" : ""}{delta}% over reported window
@@ -145,21 +195,35 @@ export function TrendCard({
           <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
             <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
             <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
-            <YAxis tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" width={48} />
+            <YAxis
+              tick={{ fontSize: 10 }}
+              stroke="var(--muted-foreground)"
+              width={56}
+              tickFormatter={(v) => {
+                if (unit === "alt") {
+                  if (v >= 1e6) return "£" + (v / 1e6).toFixed(1) + "m";
+                  if (v >= 1e3) return "£" + (v / 1e3).toFixed(0) + "k";
+                  return "£" + v;
+                }
+                if (v >= 1e6) return (v / 1e6).toFixed(1) + "m";
+                if (v >= 1e3) return (v / 1e3).toFixed(0) + "k";
+                return String(v);
+              }}
+            />
             <Tooltip
               contentStyle={{
                 background: "var(--card)", border: "1px solid var(--border)",
                 borderRadius: 6, fontSize: 12,
               }}
-              formatter={(v: number) => formatValue(v)}
+              formatter={(v: number) => activeFormat(v)}
             />
-            {comparisonLabel && <Legend wrapperStyle={{ fontSize: 11 }} />}
+            {comparisonLabel && unit === "primary" && <Legend wrapperStyle={{ fontSize: 11 }} />}
             <Line
-              type="monotone" dataKey="value" name={primaryLabel}
+              type="monotone" dataKey="value" name={unit === "alt" ? (altSeries?.altUnitLabel || primaryLabel) : primaryLabel}
               stroke="var(--cmp-1, var(--chart-1))" strokeWidth={2} dot={false}
               isAnimationActive={false} connectNulls={false}
             />
-            {comparisonLabel && (
+            {comparisonLabel && unit === "primary" && (
               <Line
                 type="monotone" dataKey="comparison" name={comparisonLabel}
                 stroke="var(--cmp-2, var(--chart-2))" strokeWidth={2} dot={false}
