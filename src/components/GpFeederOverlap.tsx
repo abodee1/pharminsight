@@ -202,7 +202,7 @@ export function GpFeederOverlap({
     return (
       <div className="rounded-xl bg-card border border-border p-6 shadow-sm mb-6">
         <h2 className="text-sm font-semibold mb-1">GP feeder overlap</h2>
-        <p className="text-xs text-muted-foreground">No GP prescribing linkage data for the selected pharmacies in the last {monthsWindow} months. (Available where NHSBSA practice-level data is published.)</p>
+        <p className="text-xs text-muted-foreground">No GP prescribing linkage data for the selected pharmacies in the {monthsWindow last {monthsWindow} monthslast {monthsWindow} months monthsWindow > 0 ? `last ${monthsWindow} months` : "all available history"}. (Available where NHSBSA practice-level data is published.)</p>
       </div>
     );
   }
@@ -222,7 +222,7 @@ export function GpFeederOverlap({
           <div className="rounded-lg bg-secondary p-2 shrink-0"><Share2 className="h-5 w-5" /></div>
           <div className="min-w-0">
             <h2 className="text-base font-semibold">GP feeder overlap & catchment</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Which GP practices feed both pharmacies, and where each draws its scripts from. Last {monthsWindow} months.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Which GP practices feed both pharmacies, and where each draws its scripts from. {monthsWindow && monthsWindow > 0 ? `Last ${monthsWindow} months` : "All available history"}.</p>
           </div>
         </div>
 
@@ -320,7 +320,7 @@ export function GpFeederOverlap({
       {/* Major feeders per pharmacy — top GP practices by name */}
       <div className="rounded-xl bg-card border border-border p-5 md:p-6 shadow-sm">
         <h3 className="text-sm font-semibold mb-1">Major GP feeders · top practices by name</h3>
-        <p className="text-xs text-muted-foreground mb-4">The largest prescribing practices feeding each pharmacy over the last {monthsWindow} months. Share = % of that pharmacy's total items.</p>
+        <p className="text-xs text-muted-foreground mb-4">The largest prescribing practices feeding each pharmacy over the {monthsWindow last {monthsWindow} monthslast {monthsWindow} months monthsWindow > 0 ? `last ${monthsWindow} months` : "all available history"}. Share = % of that pharmacy's total items.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {pharms.map((p) => {
             const feeders = summary.topFeedersPerPh[p.id] || [];
