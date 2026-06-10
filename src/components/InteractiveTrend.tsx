@@ -57,6 +57,8 @@ export function InteractiveTrend({
   const initial = available[0] ?? "items";
   const [activeMetrics, setActiveMetrics] = useState<MetricKey[]>([initial]);
   const [win, setWin] = useState<PeriodWindow>(initialWindow);
+  const [pfUnit, setPfUnit] = useState<"count" | "money">("count");
+
 
   const toggleMetric = (k: MetricKey) => {
     setActiveMetrics((cur) => {
