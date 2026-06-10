@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
 import { PercentileRail, GpPrescribingCard } from "@/components/Infographics";
+import { PharmacySearch } from "@/components/PharmacySearch";
+import { CountryBadge } from "@/components/CountryBadge";
 
 export const Route = createFileRoute("/_authenticated/benchmarking")({ component: Benchmarking });
 
@@ -74,6 +76,7 @@ function metricValue(m: MetricDef, row: any): number {
 function Benchmarking() {
   const { user } = useAuth();
   const [pharmacy, setPharmacy] = useState<any>(null);
+  const [pharmacyOverride, setPharmacyOverride] = useState<any>(null);
   const [myHistory, setMyHistory] = useState<any[]>([]);
   const [regionPharms, setRegionPharms] = useState<any[]>([]);
   const [countryPharms, setCountryPharms] = useState<any[]>([]);
@@ -81,8 +84,9 @@ function Benchmarking() {
   const [snapshots, setSnapshots] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
-  // Load pharmacy & cohorts
+  // Load default pharmacy from user_pharmacy (only if no override is active)
   useEffect(() => {
+    if (pharmacyOverride) return;
     (async () => {
       if (!user) return;
       const { data: up } = await supabase
@@ -99,33 +103,55 @@ function Benchmarking() {
         .select("*")
         .eq("id", up.pharmacy_id)
         .maybeSingle();
-      if (!ph) {
-        setLoading(false);
-        return;
-      }
-      setPharmacy(ph);
+      if (ph) setPharmacy(ph);
+      else setLoading(false);
+    })();
+  }, [user, pharmacyOverride]);
 
+  // When override is set, load its full pharmacy row
+  useEffect(() => {
+    if (!pharmacyOverride) return;
+    (async () => {
+      const { data: ph } = await supabase
+        .from("pharmacies")
+        .select("*")
+        .eq("id", pharmacyOverride.id)
+        .maybeSingle();
+      if (ph) setPharmacy(ph);
+    })();
+  }, [pharmacyOverride]);
+
+  // When the active pharmacy changes, load cohorts + history
+  useEffect(() => {
+    if (!pharmacy) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setSnapshots({});
       const country = await fetchAll<any>((from, to) =>
         supabase
           .from("pharmacies")
           .select("id,name,region,country")
-          .eq("country", ph.country ?? "")
+          .eq("country", pharmacy.country ?? "")
           .range(from, to),
       );
+      if (cancelled) return;
       setCountryPharms(country);
-      setRegionPharms(country.filter((p) => p.region === ph.region));
+      setRegionPharms(country.filter((p) => p.region === pharmacy.region));
 
-      // 12-month history for user pharmacy
       const { data: hist } = await supabase
         .from("dispensing_data")
         .select("*")
-        .eq("pharmacy_id", ph.id)
+        .eq("pharmacy_id", pharmacy.id)
         .order("year", { ascending: false })
         .order("month", { ascending: false })
         .limit(24);
-      setMyHistory(hist ?? []);
+      if (!cancelled) setMyHistory(hist ?? []);
     })();
-  }, [user]);
+    return () => {
+      cancelled = true;
+    };
+  }, [pharmacy]);
 
   // Once we have the user history + cohorts, pick a target month per metric (latest where user > 0)
   // and fetch country-wide rows for that month. Months are deduped to minimise queries.
@@ -244,15 +270,44 @@ function Benchmarking() {
     <div className="p-6 md:p-10 max-w-7xl mx-auto">
       <PageHeader
         title="Benchmarking"
-        subtitle="How your pharmacy compares against local and national peers across volume, services, revenue and efficiency."
+        subtitle="How any pharmacy compares against local and national peers across volume, services, revenue and efficiency."
       />
+
+      {/* Pharmacy switcher — benchmark any pharmacy, not just your own */}
+      <div className="rounded-lg bg-card border border-border p-4 shadow-sm mb-6">
+        <div className="flex flex-col md:flex-row md:items-center gap-3">
+          <div className="md:w-[420px] shrink-0">
+            <PharmacySearch
+              placeholder="Search any pharmacy by name, postcode or ODS code…"
+              clearOnSelect
+              onSelect={(p) => setPharmacyOverride(p)}
+            />
+          </div>
+          {pharmacy && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+              <span>Benchmarking</span>
+              <span className="font-semibold text-foreground">{pharmacy.name}</span>
+              <CountryBadge country={pharmacy.country} />
+              {pharmacyOverride && (
+                <button
+                  type="button"
+                  onClick={() => { setPharmacyOverride(null); setPharmacy(null); }}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Reset to my pharmacy
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
       {!pharmacy && !loading && (
         <div className="rounded-lg border border-border bg-card p-6 shadow-sm text-sm">
-          You need to set your pharmacy first.{" "}
+          Search a pharmacy above, or{" "}
           <Link to="/settings" className="text-primary font-semibold hover:underline">
-            Go to Settings
-          </Link>
+            set your default in Settings
+          </Link>.
         </div>
       )}
 

@@ -19,6 +19,7 @@ import {
   type SpotlightMetric,
   type IntensityRate,
 } from "@/components/Infographics";
+import { LocalLandscape } from "@/components/LocalLandscape";
 
 import {
   Trophy, BarChart2, GitCompare, Package, Stethoscope, ClipboardCheck, Medal,
@@ -31,7 +32,7 @@ const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov
 const labelFor = (y: number, m: number) => `${MONTHS[m - 1]} ${String(y).slice(2)}`;
 const money = (n: number) => `£${Math.round(n).toLocaleString()}`;
 
-type Pharmacy = { id: string; ods_code: string; name: string; region: string | null; country: string | null };
+type Pharmacy = { id: string; ods_code: string; name: string; region: string | null; country: string | null; postcode: string | null; address: string | null };
 type Row = {
   pharmacy_id: string; month: number; year: number;
   items_dispensed: number; nms_count: number; pharmacy_first_count: number;
@@ -81,7 +82,7 @@ function Dashboard() {
       let ph: Pharmacy | null = null;
       if (up) {
         const { data } = await supabase
-          .from("pharmacies").select("id,ods_code,name,region,country").eq("id", up.pharmacy_id).maybeSingle();
+          .from("pharmacies").select("id,ods_code,name,region,country,postcode,address").eq("id", up.pharmacy_id).maybeSingle();
         ph = (data as Pharmacy) || null;
       }
       setPharmacy(ph);
@@ -483,6 +484,15 @@ function Dashboard() {
         <div className="mt-6">
           <GpPrescribingCard pharmacyOds={pharmacy.ods_code} />
         </div>
+      )}
+
+      {/* Local landscape — nearby competitor pharmacies & GP surgeries */}
+      {pharmacy && (
+        <LocalLandscape
+          pharmacyName={pharmacy.name}
+          postcode={pharmacy.postcode}
+          address={pharmacy.address}
+        />
       )}
 
       {pharmacy && peerItems.length > 0 && (
