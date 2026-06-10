@@ -722,13 +722,13 @@ function Compare() {
               )}
 
               {/* Trend small multiples — one chart per active metric */}
-              <div className="rounded-xl bg-card border border-border p-6 shadow-sm mb-6">
+              <div className="rounded-xl bg-card border border-border p-4 sm:p-6 shadow-sm mb-6">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <h2 className="text-sm font-semibold">
-                    {trendWindow === 1 ? "Latest month" : `${trendWindow}-month trend`} by service
+                    {trendWindow === 0 ? "All-time trend" : `${trendWindow}-month trend`} by service
                   </h2>
-                  <div className="inline-flex rounded-md border border-border bg-secondary/40 p-0.5">
-                    {([1, 3, 6, 12] as const).map((w) => (
+                  <div className="inline-flex rounded-md border border-border bg-secondary/40 p-0.5 flex-wrap">
+                    {([3, 6, 12, 24, 0] as const).map((w) => (
                       <button
                         key={w}
                         type="button"
@@ -740,7 +740,7 @@ function Compare() {
                         }`}
                         aria-pressed={trendWindow === w}
                       >
-                        {w}M
+                        {w === 0 ? "All" : `${w}M`}
                       </button>
                     ))}
                   </div>
