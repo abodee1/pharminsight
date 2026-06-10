@@ -165,20 +165,20 @@ export function GpFeederOverlap({
 
     // Top feeder concentration: share of pharmacy items from its top feeder
     const topFeederShare: Record<string, { name: string; pct: number } | null> = {};
-    // Top N major feeders per pharmacy — strict thresholds, real names only
+    // Top N major feeders per pharmacy — material only; fall back to practice code label when name missing.
     const topFeedersPerPh: Record<string, { code: string; name: string; postcode: string; items: number; share: number }[]> = {};
     pharms.forEach((p) => {
       const phRows = rows
-        .filter((r) => (r.vals[p.id] || 0) > 0 && r.hasName)
+        .filter((r) => (r.vals[p.id] || 0) > 0)
         .map((r) => ({ code: r.code, name: r.name, postcode: r.postcode, items: r.vals[p.id] }));
       phRows.sort((a, b) => b.items - a.items);
       const t = totalsPerPh[p.id] || 0;
       topFeederShare[p.id] = phRows[0] && t > 0 ? { name: phRows[0].name, pct: (phRows[0].items / t) * 100 } : null;
-      // Major = top 5 only, must be ≥3% of items OR ≥50 items in window — drop the long tail.
+      // Major = top 6, must be ≥3% of items OR ≥50 items in window — drop the long tail.
       topFeedersPerPh[p.id] = phRows
         .map((r) => ({ ...r, share: t > 0 ? (r.items / t) * 100 : 0 }))
         .filter((r) => r.share >= 3 || r.items >= 50)
-        .slice(0, 5);
+        .slice(0, 6);
     });
 
     return { rows, shared, exclusiveByPh, totalsPerPh, overlapPct, overlapItems, distinctPractices, topFeederShare, topFeedersPerPh };
