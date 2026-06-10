@@ -165,6 +165,8 @@ export function InteractiveTrend({
   const hasMoney = activeMetrics.some((k) => k === "gross" || k === "final") || pfIsMoney;
   const hasCount = activeMetrics.some((k) => k !== "gross" && k !== "final" && !(k === "pf" && pfUnit === "money"));
   const dualAxis = hasMoney && hasCount;
+  // Left axis is money when everything left of it is money (no count metrics present).
+  const leftAxisIsMoney = hasMoney && !hasCount;
 
   // Single-metric: keep the focused average reference line
   const singleMetric = activeMetrics.length === 1 ? activeMetrics[0] : null;
