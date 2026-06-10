@@ -565,6 +565,10 @@ function Dashboard() {
             values: peerPf,
             yourValue: stats.pf,
             period: peerPfPeriod || stats.period,
+            companion: {
+              label: "Remuneration this month",
+              value: `${fmtGbpCompact(stats.pfPayment)} · cohort avg ${fmtGbpCompact(peerPfPayment.length ? peerPfPayment.reduce((a,b)=>a+b,0)/peerPfPayment.length : 0)}`,
+            },
           },
           {
             key: "nms",
