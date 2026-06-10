@@ -70,23 +70,39 @@ export function InteractiveTrend({
     });
   };
 
+  // Locally swap the PF metric definition when the user toggles to £ remuneration view.
+  const M = useMemo<Record<MetricKey, MetricDef>>(() => {
+    if (pfUnit === "money") {
+      return {
+        ...MET,
+        pf: {
+          key: "pf",
+          label: "Pharmacy First (£)",
+          short: "PF £",
+          field: (r) => Number(r.pharmacy_first_payment) || 0,
+          format: (n) => "£" + Math.round(n).toLocaleString(),
+          color: MET.pf.color,
+        },
+      };
+    }
+    return MET;
+  }, [pfUnit]);
+
   // Build chart data: one row per month with all selected metric values
   const { points, perMetric } = useMemo(() => {
-    // Find latest reported month across all active metrics so we don't trim too aggressively
     let lastIdx = -1;
     for (let i = rows.length - 1; i >= 0; i--) {
-      const anyVal = activeMetrics.some((k) => MET[k].field(rows[i]) > 0);
+      const anyVal = activeMetrics.some((k) => M[k].field(rows[i]) > 0);
       if (anyVal) { lastIdx = i; break; }
     }
     const trimmed = lastIdx >= 0 ? rows.slice(0, lastIdx + 1) : rows;
     const sliced = trimmed.slice(-Number(win));
 
-    // Trailing-zero handling per metric — turn trailing zeros into null
     const lastReportedByMetric: Record<string, number> = {};
     activeMetrics.forEach((k) => {
       let li = -1;
       for (let i = sliced.length - 1; i >= 0; i--) {
-        if (MET[k].field(sliced[i]) > 0) { li = i; break; }
+        if (M[k].field(sliced[i]) > 0) { li = i; break; }
       }
       lastReportedByMetric[k] = li;
     });
@@ -97,12 +113,11 @@ export function InteractiveTrend({
       };
       activeMetrics.forEach((k) => {
         const li = lastReportedByMetric[k];
-        point[k] = i <= li ? MET[k].field(r) : null;
+        point[k] = i <= li ? M[k].field(r) : null;
       });
       return point;
     });
 
-    // Per-metric headline stats
     const perMetric: Record<string, { latest: number; avg: number; total: number; firstLabel: string; latestLabel: string; delta: number }> = {};
     activeMetrics.forEach((k) => {
       const vals = pts.map((p) => p[k]).filter((v) => typeof v === "number" && v > 0) as number[];
@@ -122,7 +137,8 @@ export function InteractiveTrend({
     });
 
     return { points: pts, perMetric };
-  }, [rows, activeMetrics, win]);
+  }, [rows, activeMetrics, win, M]);
+
 
   // PF £ companion — total + latest remuneration paired with the PF count tile.
   const pfPaymentInfo = useMemo(() => {
