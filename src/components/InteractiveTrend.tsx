@@ -165,6 +165,8 @@ export function InteractiveTrend({
   const hasMoney = activeMetrics.some((k) => k === "gross" || k === "final") || pfIsMoney;
   const hasCount = activeMetrics.some((k) => k !== "gross" && k !== "final" && !(k === "pf" && pfUnit === "money"));
   const dualAxis = hasMoney && hasCount;
+  // Left axis is money when everything left of it is money (no count metrics present).
+  const leftAxisIsMoney = hasMoney && !hasCount;
 
   // Single-metric: keep the focused average reference line
   const singleMetric = activeMetrics.length === 1 ? activeMetrics[0] : null;
@@ -279,9 +281,10 @@ export function InteractiveTrend({
               stroke="var(--muted-foreground)"
               width={52}
               tickFormatter={(v) => {
-                if (v >= 1e6) return (v/1e6).toFixed(1) + "m";
-                if (v >= 1e3) return (v/1e3).toFixed(0) + "k";
-                return String(v);
+                const prefix = leftAxisIsMoney ? "£" : "";
+                if (v >= 1e6) return prefix + (v/1e6).toFixed(1) + "m";
+                if (v >= 1e3) return prefix + (v/1e3).toFixed(0) + "k";
+                return prefix + String(v);
               }}
             />
             {dualAxis && (
