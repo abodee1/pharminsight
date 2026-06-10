@@ -30,6 +30,7 @@ const ratio = (n: number) => `${n.toFixed(1)}`;
 
 const METRICS: MetricDef[] = [
   { key: "items_dispensed", label: "Items dispensed", group: "volume", description: "Total prescription items dispensed in the month." },
+  { key: "eps_items", label: "EPS items", group: "volume", description: "Items processed via Electronic Prescription Service." },
   { key: "pharmacy_first_count", label: "Pharmacy First consultations", group: "service", description: "Walk-in clinical consultations completed." },
   { key: "nms_count", label: "New Medicine Service", group: "service", description: "NMS interventions delivered to patients starting new meds." },
   { key: "flu_vaccinations", label: "Flu vaccinations", group: "service", description: "NHS flu jabs administered in the month." },
@@ -141,6 +142,7 @@ function Benchmarking() {
           .from("pharmacies")
           .select("id,name,region,country")
           .eq("country", pharmacy.country ?? "")
+          .order("id", { ascending: true })
           .range(from, to),
       );
       if (cancelled) return;
@@ -195,10 +197,11 @@ function Benchmarking() {
             supabase
               .from("dispensing_data")
               .select(
-                "pharmacy_id,items_dispensed,nms_count,pharmacy_first_count,pharmacy_first_payment,flu_vaccinations,methadone_items,mcr_registrations,gross_cost,final_payment",
+                "pharmacy_id,items_dispensed,eps_items,nms_count,pharmacy_first_count,pharmacy_first_payment,flu_vaccinations,methadone_items,mcr_registrations,gross_cost,final_payment",
               )
               .eq("year", year)
               .eq("month", month)
+              .order("id", { ascending: true })
               .range(from, to),
           );
           monthData.set(

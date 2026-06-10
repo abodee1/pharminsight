@@ -230,6 +230,7 @@ function PharmacyProfile() {
           .from("pharmacies")
           .select("id")
           .eq("country", pharmacy.country ?? "")
+          .order("id", { ascending: true })
           .range(from, to),
       );
       const peerIds = peerRows.map((p) => p.id);
@@ -256,6 +257,7 @@ function PharmacyProfile() {
             .from("dispensing_data")
             .select("pharmacy_id,items_dispensed,nms_count,pharmacy_first_count,eps_items")
             .eq("year", y).eq("month", m)
+            .order("id", { ascending: true })
             .range(from, to),
         );
         return all.filter((r) => peerIdSet.has(r.pharmacy_id));
