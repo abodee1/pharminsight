@@ -281,9 +281,10 @@ export function InteractiveTrend({
               stroke="var(--muted-foreground)"
               width={52}
               tickFormatter={(v) => {
-                if (v >= 1e6) return (v/1e6).toFixed(1) + "m";
-                if (v >= 1e3) return (v/1e3).toFixed(0) + "k";
-                return String(v);
+                const prefix = leftAxisIsMoney ? "£" : "";
+                if (v >= 1e6) return prefix + (v/1e6).toFixed(1) + "m";
+                if (v >= 1e3) return prefix + (v/1e3).toFixed(0) + "k";
+                return prefix + String(v);
               }}
             />
             {dualAxis && (
