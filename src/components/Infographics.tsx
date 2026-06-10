@@ -67,6 +67,7 @@ export function TrendCard({
   primaryLabel = "You",
   options = PERIOD_OPTIONS,
   height = 220,
+  altSeries,
 }: {
   title: string;
   subtitle?: string;
@@ -79,13 +80,33 @@ export function TrendCard({
   primaryLabel?: string;
   options?: PeriodWindow[];
   height?: number;
+  /** Optional second-unit toggle (e.g. £ remuneration alongside a count series).
+   *  Same length & order as `points`. When provided, a small unit selector
+   *  appears next to the period pills and swaps the displayed series. */
+  altSeries?: {
+    primaryUnitLabel: string;   // e.g. "#"
+    altUnitLabel: string;       // e.g. "£"
+    altValues: number[];        // aligned with points
+    altFormat?: (n: number) => string;
+    altTitleSuffix?: string;    // appended to subtitle when alt is active
+  };
 }) {
-  const sliced = points.slice(-window);
+  const [unit, setUnit] = useState<"primary" | "alt">("primary");
+  const activeFormat = unit === "alt" && altSeries?.altFormat ? altSeries.altFormat : formatValue;
 
-  // Trailing zero handling — many NHS metrics (Pharmacy First, NMS, MCR)
-  // are published with a lag, so the most recent months arrive as 0 before
-  // the real figure lands. Treat trailing zeros as "not reported yet" so
-  // the headline, delta and line don't get dragged to zero.
+  const seriesPoints = useMemo(() => {
+    if (unit === "alt" && altSeries) {
+      return points.map((p, i) => ({
+        label: p.label,
+        value: altSeries.altValues[i] ?? 0,
+        comparison: undefined as number | undefined,
+      }));
+    }
+    return points;
+  }, [points, unit, altSeries]);
+
+  const sliced = seriesPoints.slice(-window);
+
   let lastReportedIdx = -1;
   for (let i = sliced.length - 1; i >= 0; i--) {
     if ((sliced[i]?.value ?? 0) > 0) { lastReportedIdx = i; break; }
@@ -103,9 +124,6 @@ export function TrendCard({
   const trailingLag = hasData && lastReportedIdx < sliced.length - 1;
   const latestLabel = hasData ? sliced[lastReportedIdx].label : null;
 
-  // For the chart: convert trailing zeros to null so the line stops at the
-  // last reported month instead of crashing to the x-axis. Same for the
-  // comparison series independently.
   let cmpLastIdx = -1;
   for (let i = sliced.length - 1; i >= 0; i--) {
     if ((sliced[i]?.comparison ?? 0) > 0) { cmpLastIdx = i; break; }
@@ -118,16 +136,48 @@ export function TrendCard({
 
   return (
     <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3 mb-3">
+      <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold tracking-tight truncate">{title}</h3>
-          {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
+          {subtitle && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {subtitle}{unit === "alt" && altSeries?.altTitleSuffix ? ` · ${altSeries.altTitleSuffix}` : ""}
+            </p>
+          )}
         </div>
-        <PeriodPills value={window} onChange={onWindowChange} options={options} />
+        <div className="flex items-center gap-2 flex-wrap">
+          {altSeries && (
+            <div className="inline-flex items-center rounded-md border border-border bg-secondary/40 p-0.5">
+              <button
+                type="button"
+                onClick={() => setUnit("primary")}
+                className={[
+                  "px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+                  unit === "primary" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+                aria-pressed={unit === "primary"}
+              >
+                {altSeries.primaryUnitLabel}
+              </button>
+              <button
+                type="button"
+                onClick={() => setUnit("alt")}
+                className={[
+                  "px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+                  unit === "alt" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+                aria-pressed={unit === "alt"}
+              >
+                {altSeries.altUnitLabel}
+              </button>
+            </div>
+          )}
+          <PeriodPills value={window} onChange={onWindowChange} options={options} />
+        </div>
       </div>
 
       <div className="flex items-baseline justify-between gap-3 mb-2">
-        <p className="text-2xl font-semibold tabular-nums">{formatValue(latest)}</p>
+        <p className="text-2xl font-semibold tabular-nums">{activeFormat(latest)}</p>
         {canDelta && (
           <p className={`text-xs font-semibold ${tone}`}>
             {delta >= 0 ? "+" : ""}{delta}% over reported window
@@ -145,21 +195,35 @@ export function TrendCard({
           <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
             <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
             <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
-            <YAxis tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" width={48} />
+            <YAxis
+              tick={{ fontSize: 10 }}
+              stroke="var(--muted-foreground)"
+              width={56}
+              tickFormatter={(v) => {
+                if (unit === "alt") {
+                  if (v >= 1e6) return "£" + (v / 1e6).toFixed(1) + "m";
+                  if (v >= 1e3) return "£" + (v / 1e3).toFixed(0) + "k";
+                  return "£" + v;
+                }
+                if (v >= 1e6) return (v / 1e6).toFixed(1) + "m";
+                if (v >= 1e3) return (v / 1e3).toFixed(0) + "k";
+                return String(v);
+              }}
+            />
             <Tooltip
               contentStyle={{
                 background: "var(--card)", border: "1px solid var(--border)",
                 borderRadius: 6, fontSize: 12,
               }}
-              formatter={(v: number) => formatValue(v)}
+              formatter={(v: number) => activeFormat(v)}
             />
-            {comparisonLabel && <Legend wrapperStyle={{ fontSize: 11 }} />}
+            {comparisonLabel && unit === "primary" && <Legend wrapperStyle={{ fontSize: 11 }} />}
             <Line
-              type="monotone" dataKey="value" name={primaryLabel}
+              type="monotone" dataKey="value" name={unit === "alt" ? (altSeries?.altUnitLabel || primaryLabel) : primaryLabel}
               stroke="var(--cmp-1, var(--chart-1))" strokeWidth={2} dot={false}
               isAnimationActive={false} connectNulls={false}
             />
-            {comparisonLabel && (
+            {comparisonLabel && unit === "primary" && (
               <Line
                 type="monotone" dataKey="comparison" name={comparisonLabel}
                 stroke="var(--cmp-2, var(--chart-2))" strokeWidth={2} dot={false}
@@ -927,7 +991,7 @@ export function MetricSpotlight({
   metrics,
   defaultKey,
   highlightLabel,
-  peerLabel = "Peer avg",
+  peerLabel = "Cohort avg",
   caption,
 }: {
   title: string;
@@ -941,30 +1005,126 @@ export function MetricSpotlight({
   const [activeKey, setActiveKey] = useState<string>(defaultKey || available[0]?.key || "");
   const active = available.find((m) => m.key === activeKey) || available[0];
 
+  // All hooks must run before any early return.
+  const stats = useMemo(() => {
+    if (!active) {
+      return {
+        sorted: [] as number[],
+        avg: 0,
+        max: 0,
+        min: 0,
+        percentile: 0,
+        avgPercentile: 0,
+        rank: 0,
+        n: 0,
+      };
+    }
+    const arr = active.values.filter((v) => typeof v === "number" && !isNaN(v));
+    if (!arr.length) {
+      return { sorted: [], avg: 0, max: 0, min: 0, percentile: 0, avgPercentile: 0, rank: 0, n: 0 };
+    }
+    const sorted = [...arr].sort((a, b) => a - b);
+    const max = sorted[sorted.length - 1];
+    const min = sorted[0];
+    const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+    const below = sorted.filter((v) => v < active.yourValue).length;
+    const percentile = Math.round((below / sorted.length) * 100);
+    const belowAvg = sorted.filter((v) => v < avg).length;
+    const avgPercentile = Math.round((belowAvg / sorted.length) * 100);
+    const rank = sorted.length - Math.round((percentile / 100) * sorted.length) + 1;
+    return { sorted, avg, max, min, percentile, avgPercentile, rank, n: sorted.length };
+  }, [active]);
+
+  // Log-binned histogram so heavily-skewed metrics (PF, NMS) actually spread.
+  const histogram = useMemo(() => {
+    if (!active || !stats.sorted.length) return { bins: [] as number[], edges: [] as number[], yourBin: -1, useLog: false };
+    const arr = stats.sorted;
+    const lo = Math.max(arr[0], 0);
+    const hi = arr[arr.length - 1];
+    const range = hi - lo || 1;
+    const positive = arr.filter((v) => v > 0);
+    // Use a log scale when the spread between 5th and 95th percentile spans >20x.
+    const p05 = positive[Math.floor(positive.length * 0.05)] || lo;
+    const p95 = positive[Math.floor(positive.length * 0.95)] || hi;
+    const useLog = positive.length > 5 && p05 > 0 && p95 / p05 > 20;
+    const BIN_COUNT = 26;
+    const bins = new Array(BIN_COUNT).fill(0);
+    const edges = new Array(BIN_COUNT + 1).fill(0);
+    if (useLog) {
+      const logLo = Math.log(Math.max(p05 * 0.6, 1));
+      const logHi = Math.log(hi);
+      const step = (logHi - logLo) / BIN_COUNT;
+      for (let i = 0; i <= BIN_COUNT; i++) edges[i] = Math.exp(logLo + step * i);
+      arr.forEach((v) => {
+        const x = Math.max(v, edges[0] + 0.001);
+        const idx = Math.min(BIN_COUNT - 1, Math.max(0, Math.floor((Math.log(x) - logLo) / step)));
+        bins[idx] += 1;
+      });
+    } else {
+      for (let i = 0; i <= BIN_COUNT; i++) edges[i] = lo + (range * i) / BIN_COUNT;
+      arr.forEach((v) => {
+        const idx = Math.min(BIN_COUNT - 1, Math.max(0, Math.floor(((v - lo) / range) * BIN_COUNT)));
+        bins[idx] += 1;
+      });
+    }
+    let yourBin = -1;
+    if (active.yourValue > 0 || !useLog) {
+      const yv = active.yourValue;
+      for (let i = 0; i < BIN_COUNT; i++) {
+        if (yv >= edges[i] && yv <= edges[i + 1]) { yourBin = i; break; }
+      }
+      if (yourBin < 0 && yv >= edges[BIN_COUNT]) yourBin = BIN_COUNT - 1;
+      if (yourBin < 0 && yv > 0) yourBin = 0;
+    }
+    return { bins, edges, yourBin, useLog };
+  }, [active, stats.sorted]);
+
   if (!active) return null;
   const fmtFn = active.format || fmt;
 
+  // Bell-curve SVG points — a stylised normal distribution for the percentile arc.
+  const curveW = 100;
+  const curveH = 36;
+  const curvePts: string[] = [];
+  for (let i = 0; i <= 100; i++) {
+    const x = i / 100;
+    // Normal density centered at 0.5
+    const y = Math.exp(-Math.pow((x - 0.5) / 0.18, 2));
+    const px = (x * curveW).toFixed(2);
+    const py = (curveH - y * (curveH - 4) - 2).toFixed(2);
+    curvePts.push(`${px},${py}`);
+  }
+  const curvePath = "M" + curvePts.join(" L");
+  const areaPath = `${curvePath} L${curveW},${curveH} L0,${curveH} Z`;
+  const yPct = Math.max(2, Math.min(98, stats.percentile));
+  const avgPct = Math.max(2, Math.min(98, stats.avgPercentile));
+
+  const peakBin = Math.max(...histogram.bins, 1);
+
   return (
-    <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+    <div className="rounded-xl border border-border bg-card p-5 sm:p-6 shadow-sm">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold tracking-tight truncate">{title}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Pick a metric to see where you sit across the cohort{active.period ? ` · ${active.period}` : ""}.
+            Where you sit in the cohort distribution{active.period ? ` · ${active.period}` : ""}
           </p>
         </div>
-        <div className="inline-flex flex-wrap items-center gap-1 rounded-md border border-border bg-secondary/40 p-0.5">
+        {/* Segmented metric control */}
+        <div className="inline-flex flex-wrap items-center rounded-lg border border-border bg-secondary/40 p-0.5">
           {available.map((m) => (
             <button
               key={m.key}
               type="button"
               onClick={() => setActiveKey(m.key)}
               className={[
-                "px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+                "px-3 py-1 text-[11px] font-semibold rounded-md transition-all",
                 active.key === m.key
-                  ? "bg-foreground text-background"
+                  ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
               ].join(" ")}
+              aria-pressed={active.key === m.key}
             >
               {m.label}
             </button>
@@ -972,34 +1132,149 @@ export function MetricSpotlight({
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <PercentileRail
-          label={`${active.label}${active.period ? ` · ${active.period}` : ""}`}
-          value={active.yourValue}
-          values={active.values}
-          peerLabel={peerLabel}
-          nationalLabel="Highest"
-          formatValue={fmtFn}
+      {/* Companion remuneration callout */}
+      {active.companion && (
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-900 px-4 py-2.5">
+          <p className="text-[10px] uppercase tracking-wider font-semibold text-emerald-800 dark:text-emerald-300">
+            {active.companion.label}
+          </p>
+          <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200 tabular-nums">
+            {active.companion.value}
+          </p>
+        </div>
+      )}
+
+      {/* Bell curve / distribution arc with you · avg · top markers */}
+      <div className="mb-2">
+        <div className="flex items-baseline justify-between mb-1">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Percentile position</p>
+          <p className="text-[11px] font-semibold tabular-nums">
+            {ordinal(stats.percentile)} <span className="text-muted-foreground font-normal">· {ordinal(stats.rank)} of {stats.n}</span>
+          </p>
+        </div>
+        <div className="relative">
+          <svg viewBox={`0 0 ${curveW} ${curveH + 14}`} preserveAspectRatio="none" className="w-full h-20">
+            {/* Area + curve */}
+            <path d={areaPath} fill="var(--secondary)" opacity={0.55} />
+            <path d={curvePath} fill="none" stroke="var(--muted-foreground)" strokeWidth={0.6} opacity={0.7} />
+            {/* Cohort avg marker */}
+            <line x1={avgPct} y1={2} x2={avgPct} y2={curveH} stroke="var(--muted-foreground)" strokeWidth={0.5} strokeDasharray="1.2 1.2" />
+            {/* Top performer marker */}
+            <line x1={98} y1={2} x2={98} y2={curveH} stroke="var(--muted-foreground)" strokeWidth={0.5} strokeDasharray="1.2 1.2" />
+            {/* You marker (solid) */}
+            <line x1={yPct} y1={0} x2={yPct} y2={curveH} stroke="currentColor" strokeWidth={0.9} className="text-foreground" />
+            <circle cx={yPct} cy={2} r={1.6} className="fill-foreground" />
+          </svg>
+          {/* Inline labels */}
+          <div className="relative h-0">
+            <span
+              className="absolute -top-1 text-[9px] font-semibold uppercase tracking-wider text-foreground"
+              style={{ left: `${yPct}%`, transform: "translateX(-50%)" }}
+            >
+              You
+            </span>
+            <span
+              className="absolute -top-1 text-[9px] uppercase tracking-wider text-muted-foreground"
+              style={{ left: `${avgPct}%`, transform: "translateX(-50%)" }}
+            >
+              Avg
+            </span>
+            <span
+              className="absolute -top-1 text-[9px] uppercase tracking-wider text-muted-foreground"
+              style={{ right: 0 }}
+            >
+              Top
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Log-binned histogram */}
+      <div className="mt-5">
+        <div className="flex items-baseline justify-between mb-1">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Cohort spread {histogram.useLog ? "(log scale)" : ""}
+          </p>
+          <p className="text-[10px] text-muted-foreground tabular-nums">{stats.n.toLocaleString()} pharmacies</p>
+        </div>
+        <div className="flex items-end gap-[2px] h-20">
+          {histogram.bins.map((count, i) => {
+            const h = (count / peakBin) * 100;
+            const isYou = i === histogram.yourBin;
+            return (
+              <div
+                key={i}
+                className={[
+                  "flex-1 rounded-sm transition-all",
+                  isYou ? "bg-foreground" : "bg-secondary hover:bg-secondary/80",
+                ].join(" ")}
+                style={{ height: `${Math.max(3, h)}%` }}
+                title={`${count} pharmacies`}
+              />
+            );
+          })}
+        </div>
+        <div className="mt-1 flex justify-between text-[10px] text-muted-foreground tabular-nums">
+          <span>{fmtFn(histogram.edges[0] || 0)}</span>
+          <span>{fmtFn(histogram.edges[histogram.edges.length - 1] || stats.max)}</span>
+        </div>
+      </div>
+
+      {/* Three stat blocks */}
+      <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
+        <StatBlock
+          label={highlightLabel ? "You" : "You"}
+          value={fmtFn(active.yourValue)}
+          accent="foreground"
         />
-        <DistributionStrip
-          label={`${active.label} spread`}
-          values={active.values}
-          highlightValue={active.yourValue}
-          highlightLabel={highlightLabel || "You"}
+        <StatBlock
+          label={peerLabel}
+          value={fmtFn(stats.avg)}
+          accent="muted"
+        />
+        <StatBlock
+          label="Highest"
+          value={fmtFn(stats.max)}
+          accent="muted"
         />
       </div>
 
-      {active.companion && (
-        <p className="mt-3 text-xs text-muted-foreground">
-          <span className="uppercase tracking-wider text-[10px] mr-2">{active.companion.label}</span>
-          <span className="font-semibold text-foreground tabular-nums">{active.companion.value}</span>
-        </p>
-      )}
-
-      {caption && <p className="mt-3 text-xs italic text-muted-foreground border-t border-border pt-2">{caption}</p>}
+      {caption && <p className="mt-4 text-xs italic text-muted-foreground border-t border-border pt-3">{caption}</p>}
     </div>
   );
 }
+
+function StatBlock({
+  label,
+  value,
+  accent = "muted",
+}: {
+  label: string;
+  value: string;
+  accent?: "foreground" | "muted";
+}) {
+  return (
+    <div
+      className={[
+        "rounded-lg px-3 py-2.5 border",
+        accent === "foreground"
+          ? "bg-foreground text-background border-foreground"
+          : "bg-secondary/40 text-foreground border-border",
+      ].join(" ")}
+    >
+      <p
+        className={[
+          "text-[9px] uppercase tracking-wider font-semibold",
+          accent === "foreground" ? "text-background/70" : "text-muted-foreground",
+        ].join(" ")}
+      >
+        {label}
+      </p>
+      <p className="text-base font-bold tabular-nums leading-tight mt-0.5 truncate">{value}</p>
+    </div>
+  );
+}
+
 
 /* ----------------------------------------------------------------
  * ServiceIntensityCard

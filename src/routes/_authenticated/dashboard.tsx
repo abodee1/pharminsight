@@ -333,6 +333,12 @@ function Dashboard() {
     [trendKeys, myByKey, aggByKey, pharmacy],
   );
 
+  const pfPaymentSeries = useMemo(
+    () => trendKeys.map((k) => Number(myByKey.get(k)?.pharmacy_first_payment) || 0),
+    [trendKeys, myByKey],
+  );
+
+
   const costPoints = useMemo(
     () => trendKeys.map((k) => {
       const y = Math.floor(k / 12);
@@ -474,8 +480,16 @@ function Dashboard() {
             window={trendWindow}
             onWindowChange={setTrendWindow}
             caption={`Consultations delivered through the Pharmacy First pathway. Latest month: ${stats.pf.toLocaleString()} consultations · ${fmtGbpCompact(stats.pfPayment)} remuneration.`}
+            altSeries={pharmacy ? {
+              primaryUnitLabel: "#",
+              altUnitLabel: "£",
+              altValues: pfPaymentSeries,
+              altFormat: (n) => fmtGbpCompact(n),
+              altTitleSuffix: "remuneration view",
+            } : undefined}
           />
         )}
+
         {pharmacy && costPoints.length > 0 && (
           <TrendCard
             title="Gross drug cost"

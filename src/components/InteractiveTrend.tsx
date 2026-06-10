@@ -57,6 +57,8 @@ export function InteractiveTrend({
   const initial = available[0] ?? "items";
   const [activeMetrics, setActiveMetrics] = useState<MetricKey[]>([initial]);
   const [win, setWin] = useState<PeriodWindow>(initialWindow);
+  const [pfUnit, setPfUnit] = useState<"count" | "money">("count");
+
 
   const toggleMetric = (k: MetricKey) => {
     setActiveMetrics((cur) => {
@@ -68,23 +70,39 @@ export function InteractiveTrend({
     });
   };
 
+  // Locally swap the PF metric definition when the user toggles to £ remuneration view.
+  const M = useMemo<Record<MetricKey, MetricDef>>(() => {
+    if (pfUnit === "money") {
+      return {
+        ...MET,
+        pf: {
+          key: "pf",
+          label: "Pharmacy First (£)",
+          short: "PF £",
+          field: (r) => Number(r.pharmacy_first_payment) || 0,
+          format: (n) => "£" + Math.round(n).toLocaleString(),
+          color: MET.pf.color,
+        },
+      };
+    }
+    return MET;
+  }, [pfUnit]);
+
   // Build chart data: one row per month with all selected metric values
   const { points, perMetric } = useMemo(() => {
-    // Find latest reported month across all active metrics so we don't trim too aggressively
     let lastIdx = -1;
     for (let i = rows.length - 1; i >= 0; i--) {
-      const anyVal = activeMetrics.some((k) => MET[k].field(rows[i]) > 0);
+      const anyVal = activeMetrics.some((k) => M[k].field(rows[i]) > 0);
       if (anyVal) { lastIdx = i; break; }
     }
     const trimmed = lastIdx >= 0 ? rows.slice(0, lastIdx + 1) : rows;
     const sliced = trimmed.slice(-Number(win));
 
-    // Trailing-zero handling per metric — turn trailing zeros into null
     const lastReportedByMetric: Record<string, number> = {};
     activeMetrics.forEach((k) => {
       let li = -1;
       for (let i = sliced.length - 1; i >= 0; i--) {
-        if (MET[k].field(sliced[i]) > 0) { li = i; break; }
+        if (M[k].field(sliced[i]) > 0) { li = i; break; }
       }
       lastReportedByMetric[k] = li;
     });
@@ -95,12 +113,11 @@ export function InteractiveTrend({
       };
       activeMetrics.forEach((k) => {
         const li = lastReportedByMetric[k];
-        point[k] = i <= li ? MET[k].field(r) : null;
+        point[k] = i <= li ? M[k].field(r) : null;
       });
       return point;
     });
 
-    // Per-metric headline stats
     const perMetric: Record<string, { latest: number; avg: number; total: number; firstLabel: string; latestLabel: string; delta: number }> = {};
     activeMetrics.forEach((k) => {
       const vals = pts.map((p) => p[k]).filter((v) => typeof v === "number" && v > 0) as number[];
@@ -120,7 +137,8 @@ export function InteractiveTrend({
     });
 
     return { points: pts, perMetric };
-  }, [rows, activeMetrics, win]);
+  }, [rows, activeMetrics, win, M]);
+
 
   // PF £ companion — total + latest remuneration paired with the PF count tile.
   const pfPaymentInfo = useMemo(() => {
@@ -141,9 +159,11 @@ export function InteractiveTrend({
   }, [rows, activeMetrics, win]);
 
   // Need normalisation when mixing very different scales (e.g. Items + Final £)
-  // Use a dual y-axis if mixing £ metrics with count metrics
-  const hasMoney = activeMetrics.some((k) => k === "gross" || k === "final");
-  const hasCount = activeMetrics.some((k) => k !== "gross" && k !== "final");
+  // Use a dual y-axis if mixing £ metrics with count metrics. PF in money mode
+  // counts as a money metric.
+  const pfIsMoney = pfUnit === "money" && activeMetrics.includes("pf");
+  const hasMoney = activeMetrics.some((k) => k === "gross" || k === "final") || pfIsMoney;
+  const hasCount = activeMetrics.some((k) => k !== "gross" && k !== "final" && !(k === "pf" && pfUnit === "money"));
   const dualAxis = hasMoney && hasCount;
 
   // Single-metric: keep the focused average reference line
@@ -159,13 +179,41 @@ export function InteractiveTrend({
             Toggle one or more metrics. {singleMetric ? `Dashed line marks the ${win >= ALL_PERIOD ? `all-time (${points.length}-month)` : `${Number(win)}-month`} average.` : "Compare multiple trends at once."}
           </p>
         </div>
-        <PeriodPills value={win} onChange={setWin} options={windows} />
+        <div className="flex items-center gap-2 flex-wrap">
+          {activeMetrics.includes("pf") && (
+            <div className="inline-flex items-center rounded-md border border-border bg-secondary/40 p-0.5" title="Pharmacy First — consultations or remuneration">
+              <button
+                type="button"
+                onClick={() => setPfUnit("count")}
+                className={[
+                  "px-2 py-0.5 text-[10px] font-semibold rounded-sm transition-colors",
+                  pfUnit === "count" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+                aria-pressed={pfUnit === "count"}
+              >
+                PF #
+              </button>
+              <button
+                type="button"
+                onClick={() => setPfUnit("money")}
+                className={[
+                  "px-2 py-0.5 text-[10px] font-semibold rounded-sm transition-colors",
+                  pfUnit === "money" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+                aria-pressed={pfUnit === "money"}
+              >
+                PF £
+              </button>
+            </div>
+          )}
+          <PeriodPills value={win} onChange={setWin} options={windows} />
+        </div>
       </div>
 
       {/* Metric toggle pills */}
       <div className="flex flex-wrap gap-1 mb-3">
         {available.map((k) => {
-          const m = MET[k];
+          const m = M[k];
           const active = activeMetrics.includes(k);
           return (
             <button
@@ -187,10 +235,11 @@ export function InteractiveTrend({
         })}
       </div>
 
+
       {/* Headline strip — per active metric */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-3">
         {activeMetrics.map((k) => {
-          const m = MET[k];
+          const m = M[k];
           const pm = perMetric[k];
           if (!pm) return null;
           const Trend = pm.delta > 1 ? TrendingUp : pm.delta < -1 ? TrendingDown : Minus;
@@ -199,11 +248,17 @@ export function InteractiveTrend({
             <div key={k} className="rounded-md border border-border bg-secondary/30 px-2 py-1.5" style={{ borderLeft: `3px solid ${m.color}` }}>
               <p className="text-[9px] uppercase tracking-wider text-muted-foreground truncate">{m.short} · latest</p>
               <p className="text-sm font-bold tabular-nums leading-tight">{m.format(pm.latest)}</p>
-              {k === "pf" && pfPaymentInfo && (
+              {k === "pf" && pfPaymentInfo && pfUnit === "count" && (
                 <p className="text-[10px] font-semibold tabular-nums text-emerald-700 leading-tight">
                   {fmtGbpCompact(pfPaymentInfo.latest)} paid
                 </p>
               )}
+              {k === "pf" && pfPaymentInfo && pfUnit === "money" && (
+                <p className="text-[10px] font-semibold tabular-nums text-muted-foreground leading-tight">
+                  {pfPaymentInfo.total > 0 ? `${fmtGbpCompact(pfPaymentInfo.total)} total` : ""}
+                </p>
+              )}
+
               <p className={`text-[10px] font-semibold inline-flex items-center gap-0.5 ${tone}`}>
                 <Trend className="h-3 w-3" />
                 {pm.delta >= 0 ? "+" : ""}{pm.delta.toFixed(1)}%
@@ -246,7 +301,7 @@ export function InteractiveTrend({
             <Tooltip
               contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, fontSize: 12 }}
               formatter={(v: number, name: string) => {
-                const m = MET[name as MetricKey];
+                const m = M[name as MetricKey];
                 return [m ? m.format(v) : v, m?.label ?? name];
               }}
             />
@@ -255,8 +310,9 @@ export function InteractiveTrend({
               <ReferenceLine yAxisId="left" y={singleAvg} stroke="var(--muted-foreground)" strokeDasharray="4 4" strokeOpacity={0.5} />
             )}
             {activeMetrics.map((k) => {
-              const m = MET[k];
-              const isMoney = k === "gross" || k === "final";
+              const m = M[k];
+              const isMoney = k === "gross" || k === "final" || (k === "pf" && pfUnit === "money");
+
               return (
                 <Line
                   key={k}
@@ -278,8 +334,8 @@ export function InteractiveTrend({
 
       {singleMetric && perMetric[singleMetric] && (
         <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
-          <Stat label="Avg / month" value={MET[singleMetric].format(perMetric[singleMetric].avg)} />
-          <Stat label={win >= ALL_PERIOD ? "All-time total" : `${Number(win)}M total`} value={MET[singleMetric].format(perMetric[singleMetric].total)} />
+          <Stat label="Avg / month" value={M[singleMetric].format(perMetric[singleMetric].avg)} />
+          <Stat label={win >= ALL_PERIOD ? "All-time total" : `${Number(win)}M total`} value={M[singleMetric].format(perMetric[singleMetric].total)} />
           <Stat label="Window start" value={perMetric[singleMetric].firstLabel} />
         </div>
       )}
