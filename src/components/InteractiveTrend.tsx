@@ -4,6 +4,7 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { PeriodPills, type PeriodWindow, ALL_PERIOD } from "@/components/Infographics";
+import { fmtGbpCompact } from "@/lib/utils";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -16,6 +17,7 @@ export type TrendRow = {
   eps_items: number;
   gross_cost: number | string | null;
   final_payment: number | string | null;
+  pharmacy_first_payment?: number | string | null;
 };
 
 type MetricKey = "items" | "pf" | "nms" | "eps" | "gross" | "final";
