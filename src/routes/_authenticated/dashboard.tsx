@@ -486,6 +486,15 @@ function Dashboard() {
         </div>
       )}
 
+      {/* Local landscape — nearby competitor pharmacies & GP surgeries */}
+      {pharmacy && (
+        <LocalLandscape
+          pharmacyName={pharmacy.name}
+          postcode={pharmacy.postcode}
+          address={pharmacy.address}
+        />
+      )}
+
       {pharmacy && peerItems.length > 0 && (
         <div className="mt-6 grid md:grid-cols-2 gap-4">
           <PercentileRail
