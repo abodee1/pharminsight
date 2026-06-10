@@ -383,8 +383,12 @@ function Dashboard() {
         />
         <StatCard
           label="Pharmacy First"
-          value={stats.pf.toLocaleString()}
-          hint={stats.pfPeriod && stats.pfPeriod !== stats.period ? `Latest reported · ${stats.pfPeriod}` : stats.pfPeriod || undefined}
+          value={`${stats.pf.toLocaleString()} · ${fmtGbpCompact(stats.pfPayment)}`}
+          hint={
+            stats.pfPeriod
+              ? `Consultations · remunerated · ${stats.pfPeriod}${stats.pfPeriod !== stats.period ? " (lag)" : ""}`
+              : "Consultations · remunerated"
+          }
           icon={Stethoscope}
           accent="emerald"
         />
@@ -465,11 +469,11 @@ function Dashboard() {
         {pfPoints.length > 0 && (
           <TrendCard
             title="Pharmacy First consultations"
-            subtitle={pharmacy ? "Monthly walk-in clinical activity" : "National monthly average"}
+            subtitle={pharmacy ? `Walk-in clinical activity · latest ${fmtGbpCompact(stats.pfPayment)} remunerated` : "National monthly average"}
             points={pfPoints}
             window={trendWindow}
             onWindowChange={setTrendWindow}
-            caption="Walk-in consultations delivered through the Pharmacy First pathway."
+            caption={`Consultations delivered through the Pharmacy First pathway. Latest month: ${stats.pf.toLocaleString()} consultations · ${fmtGbpCompact(stats.pfPayment)} remuneration.`}
           />
         )}
         {pharmacy && costPoints.length > 0 && (
@@ -517,7 +521,7 @@ function Dashboard() {
             values={peerPf}
             peerLabel={`${pharmacy.country || "Country"} avg`}
             nationalLabel="Highest"
-            caption="Clinical consultations delivered through the Pharmacy First pathway."
+            caption={`${stats.pf.toLocaleString()} consultations · ${fmtGbpCompact(stats.pfPayment)} remuneration this month. Country avg remuneration ${fmtGbpCompact(peerPfPayment.length ? peerPfPayment.reduce((a,b)=>a+b,0)/peerPfPayment.length : 0)}.`}
           />
         </div>
       )}
