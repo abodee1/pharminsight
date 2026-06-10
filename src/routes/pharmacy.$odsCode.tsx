@@ -20,6 +20,7 @@ import { AnalysisPanel } from "@/components/AnalysisPanel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetchAll } from "@/lib/fetchAll";
 import { cn } from "@/lib/utils";
+import { setViewedPharmacy, clearViewedPharmacy } from "@/lib/viewedPharmacy";
 
 type WindowKey = 1 | 3 | 6 | 12;
 
