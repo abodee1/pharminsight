@@ -24,8 +24,8 @@ import { Route as AuthenticatedCompareRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedBenchmarkingRouteImport } from './routes/_authenticated/benchmarking'
 import { Route as AuthenticatedGpSurgeriesCodeRouteImport } from './routes/_authenticated/gp-surgeries.$code'
 import { Route as AuthenticatedAdminPaymentsImportRouteImport } from './routes/_authenticated/admin.payments-import'
+import { Route as AuthenticatedAdminIngestionRouteImport } from './routes/_authenticated/admin.ingestion'
 import { Route as AuthenticatedAdminGpDataRouteImport } from './routes/_authenticated/admin.gp-data'
-import { Route as AuthenticatedAdminDataIngestionRouteImport } from './routes/_authenticated/admin.data-ingestion'
 import { Route as AuthenticatedAcquisitionOdsCodeRouteImport } from './routes/_authenticated/acquisition.$odsCode'
 import { Route as ApiPublicIngestPharmacyPaymentsRouteImport } from './routes/api/public/ingest.pharmacy-payments'
 import { Route as ApiPublicHooksIngestScotlandGpListsizeRouteImport } from './routes/api/public/hooks/ingest-scotland-gp-listsize'
@@ -36,6 +36,7 @@ import { Route as ApiPublicHooksIngestNiRouteImport } from './routes/api/public/
 import { Route as ApiPublicHooksIngestEnglandGpListsizeRouteImport } from './routes/api/public/hooks/ingest-england-gp-listsize'
 import { Route as ApiPublicHooksIngestEnglandGpRouteImport } from './routes/api/public/hooks/ingest-england-gp'
 import { Route as ApiPublicHooksIngestEnglandRouteImport } from './routes/api/public/hooks/ingest-england'
+import { Route as ApiPublicHooksCheckDataFreshnessRouteImport } from './routes/api/public/hooks/check-data-freshness'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -116,16 +117,16 @@ const AuthenticatedAdminPaymentsImportRoute =
     path: '/admin/payments-import',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminIngestionRoute =
+  AuthenticatedAdminIngestionRouteImport.update({
+    id: '/admin/ingestion',
+    path: '/admin/ingestion',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAdminGpDataRoute =
   AuthenticatedAdminGpDataRouteImport.update({
     id: '/admin/gp-data',
     path: '/admin/gp-data',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedAdminDataIngestionRoute =
-  AuthenticatedAdminDataIngestionRouteImport.update({
-    id: '/admin/data-ingestion',
-    path: '/admin/data-ingestion',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedAcquisitionOdsCodeRoute =
@@ -187,6 +188,12 @@ const ApiPublicHooksIngestEnglandRoute =
     path: '/api/public/hooks/ingest-england',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksCheckDataFreshnessRoute =
+  ApiPublicHooksCheckDataFreshnessRouteImport.update({
+    id: '/api/public/hooks/check-data-freshness',
+    path: '/api/public/hooks/check-data-freshness',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -202,10 +209,11 @@ export interface FileRoutesByFullPath {
   '/upload': typeof AuthenticatedUploadRoute
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/acquisition/$odsCode': typeof AuthenticatedAcquisitionOdsCodeRoute
-  '/admin/data-ingestion': typeof AuthenticatedAdminDataIngestionRoute
   '/admin/gp-data': typeof AuthenticatedAdminGpDataRoute
+  '/admin/ingestion': typeof AuthenticatedAdminIngestionRoute
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/gp-surgeries/$code': typeof AuthenticatedGpSurgeriesCodeRoute
+  '/api/public/hooks/check-data-freshness': typeof ApiPublicHooksCheckDataFreshnessRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-england-gp': typeof ApiPublicHooksIngestEnglandGpRoute
   '/api/public/hooks/ingest-england-gp-listsize': typeof ApiPublicHooksIngestEnglandGpListsizeRoute
@@ -230,10 +238,11 @@ export interface FileRoutesByTo {
   '/upload': typeof AuthenticatedUploadRoute
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/acquisition/$odsCode': typeof AuthenticatedAcquisitionOdsCodeRoute
-  '/admin/data-ingestion': typeof AuthenticatedAdminDataIngestionRoute
   '/admin/gp-data': typeof AuthenticatedAdminGpDataRoute
+  '/admin/ingestion': typeof AuthenticatedAdminIngestionRoute
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/gp-surgeries/$code': typeof AuthenticatedGpSurgeriesCodeRoute
+  '/api/public/hooks/check-data-freshness': typeof ApiPublicHooksCheckDataFreshnessRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-england-gp': typeof ApiPublicHooksIngestEnglandGpRoute
   '/api/public/hooks/ingest-england-gp-listsize': typeof ApiPublicHooksIngestEnglandGpListsizeRoute
@@ -260,10 +269,11 @@ export interface FileRoutesById {
   '/_authenticated/upload': typeof AuthenticatedUploadRoute
   '/pharmacy/$odsCode': typeof PharmacyOdsCodeRoute
   '/_authenticated/acquisition/$odsCode': typeof AuthenticatedAcquisitionOdsCodeRoute
-  '/_authenticated/admin/data-ingestion': typeof AuthenticatedAdminDataIngestionRoute
   '/_authenticated/admin/gp-data': typeof AuthenticatedAdminGpDataRoute
+  '/_authenticated/admin/ingestion': typeof AuthenticatedAdminIngestionRoute
   '/_authenticated/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/_authenticated/gp-surgeries/$code': typeof AuthenticatedGpSurgeriesCodeRoute
+  '/api/public/hooks/check-data-freshness': typeof ApiPublicHooksCheckDataFreshnessRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-england-gp': typeof ApiPublicHooksIngestEnglandGpRoute
   '/api/public/hooks/ingest-england-gp-listsize': typeof ApiPublicHooksIngestEnglandGpListsizeRoute
@@ -290,10 +300,11 @@ export interface FileRouteTypes {
     | '/upload'
     | '/pharmacy/$odsCode'
     | '/acquisition/$odsCode'
-    | '/admin/data-ingestion'
     | '/admin/gp-data'
+    | '/admin/ingestion'
     | '/admin/payments-import'
     | '/gp-surgeries/$code'
+    | '/api/public/hooks/check-data-freshness'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-england-gp'
     | '/api/public/hooks/ingest-england-gp-listsize'
@@ -318,10 +329,11 @@ export interface FileRouteTypes {
     | '/upload'
     | '/pharmacy/$odsCode'
     | '/acquisition/$odsCode'
-    | '/admin/data-ingestion'
     | '/admin/gp-data'
+    | '/admin/ingestion'
     | '/admin/payments-import'
     | '/gp-surgeries/$code'
+    | '/api/public/hooks/check-data-freshness'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-england-gp'
     | '/api/public/hooks/ingest-england-gp-listsize'
@@ -347,10 +359,11 @@ export interface FileRouteTypes {
     | '/_authenticated/upload'
     | '/pharmacy/$odsCode'
     | '/_authenticated/acquisition/$odsCode'
-    | '/_authenticated/admin/data-ingestion'
     | '/_authenticated/admin/gp-data'
+    | '/_authenticated/admin/ingestion'
     | '/_authenticated/admin/payments-import'
     | '/_authenticated/gp-surgeries/$code'
+    | '/api/public/hooks/check-data-freshness'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-england-gp'
     | '/api/public/hooks/ingest-england-gp-listsize'
@@ -368,6 +381,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
   PharmacyOdsCodeRoute: typeof PharmacyOdsCodeRoute
+  ApiPublicHooksCheckDataFreshnessRoute: typeof ApiPublicHooksCheckDataFreshnessRoute
   ApiPublicHooksIngestEnglandRoute: typeof ApiPublicHooksIngestEnglandRoute
   ApiPublicHooksIngestEnglandGpRoute: typeof ApiPublicHooksIngestEnglandGpRoute
   ApiPublicHooksIngestEnglandGpListsizeRoute: typeof ApiPublicHooksIngestEnglandGpListsizeRoute
@@ -486,18 +500,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPaymentsImportRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/ingestion': {
+      id: '/_authenticated/admin/ingestion'
+      path: '/admin/ingestion'
+      fullPath: '/admin/ingestion'
+      preLoaderRoute: typeof AuthenticatedAdminIngestionRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin/gp-data': {
       id: '/_authenticated/admin/gp-data'
       path: '/admin/gp-data'
       fullPath: '/admin/gp-data'
       preLoaderRoute: typeof AuthenticatedAdminGpDataRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/admin/data-ingestion': {
-      id: '/_authenticated/admin/data-ingestion'
-      path: '/admin/data-ingestion'
-      fullPath: '/admin/data-ingestion'
-      preLoaderRoute: typeof AuthenticatedAdminDataIngestionRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/acquisition/$odsCode': {
@@ -570,6 +584,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksIngestEnglandRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/check-data-freshness': {
+      id: '/api/public/hooks/check-data-freshness'
+      path: '/api/public/hooks/check-data-freshness'
+      fullPath: '/api/public/hooks/check-data-freshness'
+      preLoaderRoute: typeof ApiPublicHooksCheckDataFreshnessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -597,8 +618,8 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedUploadRoute: typeof AuthenticatedUploadRoute
   AuthenticatedAcquisitionOdsCodeRoute: typeof AuthenticatedAcquisitionOdsCodeRoute
-  AuthenticatedAdminDataIngestionRoute: typeof AuthenticatedAdminDataIngestionRoute
   AuthenticatedAdminGpDataRoute: typeof AuthenticatedAdminGpDataRoute
+  AuthenticatedAdminIngestionRoute: typeof AuthenticatedAdminIngestionRoute
   AuthenticatedAdminPaymentsImportRoute: typeof AuthenticatedAdminPaymentsImportRoute
 }
 
@@ -612,8 +633,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedUploadRoute: AuthenticatedUploadRoute,
   AuthenticatedAcquisitionOdsCodeRoute: AuthenticatedAcquisitionOdsCodeRoute,
-  AuthenticatedAdminDataIngestionRoute: AuthenticatedAdminDataIngestionRoute,
   AuthenticatedAdminGpDataRoute: AuthenticatedAdminGpDataRoute,
+  AuthenticatedAdminIngestionRoute: AuthenticatedAdminIngestionRoute,
   AuthenticatedAdminPaymentsImportRoute: AuthenticatedAdminPaymentsImportRoute,
 }
 
@@ -627,6 +648,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   PharmacyOdsCodeRoute: PharmacyOdsCodeRoute,
+  ApiPublicHooksCheckDataFreshnessRoute: ApiPublicHooksCheckDataFreshnessRoute,
   ApiPublicHooksIngestEnglandRoute: ApiPublicHooksIngestEnglandRoute,
   ApiPublicHooksIngestEnglandGpRoute: ApiPublicHooksIngestEnglandGpRoute,
   ApiPublicHooksIngestEnglandGpListsizeRoute:
@@ -643,13 +665,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

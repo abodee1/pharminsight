@@ -502,6 +502,51 @@ export type Database = {
         }
         Relationships: []
       }
+      ingestion_freshness_check: {
+        Row: {
+          checked_at: string
+          details: Json | null
+          error: string | null
+          id: string
+          ingested_latest_month: number | null
+          ingested_latest_year: number | null
+          items_queued: number
+          new_data_found: boolean
+          source: string
+          status: string
+          upstream_latest_month: number | null
+          upstream_latest_year: number | null
+        }
+        Insert: {
+          checked_at?: string
+          details?: Json | null
+          error?: string | null
+          id?: string
+          ingested_latest_month?: number | null
+          ingested_latest_year?: number | null
+          items_queued?: number
+          new_data_found?: boolean
+          source: string
+          status?: string
+          upstream_latest_month?: number | null
+          upstream_latest_year?: number | null
+        }
+        Update: {
+          checked_at?: string
+          details?: Json | null
+          error?: string | null
+          id?: string
+          ingested_latest_month?: number | null
+          ingested_latest_year?: number | null
+          items_queued?: number
+          new_data_found?: boolean
+          source?: string
+          status?: string
+          upstream_latest_month?: number | null
+          upstream_latest_year?: number | null
+        }
+        Relationships: []
+      }
       ingestion_log: {
         Row: {
           created_at: string
@@ -835,6 +880,27 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -885,6 +951,13 @@ export type Database = {
         }[]
       }
       gp_prescribing_add: { Args: { rows: Json }; Returns: number }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       pharmacies_near: {
         Args: {
           p_lat: number
@@ -925,7 +998,7 @@ export type Database = {
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1052,6 +1125,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const

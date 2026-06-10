@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,12 +9,47 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import {
   Database, RefreshCw, ExternalLink, CheckCircle2, AlertTriangle, Clock, Activity,
-  Pill, Stethoscope, Users2, Building2, MapPinned, Loader2,
+  Pill, Stethoscope, Users2, Building2, MapPinned, Loader2, ShieldAlert, Radar,
 } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/admin/data-ingestion")({
-  component: DataIngestionAdmin,
+export const Route = createFileRoute("/_authenticated/admin/ingestion")({
+  component: AdminIngestionGate,
 });
+
+function AdminIngestionGate() {
+  const { user, loading } = useAuth();
+  const [checking, setChecking] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) { setIsAdmin(false); setChecking(false); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+      setIsAdmin(!!data);
+      setChecking(false);
+    })();
+  }, [user, loading]);
+
+  if (loading || checking) {
+    return <div className="p-8 text-sm text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Verifying access…</div>;
+  }
+  if (!isAdmin) {
+    return (
+      <div className="p-8 max-w-md mx-auto text-center space-y-2">
+        <ShieldAlert className="h-10 w-10 text-rose-500 mx-auto" />
+        <h1 className="text-xl font-semibold">Admin only</h1>
+        <p className="text-sm text-muted-foreground">You don't have access to the ingestion control panel.</p>
+      </div>
+    );
+  }
+  return <DataIngestionAdmin />;
+}
 
 type Cadence = "monthly" | "quarterly";
 type Group = "Pharmacy dispensing" | "GP prescribing" | "GP linkage" | "GP list sizes";
@@ -318,17 +354,32 @@ function expectedPeriods(cadence: Cadence): Array<{ y: number; m: number }> {
   return out;
 }
 
+type FreshnessRow = {
+  source: string;
+  checked_at: string;
+  upstream_latest_year: number | null;
+  upstream_latest_month: number | null;
+  ingested_latest_year: number | null;
+  ingested_latest_month: number | null;
+  new_data_found: boolean;
+  items_queued: number;
+  status: string;
+  error: string | null;
+};
+
 function DataIngestionAdmin() {
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [queue, setQueue] = useState<QueueRow[]>([]);
   const [running, setRunning] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [recentEvents, setRecentEvents] = useState<LogRow[]>([]);
+  const [freshness, setFreshness] = useState<FreshnessRow[]>([]);
+  const [checkingFreshness, setCheckingFreshness] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
     const sources = DATASETS.map((d) => d.source);
-    const [{ data: lg }, { data: q }, { data: recent }] = await Promise.all([
+    const [{ data: lg }, { data: q }, { data: recent }, { data: fr }] = await Promise.all([
       supabase
         .from("ingestion_log")
         .select("source,status,year,month,rows_ingested,error,created_at")
@@ -347,14 +398,43 @@ function DataIngestionAdmin() {
         .in("source", sources)
         .order("created_at", { ascending: false })
         .limit(40),
+      supabase
+        .from("ingestion_freshness_check")
+        .select("source,checked_at,upstream_latest_year,upstream_latest_month,ingested_latest_year,ingested_latest_month,new_data_found,items_queued,status,error")
+        .order("checked_at", { ascending: false })
+        .limit(200),
     ]);
     setLogs((lg as LogRow[]) ?? []);
     setQueue((q as QueueRow[]) ?? []);
     setRecentEvents((recent as LogRow[]) ?? []);
+    setFreshness((fr as FreshnessRow[]) ?? []);
     setLoading(false);
   };
 
   useEffect(() => { refresh(); }, []);
+
+  const triggerFreshness = async () => {
+    setCheckingFreshness(true);
+    toast.info("Running change-detection sweep…");
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      const res = await fetch(`/api/public/hooks/check-data-freshness`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`);
+      const newOnes = (j.results ?? []).filter((r: any) => r.new_data_found).length;
+      toast.success(`Checked ${j.checked} sources · ${newOnes} with new data`);
+      await refresh();
+    } catch (e: any) {
+      toast.error(`Change-detection failed: ${e?.message ?? e}`);
+    } finally {
+      setCheckingFreshness(false);
+    }
+  };
+
 
   const statsBySource = useMemo(() => {
     const out: Record<string, Stats> = {};
@@ -427,7 +507,10 @@ function DataIngestionAdmin() {
             All NHS open datasets we ingest and keep up to date. Internal use — not visible to public users.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="default" size="sm" onClick={triggerFreshness} disabled={checkingFreshness}>
+            {checkingFreshness ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radar className="h-4 w-4" />} Run change-detection
+          </Button>
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Refresh
           </Button>
@@ -439,6 +522,12 @@ function DataIngestionAdmin() {
           </Link>
         </div>
       </div>
+
+      {/* Per-region coverage breakdown */}
+      <RegionBreakdown statsBySource={statsBySource} />
+
+      {/* Change-detection panel */}
+      <FreshnessPanel freshness={freshness} />
 
       {/* Portfolio summary */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -551,4 +640,121 @@ function emptyStats(): Stats {
     successes30d: 0, failures30d: 0, totalRecords30d: 0,
     pendingQueue: 0, coveragePct: 0,
   };
+}
+
+function RegionBreakdown({ statsBySource }: { statsBySource: Record<string, Stats> }) {
+  const regions: Array<Dataset["country"]> = ["England", "Scotland", "Northern Ireland"];
+  const byRegion = regions.map((region) => {
+    const items = DATASETS.filter((d) => d.country === region);
+    const stats = items.map((d) => statsBySource[d.source]).filter(Boolean) as Stats[];
+    const healthy = stats.filter((s) => s.latestSuccess && (!s.latestFailure || new Date(s.latestSuccess.created_at) >= new Date(s.latestFailure.created_at))).length;
+    const failing = stats.length - healthy;
+    const queued = stats.reduce((s, x) => s + x.pendingQueue, 0);
+    const coverageAvg = stats.length
+      ? Math.round(stats.reduce((s, x) => s + x.coveragePct, 0) / stats.length)
+      : 0;
+    return { region, total: items.length, healthy, failing, queued, coverageAvg };
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Per-region coverage</CardTitle>
+        <CardDescription>Quick read of where data gaps live across the UK.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {byRegion.map((r) => {
+          const tone = r.failing > 0 ? "bad" : r.coverageAvg < 80 ? "neutral" : "good";
+          const dot = tone === "good" ? "bg-emerald-500" : tone === "bad" ? "bg-rose-500" : "bg-amber-500";
+          return (
+            <div key={r.region} className="rounded-lg border border-border p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold">{r.region}</p>
+                <span className={`h-2 w-2 rounded-full ${dot}`} />
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div><p className="text-muted-foreground">Pipelines</p><p className="font-semibold tabular-nums">{r.total}</p></div>
+                <div><p className="text-muted-foreground">Healthy</p><p className="font-semibold tabular-nums text-emerald-700">{r.healthy}</p></div>
+                <div><p className="text-muted-foreground">Failing</p><p className={`font-semibold tabular-nums ${r.failing > 0 ? "text-rose-700" : ""}`}>{r.failing}</p></div>
+              </div>
+              <div>
+                <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                  <span>Avg coverage</span><span>{r.coverageAvg}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                  <div className="h-full bg-emerald-500" style={{ width: `${r.coverageAvg}%` }} />
+                </div>
+              </div>
+              {r.queued > 0 && (
+                <p className="text-[11px] text-amber-700"><Clock className="inline h-3 w-3 mr-1" />{r.queued} items queued</p>
+              )}
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
+function FreshnessPanel({ freshness }: { freshness: FreshnessRow[] }) {
+  const latestBySource = new Map<string, FreshnessRow>();
+  for (const r of freshness) if (!latestBySource.has(r.source)) latestBySource.set(r.source, r);
+  const lastRunAny = freshness[0];
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2"><Radar className="h-4 w-4 text-gold" /> Change-detection</CardTitle>
+        <CardDescription>
+          {lastRunAny
+            ? <>Last run {new Date(lastRunAny.checked_at).toLocaleString()} · runs every Monday and on demand.</>
+            : <>No change-detection runs recorded yet — click "Run change-detection" above to start.</>}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Dataset</TableHead>
+              <TableHead>Last checked</TableHead>
+              <TableHead>Upstream latest</TableHead>
+              <TableHead>Ingested latest</TableHead>
+              <TableHead>New data?</TableHead>
+              <TableHead className="text-right">Queued</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {DATASETS.map((ds) => {
+              const row = latestBySource.get(ds.source);
+              const upstream = row ? periodLabel(row.upstream_latest_year, row.upstream_latest_month) : "—";
+              const ingested = row ? periodLabel(row.ingested_latest_year, row.ingested_latest_month) : "—";
+              const upScore = row && row.upstream_latest_year && row.upstream_latest_month ? row.upstream_latest_year * 12 + row.upstream_latest_month : 0;
+              const inScore = row && row.ingested_latest_year && row.ingested_latest_month ? row.ingested_latest_year * 12 + row.ingested_latest_month : 0;
+              const behind = upScore > inScore;
+              return (
+                <TableRow key={ds.source}>
+                  <TableCell className="text-xs">{ds.label}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{row ? timeAgo(row.checked_at) : "—"}</TableCell>
+                  <TableCell className="text-xs tabular-nums">{upstream}</TableCell>
+                  <TableCell className={`text-xs tabular-nums ${behind ? "text-rose-700 font-semibold" : ""}`}>{ingested}</TableCell>
+                  <TableCell className="text-xs">
+                    {row?.new_data_found
+                      ? <span className="inline-flex items-center gap-1 text-amber-800 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5"><AlertTriangle className="h-3 w-3" /> Yes</span>
+                      : row ? <span className="inline-flex items-center gap-1 text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5"><CheckCircle2 className="h-3 w-3" /> Up to date</span> : "—"}
+                  </TableCell>
+                  <TableCell className="text-xs text-right tabular-nums">{row?.items_queued ?? "—"}</TableCell>
+                  <TableCell className="text-xs">
+                    {row?.status === "failed" || row?.status === "trigger_failed"
+                      ? <span className="text-rose-700" title={row.error ?? ""}>{row.status}</span>
+                      : row ? <span className="text-emerald-700">{row.status}</span> : "—"}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
 }
