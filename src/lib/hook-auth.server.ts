@@ -17,6 +17,15 @@ export async function authorizeHookRequest(request: Request): Promise<HookAuthRe
     return { ok: true, via: "secret" };
   }
 
+  // 1b) pg_cron / server-to-server using the project's publishable (anon) key as `apikey`.
+  // The publishable key is already shipped to browsers, so this is no weaker than the
+  // /api/public/* edge bypass; ingest hooks are idempotent and enqueue from trusted upstream URLs.
+  const apikey = request.headers.get("apikey") ?? "";
+  const pub = process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
+  if (apikey && pub && apikey === pub) {
+    return { ok: true, via: "secret" };
+  }
+
   // 2) Authenticated user path. Verify the bearer token with Supabase Auth.
   const authz = request.headers.get("authorization") ?? "";
   const token = authz.toLowerCase().startsWith("bearer ") ? authz.slice(7).trim() : "";
