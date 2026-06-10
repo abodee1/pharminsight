@@ -619,11 +619,33 @@ function Compare() {
 
           {/* GP feeder overlap & catchment analysis (≥2 selected) */}
           {selectedPharms.length >= 2 && (
-            <GpFeederOverlap
-              pharms={selectedPharms.map((p) => ({ id: p.id, name: p.name, country: p.country }))}
-              colorFor={colorFor}
-              monthsWindow={12}
-            />
+            <div className="space-y-2 mb-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">GP feeder window</p>
+                <div className="inline-flex rounded-md border border-border bg-secondary/40 p-0.5 flex-wrap">
+                  {([3, 6, 12, 24, 0] as const).map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => setGpFeederWindow(w)}
+                      className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                        gpFeederWindow === w
+                          ? "bg-card text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      aria-pressed={gpFeederWindow === w}
+                    >
+                      {w === 0 ? "All" : `${w}M`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <GpFeederOverlap
+                pharms={selectedPharms.map((p) => ({ id: p.id, name: p.name, country: p.country }))}
+                colorFor={colorFor}
+                monthsWindow={gpFeederWindow}
+              />
+            </div>
           )}
 
           {/* Competitor geography heatmap (≥1 selected, needs lat/lng) */}
