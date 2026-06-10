@@ -159,9 +159,11 @@ export function InteractiveTrend({
   }, [rows, activeMetrics, win]);
 
   // Need normalisation when mixing very different scales (e.g. Items + Final £)
-  // Use a dual y-axis if mixing £ metrics with count metrics
-  const hasMoney = activeMetrics.some((k) => k === "gross" || k === "final");
-  const hasCount = activeMetrics.some((k) => k !== "gross" && k !== "final");
+  // Use a dual y-axis if mixing £ metrics with count metrics. PF in money mode
+  // counts as a money metric.
+  const pfIsMoney = pfUnit === "money" && activeMetrics.includes("pf");
+  const hasMoney = activeMetrics.some((k) => k === "gross" || k === "final") || pfIsMoney;
+  const hasCount = activeMetrics.some((k) => k !== "gross" && k !== "final" && !(k === "pf" && pfUnit === "money"));
   const dualAxis = hasMoney && hasCount;
 
   // Single-metric: keep the focused average reference line
@@ -177,13 +179,41 @@ export function InteractiveTrend({
             Toggle one or more metrics. {singleMetric ? `Dashed line marks the ${win >= ALL_PERIOD ? `all-time (${points.length}-month)` : `${Number(win)}-month`} average.` : "Compare multiple trends at once."}
           </p>
         </div>
-        <PeriodPills value={win} onChange={setWin} options={windows} />
+        <div className="flex items-center gap-2 flex-wrap">
+          {activeMetrics.includes("pf") && (
+            <div className="inline-flex items-center rounded-md border border-border bg-secondary/40 p-0.5" title="Pharmacy First — consultations or remuneration">
+              <button
+                type="button"
+                onClick={() => setPfUnit("count")}
+                className={[
+                  "px-2 py-0.5 text-[10px] font-semibold rounded-sm transition-colors",
+                  pfUnit === "count" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+                aria-pressed={pfUnit === "count"}
+              >
+                PF #
+              </button>
+              <button
+                type="button"
+                onClick={() => setPfUnit("money")}
+                className={[
+                  "px-2 py-0.5 text-[10px] font-semibold rounded-sm transition-colors",
+                  pfUnit === "money" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+                aria-pressed={pfUnit === "money"}
+              >
+                PF £
+              </button>
+            </div>
+          )}
+          <PeriodPills value={win} onChange={setWin} options={windows} />
+        </div>
       </div>
 
       {/* Metric toggle pills */}
       <div className="flex flex-wrap gap-1 mb-3">
         {available.map((k) => {
-          const m = MET[k];
+          const m = M[k];
           const active = activeMetrics.includes(k);
           return (
             <button
@@ -204,6 +234,7 @@ export function InteractiveTrend({
           );
         })}
       </div>
+
 
       {/* Headline strip — per active metric */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-3">
