@@ -225,7 +225,7 @@ function Compare() {
     setLoading(true);
     (async () => {
       const now = new Date();
-      const cutoff = new Date(now.getFullYear(), now.getMonth() - 24, 1);
+      const cutoff = new Date(now.getFullYear(), now.getMonth() - 60, 1);
       const cutoffYear = cutoff.getFullYear();
       const data = await fetchAll<Row>((from, to) =>
         supabase
