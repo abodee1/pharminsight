@@ -320,7 +320,7 @@ export function GpFeederOverlap({
       {/* Major feeders per pharmacy — top GP practices by name */}
       <div className="rounded-xl bg-card border border-border p-5 md:p-6 shadow-sm">
         <h3 className="text-sm font-semibold mb-1">Major GP feeders · top practices by name</h3>
-        <p className="text-xs text-muted-foreground mb-4">The largest prescribing practices feeding each pharmacy over the {monthsWindow last {monthsWindow} monthslast {monthsWindow} months monthsWindow > 0 ? `last ${monthsWindow} months` : "all available history"}. Share = % of that pharmacy's total items.</p>
+        <p className="text-xs text-muted-foreground mb-4">The largest prescribing practices feeding each pharmacy over the {monthsWindow && monthsWindow > 0 ? `last ${monthsWindow} months` : "available history"}. Share = % of that pharmacy's total items.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {pharms.map((p) => {
             const feeders = summary.topFeedersPerPh[p.id] || [];
