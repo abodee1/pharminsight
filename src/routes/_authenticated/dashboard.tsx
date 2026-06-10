@@ -480,8 +480,16 @@ function Dashboard() {
             window={trendWindow}
             onWindowChange={setTrendWindow}
             caption={`Consultations delivered through the Pharmacy First pathway. Latest month: ${stats.pf.toLocaleString()} consultations · ${fmtGbpCompact(stats.pfPayment)} remuneration.`}
+            altSeries={pharmacy ? {
+              primaryUnitLabel: "#",
+              altUnitLabel: "£",
+              altValues: pfPaymentSeries,
+              altFormat: (n) => fmtGbpCompact(n),
+              altTitleSuffix: "remuneration view",
+            } : undefined}
           />
         )}
+
         {pharmacy && costPoints.length > 0 && (
           <TrendCard
             title="Gross drug cost"
