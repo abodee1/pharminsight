@@ -21,6 +21,7 @@ import {
 } from "@/components/Infographics";
 import { LocalLandscape } from "@/components/LocalLandscape";
 import { fmtGbpCompact } from "@/lib/utils";
+import { clearViewedPharmacy } from "@/lib/viewedPharmacy";
 
 import {
   Trophy, BarChart2, GitCompare, Package, Stethoscope, ClipboardCheck, Medal,
