@@ -335,8 +335,17 @@ function Stat({ label, value, tone = "neutral" }: { label: string; value: string
   );
 }
 
+// Map any month to its quarter-end month (1-3→3, 4-6→6, 7-9→9, 10-12→12).
+function quarterEndMonth(month: number): number {
+  return (Math.floor((month - 1) / 3) + 1) * 3;
+}
+
 function expectedPeriods(cadence: Cadence): Array<{ y: number; m: number }> {
-  // monthly: last 36 months ending last month; quarterly: last 12 quarters (mar/jun/sep/dec)
+  // monthly: last 36 calendar months ending last month.
+  // quarterly: last 12 quarters keyed by quarter-end month (3/6/9/12). We
+  // match ingested rows by quarter rather than exact month, since publishers
+  // report on different cadences within a quarter (Scotland 1/4/7/10,
+  // England's Patients-Registered extract on the 2nd month of a quarter).
   const out: Array<{ y: number; m: number }> = [];
   const now = new Date();
   if (cadence === "monthly") {
@@ -345,10 +354,12 @@ function expectedPeriods(cadence: Cadence): Array<{ y: number; m: number }> {
       out.push({ y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 });
     }
   } else {
+    const curQ = Math.floor(now.getUTCMonth() / 3); // 0..3
     for (let i = 1; i <= 12; i++) {
-      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i * 3, 1));
-      const m = [3, 6, 9, 12].reduce((p, c) => (Math.abs(c - (d.getUTCMonth() + 1)) < Math.abs(p - (d.getUTCMonth() + 1)) ? c : p), 3);
-      out.push({ y: d.getUTCFullYear(), m });
+      const qIdx = curQ - i;
+      const yearShift = Math.floor(qIdx / 4);
+      const qNorm = ((qIdx % 4) + 4) % 4;
+      out.push({ y: now.getUTCFullYear() + yearShift, m: (qNorm + 1) * 3 });
     }
   }
   return out;
@@ -443,16 +454,30 @@ function DataIngestionAdmin() {
       const mine = logs.filter((l) => l.source === ds.source);
       const successes = mine.filter((l) => l.status === "success");
       const failures = mine.filter((l) => l.status === "failed");
+      // "Latest ingested period" must reflect the latest (year, month) actually
+      // covered — not the most recently inserted row, which can be an older
+      // backfill ingested last (e.g. Scotland list sizes inserted 2014-04 last).
+      const latestByPeriod = [...successes]
+        .filter((s) => s.year != null && s.month != null)
+        .sort((a, b) => (b.year! * 12 + b.month!) - (a.year! * 12 + a.month!))[0]
+        ?? successes[0]
+        ?? null;
       const last30 = mine.filter((l) => new Date(l.created_at).getTime() >= cutoff30);
       const pending = queue.filter((qq) => qq.source === ds.source && (qq.status === "pending" || qq.status === "processing")).length;
 
       const exp = expectedPeriods(ds.cadence);
-      const ingestedKey = new Set(successes.map((s) => `${s.year}-${s.month}`));
+      const ingestedKey = new Set(
+        successes
+          .filter((s) => s.year != null && s.month != null)
+          .map((s) => ds.cadence === "quarterly"
+            ? `${s.year}-${quarterEndMonth(s.month!)}`
+            : `${s.year}-${s.month}`),
+      );
       const covered = exp.filter((p) => ingestedKey.has(`${p.y}-${p.m}`)).length;
       const coveragePct = Math.round((covered / exp.length) * 100);
 
       out[ds.source] = {
-        latestSuccess: successes[0] ?? null,
+        latestSuccess: latestByPeriod,
         latestFailure: failures[0] ?? null,
         successes30d: last30.filter((l) => l.status === "success").length,
         failures30d: last30.filter((l) => l.status === "failed").length,
