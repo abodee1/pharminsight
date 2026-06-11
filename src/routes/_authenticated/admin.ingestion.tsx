@@ -12,6 +12,31 @@ import {
   Pill, Stethoscope, Users2, Building2, MapPinned, Loader2, ShieldAlert, Radar,
 } from "lucide-react";
 
+// ---- Friendly error helpers ---------------------------------------------
+function humanizeHookError(body: any, status: number): string {
+  const raw = typeof body === "string"
+    ? body
+    : (body?.error || body?.message || body?.detail || "");
+  const msg = String(raw || "").trim();
+
+  if (status === 401 || status === 403) return "Not authorised. Sign back in as an admin and retry.";
+  if (status === 408 || /timeout|timed out/i.test(msg)) return "The upstream source took too long to respond. Try again in a minute.";
+  if (status === 429 || /rate.?limit/i.test(msg)) return "Upstream rate limit hit. Wait a couple of minutes before retrying.";
+  if (status === 502 || status === 503 || status === 504) return "Upstream NHS / Open Data service is unavailable right now. Retry shortly.";
+  if (/ENOTFOUND|ECONN|fetch failed|network/i.test(msg)) return "Couldn't reach the upstream source. Check connectivity and retry.";
+  if (/no new|already up to date|nothing to do/i.test(msg)) return "No new data is available from the upstream source.";
+  if (msg) return msg.length > 400 ? msg.slice(0, 400) + "…" : msg;
+  return `Request failed (HTTP ${status}).`;
+}
+
+function friendlyMessage(e: unknown): string {
+  if (!e) return "Unknown error.";
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  try { return JSON.stringify(e); } catch { return String(e); }
+}
+
+
 export const Route = createFileRoute("/_authenticated/admin/ingestion")({
   component: AdminIngestionGate,
 });
