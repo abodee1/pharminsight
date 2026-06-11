@@ -92,6 +92,9 @@ function Benchmarking() {
   // Per-metric snapshots: snapshots[metricKey] = { year, month, regionRows, countryRows }
   const [snapshots, setSnapshots] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
+  const [insightMd, setInsightMd] = useState<string | null>(null);
+  const [insightLoading, setInsightLoading] = useState(false);
+  const runInsight = useServerFn(generateInsight);
 
   // Load the SUBJECT pharmacy. Priority: in-page override > "browsed" pharmacy
   // (set when the user opens another pharmacy via the search bar) > saved
