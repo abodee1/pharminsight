@@ -11,6 +11,7 @@ import {
   Bookmark,
   Stethoscope,
   Sparkles,
+  Store,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { PharmacySearch } from "./PharmacySearch";
@@ -23,6 +24,7 @@ const links = [
   { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/my-analyses", label: "My Analyses", icon: Bookmark },
   { to: "/insights", label: "Smart Insights", icon: Sparkles },
+  { to: "/distance-selling", label: "Distance Selling", icon: Store },
 
   // Admin data ingestion intentionally hidden from primary nav.
   { to: "/settings", label: "My Account", icon: Settings },

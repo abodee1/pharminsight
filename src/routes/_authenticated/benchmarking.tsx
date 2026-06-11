@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
 import { PercentileRail, GpPrescribingCard } from "@/components/Infographics";
+import { MarketShareSection } from "@/components/MarketShareSection";
 import { PharmacySearch } from "@/components/PharmacySearch";
 import { CountryBadge } from "@/components/CountryBadge";
 import { Button } from "@/components/ui/button";
@@ -405,6 +406,22 @@ function Benchmarking() {
                 GP practice activity
               </h2>
               <GpPrescribingCard pharmacyOds={pharmacy.ods_code} />
+            </section>
+          )}
+
+          {/* Market share */}
+          {pharmacy.id && pharmacy.ods_code && (
+            <section className="mb-10">
+              <h2 className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
+                Market position
+              </h2>
+              <MarketShareSection
+                pharmacyId={pharmacy.id}
+                pharmacyOds={pharmacy.ods_code}
+                pharmacyName={pharmacy.name}
+                lat={pharmacy.lat}
+                lng={pharmacy.lng}
+              />
             </section>
           )}
 

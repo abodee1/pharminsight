@@ -20,6 +20,7 @@ import { Route as AuthenticatedMyAnalysesRouteImport } from './routes/_authentic
 import { Route as AuthenticatedLeaderboardsRouteImport } from './routes/_authenticated/leaderboards'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedGpSurgeriesRouteImport } from './routes/_authenticated/gp-surgeries'
+import { Route as AuthenticatedDistanceSellingRouteImport } from './routes/_authenticated/distance-selling'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCompareRouteImport } from './routes/_authenticated/compare'
 import { Route as AuthenticatedBenchmarkingRouteImport } from './routes/_authenticated/benchmarking'
@@ -94,6 +95,12 @@ const AuthenticatedGpSurgeriesRoute =
   AuthenticatedGpSurgeriesRouteImport.update({
     id: '/gp-surgeries',
     path: '/gp-surgeries',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedDistanceSellingRoute =
+  AuthenticatedDistanceSellingRouteImport.update({
+    id: '/distance-selling',
+    path: '/distance-selling',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
@@ -215,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/benchmarking': typeof AuthenticatedBenchmarkingRoute
   '/compare': typeof AuthenticatedCompareRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/distance-selling': typeof AuthenticatedDistanceSellingRoute
   '/gp-surgeries': typeof AuthenticatedGpSurgeriesRouteWithChildren
   '/insights': typeof AuthenticatedInsightsRoute
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
@@ -246,6 +254,7 @@ export interface FileRoutesByTo {
   '/benchmarking': typeof AuthenticatedBenchmarkingRoute
   '/compare': typeof AuthenticatedCompareRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/distance-selling': typeof AuthenticatedDistanceSellingRoute
   '/gp-surgeries': typeof AuthenticatedGpSurgeriesRouteWithChildren
   '/insights': typeof AuthenticatedInsightsRoute
   '/leaderboards': typeof AuthenticatedLeaderboardsRoute
@@ -279,6 +288,7 @@ export interface FileRoutesById {
   '/_authenticated/benchmarking': typeof AuthenticatedBenchmarkingRoute
   '/_authenticated/compare': typeof AuthenticatedCompareRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/distance-selling': typeof AuthenticatedDistanceSellingRoute
   '/_authenticated/gp-surgeries': typeof AuthenticatedGpSurgeriesRouteWithChildren
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/leaderboards': typeof AuthenticatedLeaderboardsRoute
@@ -312,6 +322,7 @@ export interface FileRouteTypes {
     | '/benchmarking'
     | '/compare'
     | '/dashboard'
+    | '/distance-selling'
     | '/gp-surgeries'
     | '/insights'
     | '/leaderboards'
@@ -343,6 +354,7 @@ export interface FileRouteTypes {
     | '/benchmarking'
     | '/compare'
     | '/dashboard'
+    | '/distance-selling'
     | '/gp-surgeries'
     | '/insights'
     | '/leaderboards'
@@ -375,6 +387,7 @@ export interface FileRouteTypes {
     | '/_authenticated/benchmarking'
     | '/_authenticated/compare'
     | '/_authenticated/dashboard'
+    | '/_authenticated/distance-selling'
     | '/_authenticated/gp-surgeries'
     | '/_authenticated/insights'
     | '/_authenticated/leaderboards'
@@ -496,6 +509,13 @@ declare module '@tanstack/react-router' {
       path: '/gp-surgeries'
       fullPath: '/gp-surgeries'
       preLoaderRoute: typeof AuthenticatedGpSurgeriesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/distance-selling': {
+      id: '/_authenticated/distance-selling'
+      path: '/distance-selling'
+      fullPath: '/distance-selling'
+      preLoaderRoute: typeof AuthenticatedDistanceSellingRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/dashboard': {
@@ -652,6 +672,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedBenchmarkingRoute: typeof AuthenticatedBenchmarkingRoute
   AuthenticatedCompareRoute: typeof AuthenticatedCompareRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDistanceSellingRoute: typeof AuthenticatedDistanceSellingRoute
   AuthenticatedGpSurgeriesRoute: typeof AuthenticatedGpSurgeriesRouteWithChildren
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedLeaderboardsRoute: typeof AuthenticatedLeaderboardsRoute
@@ -668,6 +689,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBenchmarkingRoute: AuthenticatedBenchmarkingRoute,
   AuthenticatedCompareRoute: AuthenticatedCompareRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDistanceSellingRoute: AuthenticatedDistanceSellingRoute,
   AuthenticatedGpSurgeriesRoute: AuthenticatedGpSurgeriesRouteWithChildren,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedLeaderboardsRoute: AuthenticatedLeaderboardsRoute,
@@ -708,3 +730,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

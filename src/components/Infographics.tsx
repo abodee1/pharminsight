@@ -721,16 +721,19 @@ export function DistributionStrip({
     if (!arr.length) return { buckets: [] as number[], max: 0, min: 0, peakIdx: -1, highlightIdx: -1 };
     const lo = Math.min(...arr);
     const hi = Math.max(...arr);
-    const range = hi - lo || 1;
+    // Log-scale binning so right-skewed dispensing data spreads evenly across bins.
+    const logLo = Math.log1p(lo);
+    const logHi = Math.log1p(hi);
+    const logRange = logHi - logLo || 1;
     const buckets = new Array(bins).fill(0);
     arr.forEach((v) => {
-      const idx = Math.min(bins - 1, Math.floor(((v - lo) / range) * bins));
+      const idx = Math.min(bins - 1, Math.floor(((Math.log1p(v) - logLo) / logRange) * bins));
       buckets[idx] += 1;
     });
     const peak = buckets.indexOf(Math.max(...buckets));
     const hIdx =
       typeof highlightValue === "number"
-        ? Math.min(bins - 1, Math.max(0, Math.floor(((highlightValue - lo) / range) * bins)))
+        ? Math.min(bins - 1, Math.max(0, Math.floor(((Math.log1p(highlightValue) - logLo) / logRange) * bins)))
         : -1;
     return { buckets, max: hi, min: lo, peakIdx: peak, highlightIdx: hIdx };
   }, [values, bins, highlightValue]);

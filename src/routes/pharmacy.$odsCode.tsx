@@ -9,7 +9,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, Cell,
 } from "recharts";
-import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X, ShieldCheck, Sparkles, Package, Stethoscope, ClipboardCheck, FileText, PoundSterling, Cigarette, Pill, Syringe, HeartPulse, Activity } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ArrowLeft, Star, X, ShieldCheck, Sparkles, Package, Stethoscope, ClipboardCheck, FileText, PoundSterling, Cigarette, Pill, Syringe, HeartPulse, Activity, GitCompare } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PharmacySearch } from "@/components/PharmacySearch";
 import { PercentileRail, AnnotatedSparkline, ShareDonut, GpPrescribingCard } from "@/components/Infographics";
@@ -17,6 +17,9 @@ import { LocalLandscape } from "@/components/LocalLandscape";
 import { LocalRadiusInsights } from "@/components/LocalRadiusInsights";
 import { InteractiveTrend } from "@/components/InteractiveTrend";
 import { AnalysisPanel } from "@/components/AnalysisPanel";
+import { MarketShareSection } from "@/components/MarketShareSection";
+import { NominationFlow } from "@/components/NominationFlow";
+import { CompetitorDeepDive } from "@/components/CompetitorDeepDive";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetchAll } from "@/lib/fetchAll";
 import { cn } from "@/lib/utils";
@@ -85,6 +88,7 @@ function PharmacyProfile() {
     items_dispensed: string; nms_count: string; pharmacy_first_count: string; eps_items: string;
   }>({ items_dispensed: "", nms_count: "", pharmacy_first_count: "", eps_items: "" });
   const [analyseOpen, setAnalyseOpen] = useState(false);
+  const [deepDiveOpen, setDeepDiveOpen] = useState(false);
   const [statWindow, setStatWindow] = useState<WindowKey>(12);
 
 
@@ -546,6 +550,16 @@ function PharmacyProfile() {
               <Sparkles className="h-4 w-4" /> Analyse This Pharmacy
             </Button>
           )}
+          {user && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => setDeepDiveOpen(d => !d)}
+            >
+              <GitCompare className="h-4 w-4" /> Deep dive vs competitor
+            </Button>
+          )}
           {user && !isMine && !showClaimBanner && (
             <button onClick={claimAsMine} className="text-xs text-primary hover:underline">
               Set as my pharmacy
@@ -553,6 +567,16 @@ function PharmacyProfile() {
           )}
         </div>
       </div>
+
+      {deepDiveOpen && pharmacy && user && (
+        <CompetitorDeepDive
+          pharmacyId={pharmacy.id}
+          pharmacyOds={pharmacy.ods_code}
+          pharmacyName={pharmacy.name}
+          country={pharmacy.country}
+          onClose={() => setDeepDiveOpen(false)}
+        />
+      )}
 
       {metrics.length === 0 ? (
         <p className="mt-8 text-sm text-muted-foreground">No dispensing data available for this pharmacy yet.</p>
@@ -737,11 +761,20 @@ function PharmacyProfile() {
             <GpPrescribingCard pharmacyOds={pharmacy.ods_code} />
           </section>
 
+          <NominationFlow pharmacyOds={pharmacy.ods_code} country={pharmacy.country} />
 
           <LocalLandscape
             pharmacyName={pharmacy.name}
             postcode={pharmacy.postcode}
             address={pharmacy.address}
+          />
+
+          <MarketShareSection
+            pharmacyId={pharmacy.id}
+            pharmacyOds={pharmacy.ods_code}
+            pharmacyName={pharmacy.name}
+            lat={pharmacy.lat}
+            lng={pharmacy.lng}
           />
 
           {/* Pharmacy First service mix hidden for now
