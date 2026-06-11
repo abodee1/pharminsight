@@ -137,7 +137,11 @@ function Benchmarking() {
         .maybeSingle();
       if (ph) setPharmacy(ph);
     })();
-  }, [pharmacyOverride]);
+  }, [pharmacy_override_marker(pharmacyOverride)]);
+
+  // Reset AI insight whenever the active pharmacy changes
+  useEffect(() => { setInsightMd(null); }, [pharmacy?.id]);
+
 
   // When the active pharmacy changes, load cohorts + history
   useEffect(() => {
