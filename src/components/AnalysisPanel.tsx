@@ -327,6 +327,13 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
       )}
 
 
+      <LocationInsights
+        pharmacyId={pharmacy.id}
+        pharmacyName={pharmacy.name}
+        postcode={pharmacy.postcode}
+        address={pharmacy.address}
+      />
+
       <RemunerationReport pharmacy={pharmacy} rows={rows} />
     </div>
   );
