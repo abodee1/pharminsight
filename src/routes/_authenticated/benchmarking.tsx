@@ -518,12 +518,49 @@ function Benchmarking() {
             );
           })}
 
-          <Link
-            to="/insights"
-            className="inline-block rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90 transition active:scale-[0.98]"
-          >
-            Generate Smart Insight for this data
-          </Link>
+          <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
+              <div>
+                <h2 className="text-base font-semibold flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-gold" /> Smart Insight
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  AI commentary tailored to this pharmacy's volume, services, revenue and peer gaps.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                disabled={insightLoading || !pharmacy}
+                onClick={async () => {
+                  if (!pharmacy) return;
+                  setInsightLoading(true);
+                  setInsightMd(null);
+                  try {
+                    const { insight } = await runInsight({
+                      data: { insight_type: "benchmark", pharmacy_id: pharmacy.id },
+                    });
+                    setInsightMd(insight?.insight_text ?? "");
+                  } catch (e: any) {
+                    toast.error(e?.message || "Could not generate Smart Insight");
+                  } finally {
+                    setInsightLoading(false);
+                  }
+                }}
+                className="gap-1.5"
+              >
+                {insightLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {insightMd ? "Regenerate" : "Generate Smart Insight"}
+              </Button>
+            </div>
+            {insightLoading && !insightMd && (
+              <p className="text-sm text-muted-foreground">Crunching the numbers…</p>
+            )}
+            {insightMd && (
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <ReactMarkdown>{insightMd}</ReactMarkdown>
+              </div>
+            )}
+          </div>
         </>
       )}
 
