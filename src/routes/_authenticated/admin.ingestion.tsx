@@ -513,15 +513,19 @@ function DataIngestionAdmin() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const j = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`);
+      if (!res.ok) throw new Error(humanizeHookError(j, res.status));
       toast.success(`${ds.label}: queued ${j.queued ?? 0}, processed ${j.processed ?? 0}`);
       await refresh();
     } catch (e: any) {
-      toast.error(`${ds.label} failed: ${e?.message ?? e}`);
+      toast.error(`${ds.label} failed`, {
+        description: friendlyMessage(e),
+        duration: 12000,
+      });
     } finally {
       setRunning((s) => ({ ...s, [ds.source]: false }));
     }
   };
+
 
   const groups: Group[] = ["Pharmacy dispensing", "GP prescribing", "GP linkage", "GP list sizes"];
 
