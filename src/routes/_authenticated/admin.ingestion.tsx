@@ -435,16 +435,20 @@ function DataIngestionAdmin() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const j = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`);
+      if (!res.ok) throw new Error(humanizeHookError(j, res.status));
       const newOnes = (j.results ?? []).filter((r: any) => r.new_data_found).length;
       toast.success(`Checked ${j.checked} sources · ${newOnes} with new data`);
       await refresh();
     } catch (e: any) {
-      toast.error(`Change-detection failed: ${e?.message ?? e}`);
+      toast.error("Change-detection failed", {
+        description: friendlyMessage(e),
+        duration: 12000,
+      });
     } finally {
       setCheckingFreshness(false);
     }
   };
+
 
 
   const statsBySource = useMemo(() => {
