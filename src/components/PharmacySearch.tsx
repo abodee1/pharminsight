@@ -151,7 +151,7 @@ export function PharmacySearch({
       </div>
 
       {open && q.trim().length >= 2 && (
-        <div className="absolute z-50 mt-1 w-full min-w-[320px] rounded-md border border-border bg-popover text-popover-foreground shadow-lg max-h-[420px] overflow-y-auto">
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground shadow-lg max-h-[60vh] overflow-y-auto overscroll-contain">
           {!loading && results.length === 0 && (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">
               No pharmacies found. Try a different name or postcode.

@@ -557,7 +557,7 @@ function PharmacyProfile() {
               className="gap-1.5"
               onClick={() => setDeepDiveOpen(d => !d)}
             >
-              <GitCompare className="h-4 w-4" /> Pharmacy overview
+              <GitCompare className="h-4 w-4" /> Head-to-Head at a glance
             </Button>
           )}
           {user && !isMine && !showClaimBanner && (
