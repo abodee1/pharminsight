@@ -489,7 +489,7 @@ function PharmacyProfile() {
           </div>
         </div>
       </div>
-      <div className="p-6 md:p-10 max-w-6xl mx-auto">
+      <div className="p-4 sm:p-6 md:p-10 max-w-6xl mx-auto overflow-x-hidden">
 
       {showClaimBanner && (
         <div className="mb-6 rounded-lg border border-gold/40 bg-gold/10 p-4 flex items-start gap-3">
@@ -557,7 +557,7 @@ function PharmacyProfile() {
               className="gap-1.5"
               onClick={() => setDeepDiveOpen(d => !d)}
             >
-              <GitCompare className="h-4 w-4" /> Deep dive vs competitor
+              <GitCompare className="h-4 w-4" /> Pharmacy overview
             </Button>
           )}
           {user && !isMine && !showClaimBanner && (

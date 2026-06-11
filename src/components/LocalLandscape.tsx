@@ -29,7 +29,7 @@ type NearbyGP = {
 };
 
 function displayPracticeName(g: { google_name?: string | null; practice_name?: string | null; practice_code?: string }) {
-  return g.google_name || g.practice_name || g.practice_code || "GP Practice";
+  return g.practice_name || g.google_name || g.practice_code || "GP Practice";
 }
 
 function fmtDist(m: number | null) {
