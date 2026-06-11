@@ -390,6 +390,17 @@ function expectedPeriods(cadence: Cadence): Array<{ y: number; m: number }> {
   return out;
 }
 
+type SchemaAlertRow = {
+  id: string;
+  source: string;
+  dataset: string | null;
+  missing_field: string;
+  tried_variants: string[];
+  available_headers: string[];
+  resource_url: string | null;
+  created_at: string;
+};
+
 type FreshnessRow = {
   source: string;
   checked_at: string;
@@ -410,12 +421,13 @@ function DataIngestionAdmin() {
   const [loading, setLoading] = useState(true);
   const [recentEvents, setRecentEvents] = useState<LogRow[]>([]);
   const [freshness, setFreshness] = useState<FreshnessRow[]>([]);
+  const [schemaAlerts, setSchemaAlerts] = useState<SchemaAlertRow[]>([]);
   const [checkingFreshness, setCheckingFreshness] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
     const sources = DATASETS.map((d) => d.source);
-    const [{ data: lg }, { data: q }, { data: recent }, { data: fr }] = await Promise.all([
+    const [{ data: lg }, { data: q }, { data: recent }, { data: fr }, { data: sa }] = await Promise.all([
       supabase
         .from("ingestion_log")
         .select("source,status,year,month,rows_ingested,error,created_at")
@@ -439,11 +451,17 @@ function DataIngestionAdmin() {
         .select("source,checked_at,upstream_latest_year,upstream_latest_month,ingested_latest_year,ingested_latest_month,new_data_found,items_queued,status,error")
         .order("checked_at", { ascending: false })
         .limit(200),
+      supabase
+        .from("schema_alerts")
+        .select("id,source,dataset,missing_field,tried_variants,available_headers,resource_url,created_at")
+        .order("created_at", { ascending: false })
+        .limit(100),
     ]);
     setLogs((lg as LogRow[]) ?? []);
     setQueue((q as QueueRow[]) ?? []);
     setRecentEvents((recent as LogRow[]) ?? []);
     setFreshness((fr as FreshnessRow[]) ?? []);
+    setSchemaAlerts((sa as SchemaAlertRow[]) ?? []);
     setLoading(false);
   };
 
@@ -603,6 +621,9 @@ function DataIngestionAdmin() {
             <TabsTrigger key={g} value={g}>{g} ({DATASETS.filter((d) => d.group === g).length})</TabsTrigger>
           ))}
           <TabsTrigger value="activity">Recent activity</TabsTrigger>
+          <TabsTrigger value="schema-alerts" className={schemaAlerts.length > 0 ? "text-rose-700" : ""}>
+            Schema alerts{schemaAlerts.length > 0 ? ` (${schemaAlerts.length})` : ""}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="mt-4">
@@ -634,6 +655,56 @@ function DataIngestionAdmin() {
             </div>
           </TabsContent>
         ))}
+
+        <TabsContent value="schema-alerts" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">CSV field-mapping alerts</CardTitle>
+              <CardDescription>
+                Fields the ingest pipelines could not find in the source CSV — indicates the publisher changed their column layout.
+                {schemaAlerts.length === 0 && " No alerts — all CSV fields mapping correctly."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>When</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Dataset</TableHead>
+                    <TableHead>Missing field</TableHead>
+                    <TableHead>Tried variants</TableHead>
+                    <TableHead>URL</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {schemaAlerts.map((a) => (
+                    <TableRow key={a.id}>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(a.created_at).toLocaleString()}</TableCell>
+                      <TableCell className="text-xs">{a.source}</TableCell>
+                      <TableCell className="text-xs">{a.dataset ?? "—"}</TableCell>
+                      <TableCell className="text-xs font-mono text-rose-700">{a.missing_field}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[18rem] truncate">{a.tried_variants?.join(", ") ?? "—"}</TableCell>
+                      <TableCell className="text-xs">
+                        {a.resource_url
+                          ? <a href={a.resource_url} target="_blank" rel="noreferrer" className="underline text-muted-foreground hover:text-foreground truncate inline-block max-w-[14rem]">{a.resource_url.replace(/^https?:\/\//, "")}</a>
+                          : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {schemaAlerts.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                        <CheckCircle2 className="inline h-4 w-4 mr-2 text-emerald-600" />
+                        No schema alerts — all CSV fields mapping correctly.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="activity" className="mt-4">
           <Card>

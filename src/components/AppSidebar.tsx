@@ -10,7 +10,7 @@ import {
   LogOut,
   Bookmark,
   Stethoscope,
-  
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { PharmacySearch } from "./PharmacySearch";
@@ -22,6 +22,7 @@ const links = [
   { to: "/benchmarking", label: "Benchmarking", icon: BarChart2 },
   { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/my-analyses", label: "My Analyses", icon: Bookmark },
+  { to: "/insights", label: "Smart Insights", icon: Sparkles },
 
   // Admin data ingestion intentionally hidden from primary nav.
   { to: "/settings", label: "My Account", icon: Settings },

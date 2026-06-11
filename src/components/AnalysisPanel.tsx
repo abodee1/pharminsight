@@ -3,13 +3,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { X, Star, Loader2, RefreshCw, Printer, AlertTriangle, CheckCircle2, TrendingUp, TrendingDown, Minus, Upload, FileText } from "lucide-react";
+import { X, Star, Loader2, RefreshCw, Printer, AlertTriangle, CheckCircle2, TrendingUp, TrendingDown, Minus, Upload, FileText, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from "recharts";
 import { confirmCompany, rejectCandidate, searchCompany } from "@/lib/companiesHouse.functions";
+import { generateInsight } from "@/lib/insights.functions";
 import { RemunerationReport } from "@/components/RemunerationReport";
 import { InteractiveTrend } from "@/components/InteractiveTrend";
 import { LocationInsights } from "@/components/LocationInsights";
@@ -38,7 +39,7 @@ type Company = {
   match_confidence: string | null; matched_by: string | null;
   is_chain: boolean; chain_name: string | null; fetched_at: string | null;
 };
-type Tab = "overview" | "financials" | "benchmarking" | "acquisition";
+type Tab = "overview" | "financials" | "benchmarking" | "acquisition" | "insights";
 
 const gbp = (n: number | null | undefined) => n == null ? "—" : "£" + Math.round(n).toLocaleString();
 const pct = (n: number) => `${n.toFixed(1)}%`;
@@ -182,11 +183,13 @@ export function AnalysisPanel({ pharmacy, open, onClose }: { pharmacy: Pharmacy;
           <button onClick={onClose} className="p-2 rounded-md hover:bg-secondary" aria-label="Close"><X className="h-5 w-5" /></button>
         </header>
         <div className="border-b border-border px-3 md:px-6 flex gap-1 overflow-x-auto sticky top-[49px] md:top-[57px] bg-background z-10">
-          {(["overview","financials","benchmarking","acquisition"] as Tab[]).map((t) => (
+          {(["overview","financials","benchmarking","acquisition","insights"] as Tab[]).map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className={["px-3 md:px-4 py-2.5 md:py-3 text-xs md:text-sm font-medium capitalize whitespace-nowrap transition-colors border-b-2",
                 tab === t ? "border-gold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"].join(" ")}>
-              {t}
+              {t === "insights"
+                ? <><Sparkles className="inline h-3.5 w-3.5 mr-1 align-middle text-gold" /><span className="align-middle">Insights</span></>
+                : t}
             </button>
           ))}
         </div>
@@ -198,6 +201,7 @@ export function AnalysisPanel({ pharmacy, open, onClose }: { pharmacy: Pharmacy;
               {tab === "overview" && <OverviewTab pharmacy={pharmacy} rows={rows} />}
               {tab === "financials" && <FinancialsTab pharmacy={pharmacy} />}
               {tab === "benchmarking" && <BenchmarkingTab pharmacy={pharmacy} rows={rows} />}
+              {tab === "insights" && <InsightsTab pharmacy={pharmacy} rows={rows} />}
               {tab === "acquisition" && (canAcquire ? <AcquisitionTab pharmacy={pharmacy} rows={rows} /> :
                 <div className="p-10 text-center">
                   <div className="mx-auto max-w-md rounded-xl border border-border bg-card p-8">
@@ -927,6 +931,371 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
         <Printer className="h-4 w-4" /> Download Due Diligence Report (PDF)
       </Button>
       <p className="text-[11px] text-center text-muted-foreground">Use your browser's "Save as PDF" in the print dialog.</p>
+    </div>
+  );
+}
+
+// -------- AI Insights tab helpers --------
+function mdBold(text: string): React.ReactNode {
+  const parts = text.split(/\*\*([^*]+)\*\*/g);
+  if (parts.length === 1) return text;
+  return <>{parts.map((p, i) => i % 2 === 1 ? <strong key={i}>{p}</strong> : p)}</>;
+}
+function renderInsightMd(text: string): React.ReactNode[] {
+  return text.split("\n").map((line, i) => {
+    if (line.startsWith("## ")) return <h2 key={i} className="text-sm font-semibold mt-5 mb-1.5">{line.slice(3)}</h2>;
+    if (line.startsWith("# ")) return <h1 key={i} className="text-base font-bold mt-6 mb-2">{line.slice(2)}</h1>;
+    if (/^[-•*]\s/.test(line)) return <li key={i} className="ml-4 text-sm leading-relaxed mb-1">{mdBold(line.replace(/^[-•*]\s/, ""))}</li>;
+    if (/^\d+\.\s/.test(line)) return <li key={i} className="ml-4 list-decimal text-sm leading-relaxed mb-1">{mdBold(line.replace(/^\d+\.\s/, ""))}</li>;
+    if (!line.trim()) return <div key={i} className="h-2" />;
+    return <p key={i} className="text-sm leading-relaxed mb-1.5">{mdBold(line)}</p>;
+  });
+}
+function insightTimeAgo(ts: string) {
+  const h = Math.round((Date.now() - new Date(ts).getTime()) / 3600000);
+  if (h < 1) return "just now";
+  if (h < 48) return `${h}h ago`;
+  return new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+type SavedInsight = { id: string; insight_type: string; insight_text: string; generated_at: string };
+
+// -------- AI Insights tab --------
+function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
+  const { user } = useAuth();
+  const isEng = (pharmacy.country || "").toLowerCase() === "england";
+  const [natAvg, setNatAvg] = useState<Record<string, number>>({});
+  const [generating, setGenerating] = useState<"swot" | "benchmark" | null>(null);
+  const [savedInsights, setSavedInsights] = useState<SavedInsight[]>([]);
+  const [activeInsight, setActiveInsight] = useState<SavedInsight | null>(null);
+
+  const gen = useServerFn(generateInsight);
+
+  const latestIdx = useMemo(() => {
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const r = rows[i];
+      if (r.items_dispensed > 0 || r.nms_count > 0 || r.pharmacy_first_count > 0) return i;
+    }
+    return rows.length - 1;
+  }, [rows]);
+  const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
+  const last12 = useMemo(() => rows.slice(Math.max(0, latestIdx - 11), latestIdx + 1), [rows, latestIdx]);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("ai_insights")
+        .select("id,insight_type,insight_text,generated_at")
+        .eq("pharmacy_id", pharmacy.id)
+        .in("insight_type", ["swot", "benchmark"])
+        .order("generated_at", { ascending: false })
+        .limit(4);
+      const arr = (data as SavedInsight[]) ?? [];
+      setSavedInsights(arr);
+      if (arr.length) setActiveInsight(arr[0]);
+    })();
+  }, [pharmacy.id, user]);
+
+  // National averages for underclaimed services (England only, sample up to 5000 rows)
+  useEffect(() => {
+    if (!isEng || !latest) return;
+    (async () => {
+      const { data } = await supabase
+        .from("dispensing_data")
+        .select("items_dispensed,nms_count,pharmacy_first_count,flu_vaccinations")
+        .eq("year", latest.year).eq("month", latest.month)
+        .limit(5000);
+      if (!data?.length) return;
+      const sums = { nms_count: 0, pharmacy_first_count: 0, flu_vaccinations: 0 };
+      for (const r of data as any[]) {
+        sums.nms_count += r.nms_count || 0;
+        sums.pharmacy_first_count += r.pharmacy_first_count || 0;
+        sums.flu_vaccinations += r.flu_vaccinations || 0;
+      }
+      const n = data.length;
+      setNatAvg({ nms_count: sums.nms_count / n, pharmacy_first_count: sums.pharmacy_first_count / n, flu_vaccinations: sums.flu_vaccinations / n });
+    })();
+  }, [isEng, latest]);
+
+  const handleGenerate = async (type: "swot" | "benchmark") => {
+    setGenerating(type);
+    try {
+      const r = await gen({ data: { pharmacy_id: pharmacy.id, insight_type: type } });
+      const ins = r.insight as SavedInsight;
+      setSavedInsights(prev => [ins, ...prev.filter(i => i.insight_type !== type)]);
+      setActiveInsight(ins);
+      toast.success("Analysis complete");
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to generate");
+    } finally {
+      setGenerating(null);
+    }
+  };
+
+  // NMS cap
+  const nmsCap = latest ? Math.floor((latest.items_dispensed || 0) * 0.01) : 0;
+  const nmsCount = latest?.nms_count || 0;
+  const nmsUtil = nmsCap > 0 ? Math.min(100, (nmsCount / nmsCap) * 100) : 0;
+  const nmsCapped = nmsCap > 0 && nmsCount >= nmsCap;
+  const nmsHeadroom = Math.max(0, nmsCap - nmsCount);
+
+  // Underclaimed services
+  const nmsGap = natAvg.nms_count ? Math.max(0, natAvg.nms_count - nmsCount) : 0;
+  const pfGap = natAvg.pharmacy_first_count ? Math.max(0, natAvg.pharmacy_first_count - (latest?.pharmacy_first_count || 0)) : 0;
+  const fluGap = natAvg.flu_vaccinations ? Math.max(0, natAvg.flu_vaccinations - (latest?.flu_vaccinations || 0)) : 0;
+  const nmsUplift = Math.round(nmsGap * 28);
+  const pfUplift = Math.round(pfGap * 15);
+  const fluUplift = Math.round(fluGap * 12.58);
+  const totalUplift = nmsUplift + pfUplift + fluUplift;
+
+  // PQS indicators
+  const avgNms12 = last12.length ? last12.reduce((s, r) => s + (r.nms_count || 0), 0) / last12.length : 0;
+  const hasPf = last12.some(r => (r.pharmacy_first_count || 0) > 0);
+  const hasFlu = last12.some(r => [9,10,11,12,1,2,3].includes(r.month) && (r.flu_vaccinations || 0) > 0);
+  const epsRateLatest = latest && latest.items_dispensed ? (latest.eps_items / latest.items_dispensed) * 100 : 0;
+  const epsOk = epsRateLatest >= 89;
+  const epsKnown = epsRateLatest > 0;
+
+  const swotCached = savedInsights.find(i => i.insight_type === "swot");
+  const benchCached = savedInsights.find(i => i.insight_type === "benchmark");
+
+  return (
+    <div className="p-4 md:p-6 space-y-5">
+      {/* AI Analysis */}
+      <Section title="AI analysis">
+        <div className="flex flex-wrap gap-3 mb-4">
+          <Button onClick={() => handleGenerate("swot")} disabled={!!generating} className="gap-2">
+            {generating === "swot" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {swotCached ? "Refresh SWOT" : "SWOT Analysis"}
+          </Button>
+          <Button variant="outline" onClick={() => handleGenerate("benchmark")} disabled={!!generating} className="gap-2">
+            {generating === "benchmark" ? <Loader2 className="h-4 w-4 animate-spin" /> : <TrendingUp className="h-4 w-4" />}
+            {benchCached ? "Refresh Commentary" : "Performance Commentary"}
+          </Button>
+          {(swotCached || benchCached) && (
+            <div className="flex gap-2 flex-wrap">
+              {swotCached && (
+                <button
+                  onClick={() => setActiveInsight(swotCached)}
+                  className={["text-xs px-3 py-1.5 rounded-full border transition-colors",
+                    activeInsight?.id === swotCached.id
+                      ? "border-gold bg-gold/10 text-amber-800"
+                      : "border-border text-muted-foreground hover:text-foreground"].join(" ")}
+                >
+                  SWOT · {insightTimeAgo(swotCached.generated_at)}
+                </button>
+              )}
+              {benchCached && (
+                <button
+                  onClick={() => setActiveInsight(benchCached)}
+                  className={["text-xs px-3 py-1.5 rounded-full border transition-colors",
+                    activeInsight?.id === benchCached.id
+                      ? "border-sky-400 bg-sky-50 text-sky-800"
+                      : "border-border text-muted-foreground hover:text-foreground"].join(" ")}
+                >
+                  Commentary · {insightTimeAgo(benchCached.generated_at)}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {generating && (
+          <div className="rounded-xl border border-border bg-secondary/30 p-6 text-center space-y-2">
+            <Loader2 className="h-6 w-6 animate-spin text-gold mx-auto" />
+            <p className="text-sm font-medium">Analysing {pharmacy.name}…</p>
+            <p className="text-xs text-muted-foreground">Processing 24 months of NHS dispensing data and local landscape intelligence. Takes 15–30 seconds.</p>
+          </div>
+        )}
+
+        {activeInsight && !generating ? (
+          <div className="rounded-xl border border-border bg-secondary/20 overflow-hidden">
+            <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border flex-wrap bg-secondary/40">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] bg-gold/10 text-amber-700 border border-gold/25 rounded-full px-2.5 py-0.5 font-semibold uppercase tracking-wider">AI</span>
+                <span className="text-xs font-semibold">
+                  {activeInsight.insight_type === "swot" ? "SWOT Analysis" : "Performance Commentary"}
+                </span>
+                <span className="text-xs text-muted-foreground">· {insightTimeAgo(activeInsight.generated_at)}</span>
+              </div>
+              <button
+                onClick={() => handleGenerate(activeInsight.insight_type as "swot" | "benchmark")}
+                disabled={!!generating}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+              >
+                <RefreshCw className="h-3 w-3" /> Regenerate
+              </button>
+            </div>
+            <div className="px-4 py-4 space-y-0.5 max-h-[55vh] overflow-y-auto">
+              {renderInsightMd(activeInsight.insight_text)}
+            </div>
+            <div className="px-4 py-2 border-t border-border bg-secondary/30">
+              <p className="text-[10px] text-muted-foreground">AI analysis using NHS open dispensing data. Not financial advice.</p>
+            </div>
+          </div>
+        ) : !generating && (
+          <p className="text-sm text-muted-foreground">Generate an AI-powered analysis using 24 months of dispensing data and local landscape intelligence.</p>
+        )}
+      </Section>
+
+      {/* England-only sections */}
+      {isEng && latest && (
+        <>
+          {/* NMS 1% Cap */}
+          <Section title="NMS utilisation vs 1% cap">
+            <p className="text-xs text-muted-foreground mb-4">NHSBSA caps NMS at 1% of monthly items dispensed. Tracking utilisation prevents revenue leakage and avoids delivering NMS above the cap which will not be reimbursed.</p>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Items dispensed</p>
+                <p className="text-lg font-bold tabular-nums">{latest.items_dispensed.toLocaleString()}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">NMS cap (1%)</p>
+                <p className="text-lg font-bold tabular-nums">{nmsCap.toLocaleString()}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">NMS delivered</p>
+                <p className="text-lg font-bold tabular-nums">{nmsCount.toLocaleString()}</p>
+              </div>
+            </div>
+            <div className="space-y-1.5 mb-3">
+              <div className="flex justify-between text-xs">
+                <span className="font-medium">Cap utilisation</span>
+                <span className={nmsUtil > 90 ? "text-rose-600 font-semibold" : nmsUtil > 70 ? "text-amber-600 font-semibold" : "text-emerald-600 font-semibold"}>
+                  {nmsUtil.toFixed(1)}%
+                </span>
+              </div>
+              <div className="h-3 rounded-full bg-secondary overflow-hidden">
+                <div
+                  className={["h-full rounded-full transition-all", nmsUtil > 90 ? "bg-rose-500" : nmsUtil > 70 ? "bg-amber-400" : "bg-emerald-500"].join(" ")}
+                  style={{ width: `${Math.min(100, nmsUtil)}%` }}
+                />
+              </div>
+            </div>
+            {nmsCapped ? (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 text-rose-900 p-3 text-xs flex gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>NMS claims at or above the cap. Additional NMS delivered this month will not be reimbursed by NHSBSA.</span>
+              </div>
+            ) : nmsHeadroom > 0 && nmsUtil < 60 ? (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-900 p-3 text-xs flex gap-2">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>Capacity for {nmsHeadroom} more NMS this month — worth up to <span className="font-semibold">£{(nmsHeadroom * 28).toLocaleString()}</span> additional income.</span>
+              </div>
+            ) : null}
+            <p className="text-[10px] text-muted-foreground mt-3">NMS ~£28/consultation · {MONTHS[latest.month - 1]} {latest.year} data · Cap = items × 0.01</p>
+          </Section>
+
+          {/* Underclaimed services */}
+          {Object.keys(natAvg).length > 0 && (
+            <Section title="Underclaimed services">
+              <p className="text-xs text-muted-foreground mb-4">
+                Services below England average for {MONTHS[latest.month - 1]} {latest.year}.
+                Closing each gap to national average would generate the monthly revenue uplift shown.
+              </p>
+              {totalUplift === 0 ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-900 p-3 text-sm flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  This pharmacy is at or above the England average across all measured advanced services.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {nmsGap > 0.5 && (
+                    <ServiceGapRow label="New Medicine Service" current={nmsCount} avg={natAvg.nms_count} gap={nmsGap} rateLabel="~£28/consultation" uplift={nmsUplift} />
+                  )}
+                  {pfGap > 0.5 && (
+                    <ServiceGapRow label="Pharmacy First" current={latest.pharmacy_first_count || 0} avg={natAvg.pharmacy_first_count} gap={pfGap} rateLabel="~£15/consultation" uplift={pfUplift} />
+                  )}
+                  {fluGap > 0.5 && (
+                    <ServiceGapRow label="Flu vaccinations" current={latest.flu_vaccinations || 0} avg={natAvg.flu_vaccinations} gap={fluGap} rateLabel="£12.58/jab" uplift={fluUplift} />
+                  )}
+                  <div className="mt-1 rounded-lg border border-gold/40 bg-gold/5 p-3.5 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold">Total monthly uplift potential</p>
+                      <p className="text-xs text-muted-foreground">If all gaps closed to England average</p>
+                    </div>
+                    <p className="text-2xl font-bold text-gold">£{totalUplift.toLocaleString()}</p>
+                  </div>
+                </div>
+              )}
+              <p className="text-[10px] text-muted-foreground mt-3">Drug Tariff rates · {MONTHS[latest.month - 1]} {latest.year} · Sample of up to 5,000 England pharmacies</p>
+            </Section>
+          )}
+
+          {/* PQS Tracker */}
+          <Section title="PQS readiness (2024-25 indicative)">
+            <p className="text-xs text-muted-foreground mb-4">Indicative Pharmacy Quality Scheme criteria computed from NHS dispensing data. Does not cover the QI domain, declarations, or any criteria requiring the PQS portal.</p>
+            <div className="space-y-2.5">
+              <PqsCriterionRow
+                label="NMS minimum — aspirational"
+                met={avgNms12 >= 11}
+                detail={`Average ${avgNms12.toFixed(1)} NMS/month over last 12 months (aspirational target ≥ 11/month)`}
+              />
+              <PqsCriterionRow
+                label="Pharmacy First active"
+                met={hasPf}
+                detail={hasPf ? "Pharmacy First consultations recorded in the last 12 months" : "No Pharmacy First consultations found in last 12 months — confirm PF is activated"}
+              />
+              <PqsCriterionRow
+                label="Seasonal flu vaccinations"
+                met={hasFlu}
+                detail={hasFlu ? "Flu vaccinations recorded in qualifying months (Sep–Mar)" : "No flu vaccinations found in eligible months (Sep–Mar) — check flu service setup"}
+              />
+              <PqsCriterionRow
+                label="EPS nomination rate ≥ 89%"
+                met={epsOk}
+                detail={epsKnown
+                  ? `${epsRateLatest.toFixed(1)}% EPS rate in latest month${!epsOk ? " — below the 89% gateway threshold" : ""}`
+                  : "EPS nomination data unavailable for this period"}
+                warn={epsKnown && !epsOk}
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-3">PQS requires declaration via NHSBSA portal. Consult the current PQS framework for definitive gateways and aspirational thresholds.</p>
+          </Section>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ServiceGapRow({ label, current, avg, gap, rateLabel, uplift }: {
+  label: string; current: number; avg: number; gap: number; rateLabel: string; uplift: number;
+}) {
+  const pctBehind = avg > 0 ? ((gap / avg) * 100).toFixed(0) : "0";
+  return (
+    <div className="rounded-lg border border-border bg-card p-3 flex items-center gap-3">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          You: {Math.round(current).toLocaleString()} · Avg: {Math.round(avg).toLocaleString()} · {pctBehind}% below · {rateLabel}
+        </p>
+      </div>
+      <div className="text-right shrink-0">
+        <p className="text-sm font-bold text-emerald-600">+£{uplift.toLocaleString()}</p>
+        <p className="text-[10px] text-muted-foreground">per month</p>
+      </div>
+    </div>
+  );
+}
+
+function PqsCriterionRow({ label, met, detail, warn }: { label: string; met: boolean; detail: string; warn?: boolean }) {
+  const icon = met
+    ? <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+    : warn
+      ? <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+      : <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />;
+  const badge = met ? "bg-emerald-50 text-emerald-700" : warn ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-700";
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-3">
+      {icon}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{detail}</p>
+      </div>
+      <span className={["shrink-0 text-xs font-semibold rounded-full px-2.5 py-0.5", badge].join(" ")}>
+        {met ? "✓ Met" : "✗ Check"}
+      </span>
     </div>
   );
 }

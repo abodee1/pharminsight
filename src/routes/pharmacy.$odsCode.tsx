@@ -538,7 +538,11 @@ function PharmacyProfile() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {user && (
-            <Button size="sm" className="gap-1.5" onClick={() => setAnalyseOpen(true)}>
+            <Button
+              size="sm"
+              className="gap-1.5 bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-semibold border-0 shadow-md hover:from-amber-400 hover:to-yellow-300 hover:shadow-amber-400/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-150"
+              onClick={() => setAnalyseOpen(true)}
+            >
               <Sparkles className="h-4 w-4" /> Analyse This Pharmacy
             </Button>
           )}
