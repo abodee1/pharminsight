@@ -29,6 +29,8 @@ type MetricDef = {
   // ratio: compute per row from other fields
   derive?: (row: any) => number;
   description?: string;
+  /** If set, metric only renders for these countries. Undefined = all countries. */
+  countries?: string[];
 };
 
 const money = (n: number) =>
@@ -37,14 +39,14 @@ const ratio = (n: number) => `${n.toFixed(1)}`;
 
 const METRICS: MetricDef[] = [
   { key: "items_dispensed", label: "Items dispensed", group: "volume", description: "Total prescription items dispensed in the month." },
-  { key: "eps_items", label: "EPS items", group: "volume", description: "Items processed via Electronic Prescription Service." },
+  { key: "eps_items", label: "EPS items", group: "volume", countries: ["England"], description: "Items processed via Electronic Prescription Service." },
   { key: "pharmacy_first_count", label: "Pharmacy First consultations", group: "service", description: "Walk-in clinical consultations completed." },
-  { key: "nms_count", label: "New Medicine Service", group: "service", description: "NMS interventions delivered to patients starting new meds." },
+  { key: "nms_count", label: "New Medicine Service", group: "service", countries: ["England"], description: "NMS interventions delivered to patients starting new meds." },
   { key: "flu_vaccinations", label: "Flu vaccinations", group: "service", description: "NHS flu jabs administered in the month." },
-  { key: "methadone_items", label: "Methadone items", group: "service", description: "Supervised opioid substitution items." },
-  { key: "mcr_registrations", label: "MCR registrations", group: "service", description: "Patients registered for the Medicines: Care & Review service." },
-  { key: "gross_cost", label: "Gross drug cost", group: "revenue", fmt: money, description: "Reimbursable drug cost before clawback." },
-  { key: "final_payment", label: "Final payment", group: "revenue", fmt: money, description: "Net payment received for the month." },
+  { key: "methadone_items", label: "Methadone items", group: "service", countries: ["Scotland"], description: "Supervised opioid substitution items." },
+  { key: "mcr_registrations", label: "MCR registrations", group: "service", countries: ["Scotland"], description: "Patients registered for the Medicines: Care & Review service." },
+  { key: "gross_cost", label: "Gross drug cost", group: "revenue", fmt: money, countries: ["Scotland", "Wales"], description: "Reimbursable drug cost before clawback." },
+  { key: "final_payment", label: "Final payment", group: "revenue", fmt: money, countries: ["Scotland", "Wales"], description: "Net payment received for the month." },
   {
     key: "pf_per_100",
     label: "Pharmacy First per 100 items",
@@ -58,6 +60,7 @@ const METRICS: MetricDef[] = [
     label: "NMS per 100 items",
     group: "ratio",
     fmt: ratio,
+    countries: ["England"],
     derive: (r) => (r.items_dispensed ? (r.nms_count * 100) / r.items_dispensed : 0),
     description: "How actively the team engages patients on new meds.",
   },
@@ -66,6 +69,7 @@ const METRICS: MetricDef[] = [
     label: "Revenue per item",
     group: "ratio",
     fmt: (n) => `£${n.toFixed(2)}`,
+    countries: ["Scotland", "Wales"],
     derive: (r) => (r.items_dispensed ? r.final_payment / r.items_dispensed : 0),
     description: "Average revenue earned per dispensed item.",
   },
@@ -188,9 +192,11 @@ function Benchmarking() {
         (a, b) => b.year * 12 + b.month - (a.year * 12 + a.month),
       );
 
-      // pick month per metric
+      // pick month per metric (country-filtered to avoid computing Scotland metrics for England)
+      const pharmCountry: string = pharmacy.country ?? "";
+      const activeMetrics = METRICS.filter(m => !m.countries || m.countries.includes(pharmCountry));
       const metricMonth: Record<string, { year: number; month: number; mine: any }> = {};
-      for (const m of METRICS) {
+      for (const m of activeMetrics) {
         const hit = ordered.find((row) => metricValue(m, row) > 0);
         if (hit) metricMonth[m.key] = { year: hit.year, month: hit.month, mine: hit };
       }
@@ -250,7 +256,12 @@ function Benchmarking() {
     if (!pharmacy || !Object.keys(snapshots).length) return null;
     const regionIds = new Set(regionPharms.map((p) => p.id));
 
-    const rows = METRICS.map((m) => {
+    const pharmCountry: string = pharmacy.country ?? "";
+    const applicableMetrics = METRICS.filter(
+      m => !m.countries || m.countries.includes(pharmCountry)
+    );
+
+    const rows = applicableMetrics.map((m) => {
       const snap = snapshots[m.key];
       if (!snap) return null;
       const mineVal = metricValue(m, snap.mine);
