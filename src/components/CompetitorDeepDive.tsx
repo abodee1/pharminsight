@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PharmacySearch, type Pharmacy as SearchPharmacy } from "@/components/PharmacySearch";
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
-import { TrendingUp, TrendingDown, X } from "lucide-react";
+import { X, Trophy, TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 interface Props {
   pharmacyId: string;
@@ -22,6 +22,9 @@ type MetricRow = {
 };
 
 type Agg = { items: number; nms: number; pf: number; flu: number; eps: number; nom: number };
+type MonthlyTrend = { label: string; mine: number; theirs: number };
+
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 function aggregate(rows: MetricRow[]): Agg {
   const recent = [...rows]
@@ -29,12 +32,22 @@ function aggregate(rows: MetricRow[]): Agg {
     .slice(0, 12);
   return {
     items: recent.reduce((s, r) => s + (r.items_dispensed ?? 0), 0),
-    nms: recent.reduce((s, r) => s + (r.nms_count ?? 0), 0),
-    pf: recent.reduce((s, r) => s + (r.pharmacy_first_count ?? 0), 0),
-    flu: recent.reduce((s, r) => s + (r.flu_vaccinations ?? 0), 0),
-    eps: recent.reduce((s, r) => s + (r.eps_items ?? 0), 0),
-    nom: recent.reduce((s, r) => s + (r.eps_nominations ?? 0), 0),
+    nms:   recent.reduce((s, r) => s + (r.nms_count ?? 0), 0),
+    pf:    recent.reduce((s, r) => s + (r.pharmacy_first_count ?? 0), 0),
+    flu:   recent.reduce((s, r) => s + (r.flu_vaccinations ?? 0), 0),
+    eps:   recent.reduce((s, r) => s + (r.eps_items ?? 0), 0),
+    nom:   recent.reduce((s, r) => s + (r.eps_nominations ?? 0), 0),
   };
+}
+
+function buildTrend(myRows: MetricRow[], theirRows: MetricRow[]): MonthlyTrend[] {
+  const myMap = new Map(myRows.map(r => [`${r.year}-${r.month}`, r.items_dispensed ?? 0]));
+  const theirMap = new Map(theirRows.map(r => [`${r.year}-${r.month}`, r.items_dispensed ?? 0]));
+  const keys = Array.from(new Set([...myMap.keys(), ...theirMap.keys()])).sort();
+  return keys.slice(-12).map(k => {
+    const [y, m] = k.split("-").map(Number);
+    return { label: `${MONTHS[m - 1]} ${String(y).slice(2)}`, mine: myMap.get(k) ?? 0, theirs: theirMap.get(k) ?? 0 };
+  });
 }
 
 function rivalryScore(mine: Agg, theirs: Agg): number {
@@ -47,11 +60,133 @@ function rivalryScore(mine: Agg, theirs: Agg): number {
   return Math.round((sims.reduce((s, v) => s + v, 0) / sims.length) * 100);
 }
 
-function rivalryMeta(score: number) {
-  if (score >= 80) return { label: "Fierce rivals", cls: "text-red-500" };
-  if (score >= 60) return { label: "Close rivals", cls: "text-amber-500" };
-  if (score >= 30) return { label: "Local rivals", cls: "text-yellow-600 dark:text-yellow-400" };
-  return { label: "Different markets", cls: "text-muted-foreground" };
+type RivalryTier = { label: string; description: string; color: string; arcColor: string };
+function rivalryTier(score: number): RivalryTier {
+  if (score >= 80) return { label: "Fierce rivals", description: "Nearly identical market footprint — direct head-to-head competition.", color: "text-red-500", arcColor: "#ef4444" };
+  if (score >= 60) return { label: "Close rivals", description: "Significant overlap in volume and services — worth monitoring closely.", color: "text-amber-500", arcColor: "#f59e0b" };
+  if (score >= 30) return { label: "Local rivals", description: "Some overlap in core dispensing volume but different service mix.", color: "text-yellow-500", arcColor: "#eab308" };
+  return { label: "Different markets", description: "Low overlap — likely serving different patient populations or service types.", color: "text-muted-foreground", arcColor: "#6b7280" };
+}
+
+function RivalryGauge({ score }: { score: number }) {
+  const R = 52;
+  const CX = 70;
+  const CY = 68;
+  const circumference = Math.PI * R;
+  const filled = (score / 100) * circumference;
+  const tier = rivalryTier(score);
+
+  // Semi-circle: starts at left (180°), ends at right (0°) going clockwise top
+  // Path: M (cx-r, cy) arc to (cx+r, cy) with sweep=1
+  const trackD = `M ${CX - R} ${CY} A ${R} ${R} 0 0 1 ${CX + R} ${CY}`;
+
+  return (
+    <div className="flex flex-col items-center">
+      <svg width={140} height={80} overflow="visible">
+        {/* Track */}
+        <path d={trackD} fill="none" stroke="hsl(var(--border))" strokeWidth={10} strokeLinecap="round" />
+        {/* Fill */}
+        <path
+          d={trackD}
+          fill="none"
+          stroke={tier.arcColor}
+          strokeWidth={10}
+          strokeLinecap="round"
+          strokeDasharray={`${filled} ${circumference}`}
+          style={{ transition: "stroke-dasharray 0.6s ease" }}
+        />
+        {/* Score */}
+        <text x={CX} y={CY - 6} textAnchor="middle" fontSize={28} fontWeight="700" fill="currentColor" className="text-foreground">
+          {score}
+        </text>
+        <text x={CX} y={CY + 10} textAnchor="middle" fontSize={11} fill="hsl(var(--muted-foreground))">
+          / 100
+        </text>
+      </svg>
+      <p className={`text-sm font-bold mt-1 ${tier.color}`}>{tier.label}</p>
+      <p className="text-[11px] text-muted-foreground text-center mt-1 max-w-[200px] leading-snug">{tier.description}</p>
+    </div>
+  );
+}
+
+type MetricDef = { key: keyof Agg; label: string; group: string; englandOnly?: boolean };
+const METRIC_DEFS: MetricDef[] = [
+  { key: "items", label: "Items dispensed",     group: "Volume" },
+  { key: "eps",   label: "EPS items",           group: "Volume",   englandOnly: true },
+  { key: "nom",   label: "EPS nominations",     group: "Volume",   englandOnly: true },
+  { key: "pf",    label: "Pharmacy First",      group: "Services" },
+  { key: "nms",   label: "NMS interventions",   group: "Services", englandOnly: true },
+  { key: "flu",   label: "Flu vaccinations",    group: "Services" },
+];
+
+function DuelBar({
+  label,
+  mine,
+  theirs,
+  myName,
+  theirName,
+}: {
+  label: string;
+  mine: number;
+  theirs: number;
+  myName: string;
+  theirName: string;
+}) {
+  const total = mine + theirs;
+  const myPct = total > 0 ? (mine / total) * 100 : 50;
+  const theirPct = total > 0 ? (theirs / total) * 100 : 50;
+  const winner = mine > theirs ? "mine" : theirs > mine ? "theirs" : null;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span className="font-medium text-foreground">{label}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        {/* My value */}
+        <span className={`text-sm font-bold tabular-nums w-20 text-right shrink-0 ${winner === "mine" ? "text-primary" : ""}`}>
+          {mine.toLocaleString()}
+        </span>
+        {/* Duel bar */}
+        <div className="flex-1 flex rounded-full overflow-hidden h-4 bg-secondary">
+          <div
+            className="bg-primary/80 transition-all duration-500 flex items-center justify-end pr-1"
+            style={{ width: `${myPct}%` }}
+          >
+            {winner === "mine" && myPct > 15 && (
+              <Trophy className="h-2.5 w-2.5 text-white/80" />
+            )}
+          </div>
+          <div
+            className="bg-amber-500/70 transition-all duration-500 flex items-center justify-start pl-1"
+            style={{ width: `${theirPct}%` }}
+          >
+            {winner === "theirs" && theirPct > 15 && (
+              <Trophy className="h-2.5 w-2.5 text-white/80" />
+            )}
+          </div>
+        </div>
+        {/* Their value */}
+        <span className={`text-sm font-bold tabular-nums w-20 shrink-0 ${winner === "theirs" ? "text-amber-600 dark:text-amber-400" : ""}`}>
+          {theirs.toLocaleString()}
+        </span>
+      </div>
+      {winner && (
+        <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+          {winner === "mine" ? (
+            <><TrendingUp className="h-3 w-3 text-primary" /><span className="text-primary font-medium">{myName}</span> leads by {(mine - theirs).toLocaleString()} ({myPct > 0 && theirPct > 0 ? `${(myPct / theirPct * 100 - 100).toFixed(0)}% more` : ""})</>
+          ) : (
+            <><TrendingDown className="h-3 w-3 text-amber-500" /><span className="text-amber-600 dark:text-amber-400 font-medium">{theirName}</span> leads by {(theirs - mine).toLocaleString()} ({myPct > 0 && theirPct > 0 ? `${(theirPct / myPct * 100 - 100).toFixed(0)}% more` : ""})</>
+          )}
+        </p>
+      )}
+      {!winner && (
+        <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+          <Minus className="h-3 w-3" /> Identical volume
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function CompetitorDeepDive({ pharmacyId, pharmacyOds, pharmacyName, country, onClose }: Props) {
@@ -102,113 +237,174 @@ export function CompetitorDeepDive({ pharmacyId, pharmacyOds, pharmacyName, coun
   const myAgg = myRows.length > 0 ? aggregate(myRows) : null;
   const theirAgg = theirRows.length > 0 ? aggregate(theirRows) : null;
   const score = myAgg && theirAgg ? rivalryScore(myAgg, theirAgg) : null;
-  const meta = score !== null ? rivalryMeta(score) : null;
+  const trendData = myRows.length > 0 && theirRows.length > 0 ? buildTrend(myRows, theirRows) : [];
 
-  type MetricDef = { key: keyof Agg; label: string; englandOnly?: boolean };
-  const METRICS: MetricDef[] = [
-    { key: "items", label: "Items dispensed" },
-    { key: "nms", label: "NMS", englandOnly: true },
-    { key: "pf", label: "Pharmacy First" },
-    { key: "flu", label: "Flu vaccinations" },
-    { key: "eps", label: "EPS items", englandOnly: true },
-    { key: "nom", label: "EPS nominations", englandOnly: true },
-  ];
+  const visibleMetrics = METRIC_DEFS.filter(m => !m.englandOnly || isEngland);
+  const groups = Array.from(new Set(visibleMetrics.map(m => m.group)));
 
-  const visibleMetrics = METRICS.filter(m => !m.englandOnly || isEngland);
-
-  const chartData = myAgg && theirAgg
-    ? visibleMetrics.map(m => ({
-        metric: m.label,
-        [pharmacyName]: myAgg[m.key],
-        [competitor?.name ?? "Competitor"]: theirAgg[m.key],
-      }))
-    : [];
+  const shortName = (name: string) => name.length > 28 ? name.slice(0, 28) + "…" : name;
 
   return (
-    <div className="mt-4 rounded-lg bg-card border border-border shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+    <div className="mt-4 rounded-xl bg-card border border-border shadow-md overflow-hidden">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
         <h3 className="text-sm font-semibold">Competitor deep dive</h3>
-        <button onClick={onClose} className="p-1 hover:bg-secondary rounded transition-colors">
+        <button
+          onClick={onClose}
+          className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+        >
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-5 space-y-6">
+        {/* Search */}
         <div>
-          <p className="text-xs text-muted-foreground mb-2">Search for a competitor pharmacy</p>
-          <PharmacySearch onSelect={handleSelect} clearOnSelect={false} placeholder="Search competitor…" />
+          <label className="text-xs font-medium text-muted-foreground block mb-2">
+            Search for a competitor pharmacy to compare
+          </label>
+          <PharmacySearch onSelect={handleSelect} clearOnSelect={false} placeholder="Type pharmacy name, postcode, or ODS code…" />
         </div>
 
         {loading && (
-          <div className="text-sm text-muted-foreground animate-pulse py-6 text-center">Loading competitor data…</div>
+          <div className="text-sm text-muted-foreground animate-pulse py-8 text-center">
+            Loading competitor data…
+          </div>
         )}
 
-        {!loading && competitor && myAgg && theirAgg && (
+        {!loading && competitor && myAgg && theirAgg && score !== null && (
           <>
-            {score !== null && meta && (
-              <div className="flex items-center gap-4 rounded-md bg-secondary/40 p-3">
-                <div className="text-center shrink-0">
-                  <p className="text-3xl font-bold tabular-nums">{score}</p>
-                  <p className="text-xs text-muted-foreground">/ 100</p>
-                </div>
-                <div>
-                  <p className={`text-sm font-semibold ${meta.cls}`}>{meta.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Comparing {pharmacyName} vs {competitor.name}
-                  </p>
-                </div>
+            {/* Versus banner */}
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center rounded-xl bg-secondary/40 border border-border px-4 py-4">
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-wider font-semibold text-primary mb-0.5">Your pharmacy</p>
+                <p className="text-sm font-bold leading-tight truncate">{pharmacyName}</p>
               </div>
-            )}
-
-            <div>
-              <div className="grid grid-cols-[1fr_auto_1fr] gap-x-3 text-xs font-semibold pb-2 border-b border-border">
-                <span className="truncate">{pharmacyName}</span>
-                <span className="text-center text-muted-foreground text-[10px]">Metric · 12M</span>
-                <span className="text-right truncate">{competitor.name}</span>
+              <div className="text-center shrink-0">
+                <span className="text-xl font-black text-muted-foreground">VS</span>
               </div>
-              {visibleMetrics.map(m => {
-                const mine = myAgg[m.key];
-                const theirs = theirAgg[m.key];
-                const winner = mine > theirs ? "mine" : theirs > mine ? "theirs" : null;
-                return (
-                  <div key={m.key} className="grid grid-cols-[1fr_auto_1fr] gap-x-3 text-xs py-1.5 border-b border-border/50 items-center">
-                    <span className={`font-mono tabular-nums flex items-center gap-1 ${winner === "mine" ? "text-emerald-600 dark:text-emerald-400 font-semibold" : ""}`}>
-                      {mine.toLocaleString()}
-                      {winner === "mine" && <TrendingUp className="h-3 w-3 shrink-0" />}
-                    </span>
-                    <span className="text-center text-muted-foreground whitespace-nowrap text-[10px]">{m.label}</span>
-                    <span className={`font-mono tabular-nums text-right flex items-center justify-end gap-1 ${winner === "theirs" ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>
-                      {winner === "theirs" && <TrendingDown className="h-3 w-3 shrink-0" />}
-                      {theirs.toLocaleString()}
-                    </span>
-                  </div>
-                );
-              })}
+              <div className="min-w-0 text-right">
+                <p className="text-[10px] uppercase tracking-wider font-semibold text-amber-600 dark:text-amber-400 mb-0.5">Competitor</p>
+                <p className="text-sm font-bold leading-tight truncate">{shortName(competitor.name)}</p>
+                {competitor.postcode && (
+                  <p className="text-[11px] text-muted-foreground">{competitor.postcode}</p>
+                )}
+              </div>
             </div>
 
-            {chartData.length > 0 && (
+            {/* Rivalry gauge */}
+            <div className="flex flex-col items-center py-2">
+              <RivalryGauge score={score} />
+            </div>
+
+            {/* Duel bars — legend */}
+            <div className="flex items-center justify-center gap-6 text-[11px] font-medium">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-primary/80" />
+                <span>{shortName(pharmacyName)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-amber-500/70" />
+                <span>{shortName(competitor.name)}</span>
+              </div>
+            </div>
+
+            {/* Metric groups */}
+            {groups.map(group => (
+              <div key={group}>
+                <h4 className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-3">
+                  {group}
+                </h4>
+                <div className="space-y-4">
+                  {visibleMetrics
+                    .filter(m => m.group === group)
+                    .map(m => (
+                      <DuelBar
+                        key={m.key}
+                        label={m.label}
+                        mine={myAgg[m.key]}
+                        theirs={theirAgg[m.key]}
+                        myName={shortName(pharmacyName)}
+                        theirName={shortName(competitor.name)}
+                      />
+                    ))
+                  }
+                </div>
+              </div>
+            ))}
+
+            {/* 12-month items trend */}
+            {trendData.length > 2 && (
               <div>
-                <p className="text-xs text-muted-foreground mb-2">Side-by-side (12-month total)</p>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 50, left: -10 }}>
+                <h4 className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-3">
+                  Items dispensed — 12-month trend
+                </h4>
+                <ResponsiveContainer width="100%" height={160}>
+                  <LineChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="metric" tick={{ fontSize: 9 }} angle={-35} textAnchor="end" interval={0} />
-                    <YAxis tick={{ fontSize: 9 }} tickLine={false} />
-                    <Tooltip formatter={(v: number) => v.toLocaleString()} />
-                    <Legend wrapperStyle={{ fontSize: 10, paddingTop: 8 }} />
-                    <Bar dataKey={pharmacyName} fill="hsl(var(--primary))" opacity={0.85} />
-                    <Bar dataKey={competitor.name} fill="hsl(var(--muted-foreground))" opacity={0.5} />
-                  </BarChart>
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      tickLine={false}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      tickLine={false}
+                      tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)}
+                    />
+                    <Tooltip
+                      contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                      formatter={(v: number) => v.toLocaleString()}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="mine"
+                      name={shortName(pharmacyName)}
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="theirs"
+                      name={shortName(competitor.name)}
+                      stroke="#f59e0b"
+                      strokeWidth={2}
+                      dot={false}
+                      strokeDasharray="5 3"
+                    />
+                  </LineChart>
                 </ResponsiveContainer>
+                <div className="mt-2 flex items-center justify-center gap-6 text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-5 h-0.5 bg-primary rounded" /> {shortName(pharmacyName)}</span>
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-5 h-0.5 bg-amber-500 rounded border-dashed" style={{ borderBottom: "2px dashed #f59e0b", background: "none" }} /> {shortName(competitor.name)}</span>
+                </div>
               </div>
             )}
+
+            {/* Summary wins */}
+            {(() => {
+              const myWins = visibleMetrics.filter(m => myAgg[m.key] > theirAgg[m.key]).length;
+              const theirWins = visibleMetrics.filter(m => theirAgg[m.key] > myAgg[m.key]).length;
+              return (
+                <div className="rounded-lg bg-secondary/40 border border-border px-4 py-3 text-sm">
+                  <p className="font-medium">Summary</p>
+                  <p className="text-muted-foreground text-xs mt-1">
+                    {pharmacyName} leads on <strong className="text-foreground">{myWins} of {visibleMetrics.length}</strong> metrics
+                    {theirWins > 0 ? `, while ${competitor.name} leads on ${theirWins}` : ", outperforming on all measured dimensions"}.
+                  </p>
+                </div>
+              );
+            })()}
           </>
         )}
 
         {!competitor && !loading && (
-          <p className="text-xs text-muted-foreground text-center py-6">
-            Search for a pharmacy above to see a detailed side-by-side breakdown
-          </p>
+          <div className="py-10 text-center text-sm text-muted-foreground border-2 border-dashed border-border rounded-xl">
+            <p className="font-medium">No competitor selected</p>
+            <p className="mt-1 text-xs">Search for a pharmacy above to see a head-to-head comparison</p>
+          </div>
         )}
       </div>
     </div>

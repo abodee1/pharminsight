@@ -1,29 +1,21 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { sankey, sankeyLeft, sankeyLinkHorizontal } from "d3-sankey";
-import type { SankeyNode, SankeyLink, SankeyGraph } from "d3-sankey";
-import { Maximize2, Minimize2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Users, ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
 
 interface Props {
   pharmacyOds: string;
   country: string | null;
 }
 
-interface SNode {
-  id: string;
+interface GpFeeder {
+  practice_code: string;
   name: string;
-  nodeType: "gp" | "pharmacy";
+  itemsToUs: number;
+  itemsTotal: number;
+  shareOfOurInflow: number;   // % of our items that came from this GP
+  shareOfGpOutput: number;    // % of this GP's output that came to us
 }
-
-interface SLink {
-  source: string;
-  target: string;
-  value: number;
-}
-
-type LayoutNode = SankeyNode<SNode, SLink>;
-type LayoutLink = SankeyLink<SNode, SLink>;
 
 const PERIOD_OPTIONS = [
   { label: "Last 3 months", months: 3 },
@@ -31,72 +23,61 @@ const PERIOD_OPTIONS = [
   { label: "Last 12 months", months: 12 },
 ];
 
-const linkPath = sankeyLinkHorizontal();
-
 function periodFilter(months: number) {
   const now = new Date();
   const from = new Date(now.getFullYear(), now.getMonth() - months, 1);
   return { year: from.getFullYear(), month: from.getMonth() + 1 };
 }
 
+function inPeriod(row: { year: number; month: number }, fromYear: number, fromMonth: number) {
+  return row.year > fromYear || (row.year === fromYear && row.month >= fromMonth);
+}
+
 export function NominationFlow({ pharmacyOds, country }: Props) {
   const [periodIdx, setPeriodIdx] = useState(2);
-  const [layoutNodes, setLayoutNodes] = useState<LayoutNode[]>([]);
-  const [layoutLinks, setLayoutLinks] = useState<LayoutLink[]>([]);
-  const [topFeederNote, setTopFeederNote] = useState<string | null>(null);
+  const [feeders, setFeeders] = useState<GpFeeder[]>([]);
   const [loading, setLoading] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
-  const [width, setWidth] = useState(600);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [totalInflow, setTotalInflow] = useState(0);
+  const [totalGpCount, setTotalGpCount] = useState(0);
 
   const isSupported = country === "England" || country === "Scotland";
   const period = PERIOD_OPTIONS[periodIdx];
-  const height = fullscreen ? Math.max(400, window.innerHeight - 180) : 340;
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const ro = new ResizeObserver(entries => {
-      const w = entries[0]?.contentRect.width ?? 600;
-      setWidth(Math.max(320, w - 32));
-    });
-    ro.observe(containerRef.current);
-    return () => ro.disconnect();
-  }, []);
 
   useEffect(() => {
     if (!isSupported) return;
     setLoading(true);
-    setLayoutNodes([]);
-    setLayoutLinks([]);
-    setTopFeederNote(null);
+    setFeeders([]);
 
     (async () => {
       const { year, month } = periodFilter(period.months);
 
-      // Flows to this pharmacy
+      // All flows TO this pharmacy
       const { data: toThis } = await supabase
         .from("gp_pharmacy_linkage")
         .select("practice_code,items_dispensed,year,month")
         .eq("pharmacy_ods_code", pharmacyOds)
         .gte("year", year);
 
-      if (!toThis?.length) { setLoading(false); return; }
+      const toThisFiltered = (toThis ?? []).filter(r => inPeriod(r, year, month));
+      if (!toThisFiltered.length) { setLoading(false); return; }
 
-      // Filter to period (gte year filter above catches too many if spanning years)
-      const filtered = toThis.filter(r => r.year > year || (r.year === year && r.month >= month));
-      if (!filtered.length) { setLoading(false); return; }
-
-      // Aggregate by GP and pick top 10
-      const gpTotals = new Map<string, number>();
-      for (const r of filtered) {
-        gpTotals.set(r.practice_code, (gpTotals.get(r.practice_code) ?? 0) + r.items_dispensed);
+      // Aggregate by GP — items sent to US
+      const gpToUs = new Map<string, number>();
+      for (const r of toThisFiltered) {
+        gpToUs.set(r.practice_code, (gpToUs.get(r.practice_code) ?? 0) + r.items_dispensed);
       }
-      const top10 = Array.from(gpTotals.entries())
+      setTotalGpCount(gpToUs.size);
+
+      const ourTotal = Array.from(gpToUs.values()).reduce((s, v) => s + v, 0);
+      setTotalInflow(ourTotal);
+
+      // Top 10 feeders
+      const top10 = Array.from(gpToUs.entries())
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
         .map(([code]) => code);
 
-      // GP names from gp_practices
+      // GP names
       const { data: gpNames } = await supabase
         .from("gp_practices")
         .select("practice_code,practice_name,google_name")
@@ -106,216 +87,178 @@ export function NominationFlow({ pharmacyOds, country }: Props) {
         (gpNames ?? []).map(g => [g.practice_code, g.google_name || g.practice_name || g.practice_code])
       );
 
-      // All flows from top10 GPs in this period
+      // All flows FROM these GPs (to any pharmacy) in period — to compute GP's total output
       const { data: allFlows } = await supabase
         .from("gp_pharmacy_linkage")
-        .select("practice_code,pharmacy_ods_code,items_dispensed,year,month")
+        .select("practice_code,items_dispensed,year,month")
         .in("practice_code", top10)
         .gte("year", year);
 
-      const periodFlows = (allFlows ?? []).filter(
-        r => r.year > year || (r.year === year && r.month >= month)
-      );
-
-      // Aggregate by GP→pharmacy
-      const flowMap = new Map<string, number>();
-      for (const r of periodFlows) {
-        const key = `${r.practice_code}__${r.pharmacy_ods_code}`;
-        flowMap.set(key, (flowMap.get(key) ?? 0) + r.items_dispensed);
+      const gpTotalOutput = new Map<string, number>();
+      for (const r of (allFlows ?? []).filter(r => inPeriod(r, year, month))) {
+        gpTotalOutput.set(r.practice_code, (gpTotalOutput.get(r.practice_code) ?? 0) + r.items_dispensed);
       }
 
-      // Pharmacies receiving flows (keep top 8 by volume)
-      const pharmTotals = new Map<string, number>();
-      for (const [key, val] of flowMap.entries()) {
-        const pharmOds = key.split("__")[1];
-        pharmTotals.set(pharmOds, (pharmTotals.get(pharmOds) ?? 0) + val);
-      }
-      const topPharms = Array.from(pharmTotals.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 8)
-        .map(([ods]) => ods);
+      const result: GpFeeder[] = top10.map(code => {
+        const itemsToUs = gpToUs.get(code) ?? 0;
+        const itemsTotal = gpTotalOutput.get(code) ?? itemsToUs;
+        return {
+          practice_code: code,
+          name: nameMap.get(code) ?? code,
+          itemsToUs,
+          itemsTotal,
+          shareOfOurInflow: ourTotal > 0 ? (itemsToUs / ourTotal) * 100 : 0,
+          shareOfGpOutput: itemsTotal > 0 ? (itemsToUs / itemsTotal) * 100 : 0,
+        };
+      });
 
-      // Ensure this pharmacy is always included
-      if (!topPharms.includes(pharmacyOds)) topPharms.push(pharmacyOds);
-
-      // Build node list
-      const nodeData: SNode[] = [
-        ...top10.map(code => ({ id: `gp_${code}`, name: nameMap.get(code) ?? code, nodeType: "gp" as const })),
-        ...topPharms.map(ods => ({
-          id: `ph_${ods}`,
-          name: ods === pharmacyOds ? "This pharmacy" : ods,
-          nodeType: "pharmacy" as const,
-        })),
-      ];
-
-      const linkData: SLink[] = [];
-      for (const [key, value] of flowMap.entries()) {
-        const [gpCode, pharmOds] = key.split("__");
-        if (!topPharms.includes(pharmOds)) continue;
-        linkData.push({ source: `gp_${gpCode}`, target: `ph_${pharmOds}`, value });
-      }
-
-      if (!linkData.length) { setLoading(false); return; }
-
-      try {
-        const layout = sankey<SNode, SLink>()
-          .nodeId(d => d.id)
-          .nodeAlign(sankeyLeft)
-          .nodeWidth(16)
-          .nodePadding(8)
-          .extent([[0, 0], [width - 180, height - 40]]);
-
-        const graph: SankeyGraph<SNode, SLink> = layout({
-          nodes: nodeData.map(n => ({ ...n })),
-          links: linkData.map(l => ({ ...l })),
-        });
-
-        setLayoutNodes(graph.nodes as LayoutNode[]);
-        setLayoutLinks(graph.links as LayoutLink[]);
-
-        // Top feeder note
-        const topGpCode = top10[0];
-        const topGpName = nameMap.get(topGpCode) ?? topGpCode;
-        const topGpItems = gpTotals.get(topGpCode) ?? 0;
-        setTopFeederNote(`Top feeder: ${topGpName} — ${topGpItems.toLocaleString()} items over ${period.label.toLowerCase()}`);
-      } catch {
-        // Layout failed silently
-      } finally {
-        setLoading(false);
-      }
+      setFeeders(result);
+      setLoading(false);
     })();
-  }, [pharmacyOds, isSupported, period.months, width, height]);
+  }, [pharmacyOds, isSupported, period.months]);
 
-  const SVG_PADDING = { left: 120, right: 60, top: 10, bottom: 10 };
+  if (!isSupported) {
+    return (
+      <section className="mt-6 rounded-lg bg-card border border-border shadow-sm px-4 py-4 text-sm text-muted-foreground">
+        GP nomination flow data is available for England and Scotland pharmacies only.
+      </section>
+    );
+  }
 
-  const inner = (
-    <div ref={containerRef}>
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2 flex-wrap">
-        <h2 className="text-sm font-semibold">GP nomination flow</h2>
-        <div className="flex items-center gap-2">
+  const top = feeders[0];
+
+  return (
+    <section className="mt-6">
+      <div className="rounded-lg bg-card border border-border shadow-sm overflow-hidden">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold">GP feeder analysis</h2>
+          </div>
           <Select value={String(periodIdx)} onValueChange={v => setPeriodIdx(Number(v))}>
-            <SelectTrigger className="w-36 h-7 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               {PERIOD_OPTIONS.map((o, i) => (
                 <SelectItem key={i} value={String(i)}>{o.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <button
-            onClick={() => setFullscreen(f => !f)}
-            className="p-1.5 rounded hover:bg-secondary transition-colors"
-            title={fullscreen ? "Exit full screen" : "Full screen"}
-          >
-            {fullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-          </button>
         </div>
-      </div>
 
-      <div className="p-4">
         {loading && (
-          <div className="text-sm text-muted-foreground animate-pulse py-10 text-center">Loading nomination flows…</div>
+          <div className="px-5 py-12 text-sm text-muted-foreground animate-pulse text-center">
+            Loading GP feeder data…
+          </div>
         )}
 
-        {!loading && layoutNodes.length === 0 && (
-          <div className="text-sm text-muted-foreground py-10 text-center">
+        {!loading && feeders.length === 0 && (
+          <div className="px-5 py-12 text-sm text-muted-foreground text-center">
             No GP→pharmacy flow data found for this pharmacy in the selected period.
           </div>
         )}
 
-        {!loading && layoutNodes.length > 0 && (
+        {!loading && feeders.length > 0 && (
           <>
-            <svg
-              width={width}
-              height={height}
-              className="max-w-full overflow-visible"
-              style={{ fontFamily: "inherit" }}
-            >
-              <g transform={`translate(${SVG_PADDING.left},${SVG_PADDING.top})`}>
-                {layoutLinks.map((link, i) => {
-                  const targetNode = typeof link.target === "object" ? link.target as LayoutNode : null;
-                  const isThisPharm = targetNode?.id === `ph_${pharmacyOds}`;
-                  return (
-                    <path
-                      key={i}
-                      d={linkPath(link as Parameters<typeof linkPath>[0]) ?? ""}
-                      fill="none"
-                      stroke={isThisPharm ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))"}
-                      strokeWidth={Math.max(1, link.width ?? 2)}
-                      opacity={isThisPharm ? 0.45 : 0.12}
-                    />
-                  );
-                })}
-
-                {layoutNodes.map((node, i) => {
-                  const x0 = node.x0 ?? 0;
-                  const x1 = node.x1 ?? 16;
-                  const y0 = node.y0 ?? 0;
-                  const y1 = node.y1 ?? 20;
-                  const h = Math.max(2, y1 - y0);
-                  const isGp = node.nodeType === "gp";
-                  const isThis = node.id === `ph_${pharmacyOds}`;
-
-                  return (
-                    <g key={i}>
-                      <rect
-                        x={x0}
-                        y={y0}
-                        width={x1 - x0}
-                        height={h}
-                        fill={isThis ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))"}
-                        opacity={isThis ? 1 : 0.55}
-                        rx={2}
-                      />
-                      <text
-                        x={isGp ? x0 - 4 : x1 + 4}
-                        y={y0 + h / 2}
-                        dy="0.35em"
-                        textAnchor={isGp ? "end" : "start"}
-                        fontSize={9}
-                        fill="hsl(var(--foreground))"
-                        opacity={0.85}
-                      >
-                        {node.name.length > 22 ? node.name.slice(0, 22) + "…" : node.name}
-                      </text>
-                    </g>
-                  );
-                })}
-              </g>
-            </svg>
-
-            {topFeederNote && (
-              <div className="mt-3 rounded-md bg-primary/5 border border-primary/20 px-3 py-2 text-xs text-muted-foreground">
-                {topFeederNote}
+            {/* Summary stats */}
+            <div className="grid grid-cols-3 divide-x divide-border border-b border-border">
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Total GP feeders</p>
+                <p className="text-2xl font-bold mt-1 tabular-nums">{totalGpCount}</p>
               </div>
-            )}
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Items received</p>
+                <p className="text-2xl font-bold mt-1 tabular-nums">{totalInflow.toLocaleString()}</p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Top GP share</p>
+                <p className="text-2xl font-bold mt-1 tabular-nums">
+                  {top ? `${top.shareOfOurInflow.toFixed(1)}%` : "—"}
+                </p>
+                {top && <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{top.name}</p>}
+              </div>
+            </div>
+
+            {/* Column headers */}
+            <div className="grid grid-cols-[2rem_1fr_6rem_6rem_8rem] gap-x-4 px-5 py-2 border-b border-border bg-secondary/30">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">#</span>
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">GP practice</span>
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground text-right">Items to us</span>
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground text-right">Our share</span>
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground text-right">GP loyalty</span>
+            </div>
+
+            {/* Feeder rows */}
+            <div className="divide-y divide-border/60">
+              {feeders.map((gp, i) => {
+                const loyaltyWidth = Math.min(100, gp.shareOfGpOutput);
+                const inflowWidth = Math.min(100, gp.shareOfOurInflow);
+                const isTop = i === 0;
+
+                return (
+                  <div
+                    key={gp.practice_code}
+                    className={`grid grid-cols-[2rem_1fr_6rem_6rem_8rem] gap-x-4 px-5 py-3.5 items-center hover:bg-secondary/20 transition-colors ${isTop ? "bg-primary/5" : ""}`}
+                  >
+                    {/* Rank */}
+                    <span className={`text-sm font-bold tabular-nums ${isTop ? "text-primary" : "text-muted-foreground"}`}>
+                      {i + 1}
+                    </span>
+
+                    {/* GP name + inflow bar */}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate leading-tight">{gp.name}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">{gp.practice_code}</p>
+                      {/* Inflow bar */}
+                      <div className="mt-2 h-1.5 rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary/70 transition-all"
+                          style={{ width: `${inflowWidth}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Items to us */}
+                    <div className="text-right">
+                      <p className="text-sm font-semibold tabular-nums">{gp.itemsToUs.toLocaleString()}</p>
+                      <p className="text-[11px] text-muted-foreground">items</p>
+                    </div>
+
+                    {/* Share of our inflow */}
+                    <div className="text-right">
+                      <p className={`text-sm font-bold tabular-nums ${isTop ? "text-primary" : ""}`}>
+                        {gp.shareOfOurInflow.toFixed(1)}%
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">of our total</p>
+                    </div>
+
+                    {/* GP loyalty = share of GP's output that came to us */}
+                    <div className="text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden max-w-[56px]">
+                          <div
+                            className={`h-full rounded-full transition-all ${loyaltyWidth > 50 ? "bg-emerald-500" : loyaltyWidth > 25 ? "bg-amber-500" : "bg-muted-foreground/50"}`}
+                            style={{ width: `${loyaltyWidth}%` }}
+                          />
+                        </div>
+                        <p className={`text-sm font-semibold tabular-nums shrink-0 ${loyaltyWidth > 50 ? "text-emerald-600 dark:text-emerald-400" : loyaltyWidth > 25 ? "text-amber-600 dark:text-amber-400" : ""}`}>
+                          {gp.shareOfGpOutput.toFixed(0)}%
+                        </p>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">of GP output</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Legend / explainer */}
+            <div className="px-5 py-3 border-t border-border bg-secondary/20 flex items-start gap-6 flex-wrap text-[11px] text-muted-foreground">
+              <span><strong className="text-foreground">Our share</strong> — what % of this pharmacy's total items came from this GP</span>
+              <span><strong className="text-foreground">GP loyalty</strong> — what % of this GP's total prescriptions they directed here</span>
+            </div>
           </>
         )}
-      </div>
-    </div>
-  );
-
-  if (!isSupported) {
-    return (
-      <section className="mt-6 rounded-lg bg-card border border-border shadow-sm px-4 py-3 text-sm text-muted-foreground">
-        GP nomination flow data is available for England and Scotland pharmacies only.
-      </section>
-    );
-  }
-
-  if (fullscreen) {
-    return (
-      <div className="fixed inset-0 z-50 bg-background overflow-auto p-4">
-        <div className="rounded-lg bg-card border border-border shadow-sm overflow-hidden">
-          {inner}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <section className="mt-6">
-      <div className="rounded-lg bg-card border border-border shadow-sm overflow-hidden">
-        {inner}
       </div>
     </section>
   );
