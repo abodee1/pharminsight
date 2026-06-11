@@ -251,7 +251,7 @@ async function buildPharmacyContext(supabase: any, pharmacy_id: string) {
           name: p.name, distance_m: Math.round(p.distance_m), postcode: p.postcode,
         })),
         gps: (gps || []).map((p: any) => ({
-          name: p.google_name || p.practice_name, distance_m: Math.round(p.distance_m), postcode: p.postcode,
+          name: p.practice_name || p.google_name || p.practice_code, distance_m: Math.round(p.distance_m), postcode: p.postcode,
         })),
       };
     }

@@ -32,6 +32,20 @@ function displayPracticeName(g: { google_name?: string | null; practice_name?: s
   return g.practice_name || g.google_name || g.practice_code || "GP Practice";
 }
 
+async function resolveOdsName(code: string): Promise<string> {
+  try {
+    const res = await fetch(`https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/${encodeURIComponent(code)}`);
+    if (!res.ok) return code;
+    const j = await res.json() as { Organisation?: { Name?: string } };
+    const raw = j?.Organisation?.Name;
+    if (!raw) return code;
+    // ODS names come back in UPPER CASE — convert to Title Case for readability
+    return raw.replace(/\b\w+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  } catch {
+    return code;
+  }
+}
+
 function fmtDist(m: number | null) {
   if (m == null) return "";
   if (m < 1000) return `${Math.round(m)} m`;
@@ -107,7 +121,15 @@ export function LocalLandscape({ pharmacyName, postcode, address }: Props) {
           return !(samePc && sameName);
         });
         setPharmacies(others.slice(0, 10));
-        setDoctors(((gpRes.data ?? []) as NearbyGP[]).slice(0, 10));
+
+        // Resolve any GP surgeries missing both names via NHS ODS API
+        const rawGps = ((gpRes.data ?? []) as NearbyGP[]).slice(0, 10);
+        const needsLookup = rawGps.filter(g => !g.practice_name && !g.google_name);
+        if (needsLookup.length > 0) {
+          const resolved = await Promise.all(needsLookup.map(g => resolveOdsName(g.practice_code)));
+          needsLookup.forEach((g, i) => { g.practice_name = resolved[i]; });
+        }
+        setDoctors(rawGps);
       } catch (e: any) {
         if (!cancelled) setError(e?.message || "Failed to load local landscape.");
       } finally {

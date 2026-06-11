@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
+import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetchAll";
 import {
-  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ArrowUpRight } from "lucide-react";
 
 interface Props {
   pharmacyId: string;
@@ -25,21 +26,46 @@ const RADIUS_OPTIONS = [
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 type NearbyPharm = { id: string; ods_code: string; name: string; distance_m: number };
-type PharmTotals = { id: string; ods_code: string; name: string; totalItems: number; totalNms: number; totalPf: number; share: number; distance_m: number };
+type PharmTotals = {
+  id: string; ods_code: string; name: string; distance_m: number;
+  last12: number; prev12: number; yoyPct: number | null;
+  totalNms: number; totalPf: number; share: number;
+};
 type DispensingRow = { pharmacy_id: string; year: number; month: number; items_dispensed: number; nms_count: number; pharmacy_first_count: number };
 
-function fmt(n: number, dp = 1) {
-  return n.toFixed(dp);
+function fmtN(n: number) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+  if (n >= 100_000) return Math.round(n / 1000) + "k";
+  if (n >= 10_000) return (n / 1000).toFixed(1) + "k";
+  return Math.round(n).toLocaleString();
+}
+function fmtPct(n: number, dp = 1) { return n.toFixed(dp) + "%"; }
+function fmtGbp(n: number) {
+  if (n >= 1_000_000) return "£" + (n / 1_000_000).toFixed(1) + "M";
+  if (n >= 1_000) return "£" + Math.round(n / 1000) + "k";
+  return "£" + Math.round(n).toLocaleString();
+}
+
+function YoyBadge({ pct }: { pct: number | null }) {
+  if (pct === null) return <span className="text-[10px] text-muted-foreground">—</span>;
+  if (Math.abs(pct) < 1) return <span className="text-[10px] text-muted-foreground flex items-center gap-0.5"><Minus className="h-3 w-3" />Flat</span>;
+  return pct > 0
+    ? <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5"><TrendingUp className="h-3 w-3" />+{pct.toFixed(0)}%</span>
+    : <span className="text-[10px] font-semibold text-red-500 flex items-center gap-0.5"><TrendingDown className="h-3 w-3" />{pct.toFixed(0)}%</span>;
 }
 
 export function MarketShareSection({ pharmacyId, pharmacyOds, pharmacyName, lat, lng }: Props) {
   const [radiusIdx, setRadiusIdx] = useState(1);
   const [loading, setLoading] = useState(false);
   const [nearby, setNearby] = useState<NearbyPharm[]>([]);
-  const [shareTimeline, setShareTimeline] = useState<{ label: string; share: number }[]>([]);
+  const [shareTimeline, setShareTimeline] = useState<{ label: string; share: number; marketTotal: number }[]>([]);
   const [leaderboard, setLeaderboard] = useState<PharmTotals[]>([]);
   const [breakdown, setBreakdown] = useState<{ label: string; mine: number }[]>([]);
   const [myRank, setMyRank] = useState<number | null>(null);
+  const [myLast12, setMyLast12] = useState(0);
+  const [myYoy, setMyYoy] = useState<number | null>(null);
+  const [marketLast12, setMarketLast12] = useState(0);
+  const [marketYoy, setMarketYoy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const radius = RADIUS_OPTIONS[radiusIdx];
@@ -52,10 +78,7 @@ export function MarketShareSection({ pharmacyId, pharmacyOds, pharmacyName, lat,
     (async () => {
       try {
         const { data: nearbyData, error: nearbyErr } = await supabase.rpc("pharmacies_near", {
-          p_lat: lat,
-          p_lng: lng,
-          p_radius_m: radius.m,
-          p_limit: 200,
+          p_lat: lat, p_lng: lng, p_radius_m: radius.m, p_limit: 200,
         });
         if (nearbyErr) throw nearbyErr;
 
@@ -63,9 +86,7 @@ export function MarketShareSection({ pharmacyId, pharmacyOds, pharmacyName, lat,
         setNearby(nearbyPharms);
 
         const allIds = [pharmacyId, ...nearbyPharms.map(p => p.id)];
-
-        const now = new Date();
-        const fromYear = now.getFullYear() - 2;
+        const fromYear = new Date().getFullYear() - 2;
 
         const allRows = await fetchAll<DispensingRow>((from, to) =>
           supabase
@@ -78,62 +99,99 @@ export function MarketShareSection({ pharmacyId, pharmacyOds, pharmacyName, lat,
             .range(from, to) as any
         );
 
-        // Period-level share
+        if (allRows.length === 0) { setLoading(false); return; }
+
+        // Find the most recent period across all rows
+        const maxKey = Math.max(...allRows.map(r => r.year * 100 + r.month));
+        const maxYear = Math.floor(maxKey / 100);
+        const maxMonth = maxKey % 100;
+        const monthsAgo = (y: number, m: number) => (maxYear - y) * 12 + (maxMonth - m);
+
+        // Per-pharmacy aggregation split into last-12 vs prior-12
+        const byPharm = new Map<string, { l12: number; p12: number; lNms: number; lPf: number }>();
+        // Period-level for share timeline
         const byPeriod = new Map<number, { mine: number; total: number }>();
-        // Pharmacy-level totals
-        const byPharm = new Map<string, { totalItems: number; totalNms: number; totalPf: number }>();
 
         for (const row of allRows) {
-          const key = row.year * 100 + row.month;
+          const ago = monthsAgo(row.year, row.month);
           const items = row.items_dispensed ?? 0;
+          const key = row.year * 100 + row.month;
 
-          const p = byPeriod.get(key) ?? { mine: 0, total: 0 };
-          p.total += items;
-          if (row.pharmacy_id === pharmacyId) p.mine += items;
-          byPeriod.set(key, p);
+          // timeline (all periods, last 24 months)
+          if (ago >= 0 && ago < 24) {
+            const p = byPeriod.get(key) ?? { mine: 0, total: 0 };
+            p.total += items;
+            if (row.pharmacy_id === pharmacyId) p.mine += items;
+            byPeriod.set(key, p);
+          }
 
-          const ph = byPharm.get(row.pharmacy_id) ?? { totalItems: 0, totalNms: 0, totalPf: 0 };
-          ph.totalItems += items;
-          ph.totalNms += row.nms_count ?? 0;
-          ph.totalPf += row.pharmacy_first_count ?? 0;
+          // per-pharmacy split
+          const ph = byPharm.get(row.pharmacy_id) ?? { l12: 0, p12: 0, lNms: 0, lPf: 0 };
+          if (ago >= 0 && ago < 12) {
+            ph.l12 += items;
+            ph.lNms += row.nms_count ?? 0;
+            ph.lPf += row.pharmacy_first_count ?? 0;
+          } else if (ago >= 12 && ago < 24) {
+            ph.p12 += items;
+          }
           byPharm.set(row.pharmacy_id, ph);
         }
 
-        const timeline = Array.from(byPeriod.entries())
-          .sort(([a], [b]) => a - b)
-          .slice(-24)
-          .map(([key, { mine, total }]) => {
-            const year = Math.floor(key / 100);
-            const month = key % 100;
-            return {
-              label: `${MONTHS[month - 1]} ${String(year).slice(2)}`,
-              share: total > 0 ? Math.round((mine / total) * 1000) / 10 : 0,
-            };
-          });
-        setShareTimeline(timeline);
+        // Market totals
+        const mktL12 = Array.from(byPharm.values()).reduce((s, v) => s + v.l12, 0);
+        const mktP12 = Array.from(byPharm.values()).reduce((s, v) => s + v.p12, 0);
+        setMarketLast12(mktL12);
+        setMarketYoy(mktP12 > 0 ? ((mktL12 - mktP12) / mktP12) * 100 : null);
 
-        const marketItems = Array.from(byPharm.values()).reduce((s, d) => s + d.totalItems, 0);
-        const marketNms = Array.from(byPharm.values()).reduce((s, d) => s + d.totalNms, 0);
-        const marketPf = Array.from(byPharm.values()).reduce((s, d) => s + d.totalPf, 0);
+        // My stats
+        const myData = byPharm.get(pharmacyId);
+        const mL12 = myData?.l12 ?? 0;
+        const mP12 = myData?.p12 ?? 0;
+        setMyLast12(mL12);
+        setMyYoy(mP12 > 0 ? ((mL12 - mP12) / mP12) * 100 : null);
 
+        // Leaderboard sorted by last 12m items
         const sorted: PharmTotals[] = Array.from(byPharm.entries()).map(([id, data]) => {
           const info = id === pharmacyId
             ? { ods_code: pharmacyOds, name: pharmacyName, distance_m: 0 }
             : nearbyPharms.find(p => p.id === id) ?? { ods_code: id, name: id, distance_m: 0 };
-          return { id, ods_code: info.ods_code, name: info.name, distance_m: info.distance_m, ...data, share: marketItems > 0 ? (data.totalItems / marketItems) * 100 : 0 };
-        }).sort((a, b) => b.totalItems - a.totalItems);
+          const yoyPct = data.p12 > 0 ? ((data.l12 - data.p12) / data.p12) * 100 : null;
+          return {
+            id, ods_code: info.ods_code, name: info.name, distance_m: info.distance_m,
+            last12: data.l12, prev12: data.p12, yoyPct,
+            totalNms: data.lNms, totalPf: data.lPf,
+            share: mktL12 > 0 ? (data.l12 / mktL12) * 100 : 0,
+          };
+        }).sort((a, b) => b.last12 - a.last12);
 
         setMyRank((sorted.findIndex(p => p.id === pharmacyId) + 1) || null);
-        setLeaderboard(sorted.slice(0, 5));
+        setLeaderboard(sorted.slice(0, 8));
 
-        const myData = byPharm.get(pharmacyId);
+        // Service breakdown
         if (myData) {
+          const mktNms = Array.from(byPharm.values()).reduce((s, v) => s + v.lNms, 0);
+          const mktPf  = Array.from(byPharm.values()).reduce((s, v) => s + v.lPf, 0);
           setBreakdown([
-            { label: "Items", mine: marketItems > 0 ? myData.totalItems / marketItems * 100 : 0 },
-            { label: "NMS", mine: marketNms > 0 ? myData.totalNms / marketNms * 100 : 0 },
-            { label: "Pharmacy First", mine: marketPf > 0 ? myData.totalPf / marketPf * 100 : 0 },
+            { label: "Items", mine: mktL12 > 0 ? myData.l12 / mktL12 * 100 : 0 },
+            { label: "NMS", mine: mktNms > 0 ? myData.lNms / mktNms * 100 : 0 },
+            { label: "Pharmacy First", mine: mktPf > 0 ? myData.lPf / mktPf * 100 : 0 },
           ]);
         }
+
+        // Share timeline
+        const timeline = Array.from(byPeriod.entries())
+          .sort(([a], [b]) => a - b)
+          .map(([key, { mine, total }]) => {
+            const year = Math.floor(key / 100);
+            const month = key % 100;
+            return {
+              label: `${MONTHS[month - 1]} '${String(year).slice(2)}`,
+              share: total > 0 ? Math.round((mine / total) * 1000) / 10 : 0,
+              marketTotal: total,
+            };
+          });
+        setShareTimeline(timeline);
+
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Failed to load market data");
       } finally {
@@ -145,26 +203,22 @@ export function MarketShareSection({ pharmacyId, pharmacyOds, pharmacyName, lat,
   if (!lat || !lng) {
     return (
       <section className="mt-6 rounded-lg bg-card border border-border shadow-sm px-4 py-3 text-sm text-muted-foreground">
-        Market share analysis unavailable — location coordinates not recorded for this pharmacy.
+        Market share analysis unavailable — location not recorded for this pharmacy.
       </section>
     );
   }
 
-  const current = shareTimeline.at(-1)?.share ?? null;
-  const prev = shareTimeline.at(-2)?.share ?? null;
-  const trend = current !== null && prev !== null ? current - prev : null;
-
-  const summary = current !== null
-    ? `${pharmacyName} holds a ${fmt(current)}% share of items dispensed within ${radius.label}` +
-      (myRank ? `, ranking #${myRank} of ${nearby.length + 1} pharmacies` : "") +
-      (trend !== null
-        ? `. Share ${trend > 0.2 ? "grew" : trend < -0.2 ? "declined" : "held steady"} by ${fmt(Math.abs(trend), 2)} pp month-on-month.`
-        : ".")
-    : null;
+  const currentShare = shareTimeline.at(-1)?.share ?? null;
+  const leader = leaderboard[0];
+  const isLeader = leader?.id === pharmacyId;
+  const gapItems = !isLeader && leader ? Math.max(0, leader.last12 - myLast12) : 0;
+  const gapMonthlyItems = Math.round(gapItems / 12);
+  const gapMonthlyFee = gapMonthlyItems * 1.27;
 
   return (
     <section className="mt-6">
-      <div className="rounded-lg bg-card border border-border shadow-sm overflow-hidden">
+      <div className="rounded-lg bg-card border border-border shadow-sm">
+        {/* Header */}
         <div className="px-4 py-3 border-b border-border flex items-center justify-between flex-wrap gap-2">
           <h2 className="text-sm font-semibold">Market share</h2>
           <Select value={String(radiusIdx)} onValueChange={v => setRadiusIdx(Number(v))}>
@@ -181,107 +235,169 @@ export function MarketShareSection({ pharmacyId, pharmacyOds, pharmacyName, lat,
         {error && !loading && <div className="p-4 text-sm text-destructive">{error}</div>}
 
         {!loading && !error && (
-          <div className="p-4 space-y-5">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="rounded-md bg-secondary/40 p-3">
-                <p className="text-xs text-muted-foreground">Market share</p>
-                <p className="text-xl font-bold mt-1">{current !== null ? `${fmt(current)}%` : "—"}</p>
+          <div className="p-4 space-y-6">
+
+            {/* ── Stat cards ── */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="rounded-lg bg-secondary/40 p-3">
+                <p className="text-[11px] text-muted-foreground">Market share</p>
+                <p className="text-2xl font-bold tabular-nums mt-1">{currentShare !== null ? fmtPct(currentShare) : "—"}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">of items within {radius.label}</p>
               </div>
-              <div className="rounded-md bg-secondary/40 p-3">
-                <p className="text-xs text-muted-foreground">Local rank</p>
-                <p className="text-xl font-bold mt-1">
+              <div className="rounded-lg bg-secondary/40 p-3">
+                <p className="text-[11px] text-muted-foreground">Local rank</p>
+                <p className="text-2xl font-bold tabular-nums mt-1">
                   {myRank ? `#${myRank}` : "—"}
                   <span className="text-xs font-normal text-muted-foreground ml-1">of {nearby.length + 1}</span>
                 </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">by items dispensed (12m)</p>
               </div>
-              <div className="rounded-md bg-secondary/40 p-3">
-                <p className="text-xs text-muted-foreground">MoM trend</p>
-                <div className="mt-1 flex items-center gap-1">
-                  {trend !== null && trend > 0.2 ? (
-                    <TrendingUp className="h-4 w-4 text-emerald-500" />
-                  ) : trend !== null && trend < -0.2 ? (
-                    <TrendingDown className="h-4 w-4 text-red-500" />
-                  ) : (
-                    <Minus className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <span className="text-xl font-bold">
-                    {trend !== null ? `${trend > 0 ? "+" : ""}${fmt(trend, 2)}pp` : "—"}
-                  </span>
-                </div>
+              <div className="rounded-lg bg-secondary/40 p-3">
+                <p className="text-[11px] text-muted-foreground">My items YoY</p>
+                <p className="text-2xl font-bold tabular-nums mt-1">{fmtN(myLast12)}</p>
+                <div className="mt-0.5"><YoyBadge pct={myYoy} /></div>
               </div>
-              <div className="rounded-md bg-secondary/40 p-3">
-                <p className="text-xs text-muted-foreground">Competitors</p>
-                <p className="text-xl font-bold mt-1">{nearby.length}</p>
+              <div className="rounded-lg bg-secondary/40 p-3">
+                <p className="text-[11px] text-muted-foreground">Market size (12m)</p>
+                <p className="text-2xl font-bold tabular-nums mt-1">{fmtN(marketLast12)}</p>
+                <div className="mt-0.5"><YoyBadge pct={marketYoy} /></div>
+              </div>
+              <div className="rounded-lg bg-secondary/40 p-3">
+                <p className="text-[11px] text-muted-foreground">Competitors</p>
+                <p className="text-2xl font-bold tabular-nums mt-1">{nearby.length}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">within {radius.label}</p>
               </div>
             </div>
 
+            {/* ── Share trend chart ── */}
             {shareTimeline.length > 1 && (
               <div>
-                <p className="text-xs text-muted-foreground mb-2">24-month share trend (%)</p>
-                <ResponsiveContainer width="100%" height={120}>
-                  <LineChart data={shareTimeline} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+                <p className="text-xs font-medium mb-2">My market share — 24-month trend</p>
+                <ResponsiveContainer width="100%" height={130}>
+                  <AreaChart data={shareTimeline} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+                    <defs>
+                      <linearGradient id="shareGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="label" tick={{ fontSize: 9 }} tickLine={false} interval="preserveStartEnd" />
-                    <YAxis tick={{ fontSize: 9 }} tickLine={false} domain={["auto", "auto"]} unit="%" />
-                    <Tooltip formatter={(v: number) => [`${v.toFixed(1)}%`, "Share"]} />
-                    <Line type="monotone" dataKey="share" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
-                  </LineChart>
+                    <XAxis dataKey="label" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} tickLine={false} interval="preserveStartEnd" />
+                    <YAxis tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} tickLine={false} domain={["auto", "auto"]} unit="%" />
+                    <Tooltip
+                      contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                      formatter={(v: number) => [`${v.toFixed(1)}%`, "Share"]}
+                    />
+                    <Area type="monotone" dataKey="share" stroke="var(--chart-1)" strokeWidth={2} fill="url(#shareGrad)" dot={false} />
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             )}
 
-            {breakdown.length > 0 && (
+            {/* ── Service share breakdown ── */}
+            {breakdown.some(b => b.mine > 0) && (
               <div>
-                <p className="text-xs text-muted-foreground mb-2">Share by service type (24-month total)</p>
-                <div className="space-y-1.5">
+                <p className="text-xs font-medium mb-2">Share by service type <span className="text-muted-foreground font-normal">(last 12 months)</span></p>
+                <div className="space-y-2">
                   {breakdown.map(b => (
-                    <div key={b.label} className="flex items-center gap-2 text-xs">
+                    <div key={b.label} className="flex items-center gap-3 text-xs">
                       <span className="w-24 text-muted-foreground shrink-0">{b.label}</span>
-                      <div className="flex-1 h-2 rounded-full bg-secondary relative overflow-hidden">
-                        <div
-                          className="absolute inset-y-0 left-0 bg-primary/70 rounded-full"
-                          style={{ width: `${Math.min(100, b.mine)}%` }}
-                        />
+                      <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
+                        <div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.min(100, b.mine)}%` }} />
                       </div>
-                      <span className="w-12 text-right font-mono tabular-nums shrink-0">{fmt(b.mine)}%</span>
+                      <span className="w-10 text-right font-mono tabular-nums shrink-0 font-semibold">{fmtPct(b.mine)}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
+            {/* ── Leaderboard ── */}
             {leaderboard.length > 0 && (
               <div>
-                <p className="text-xs text-muted-foreground mb-2">Top-5 pharmacies within {radius.label}</p>
-                <div className="space-y-0.5">
-                  {leaderboard.map((p, i) => (
-                    <div
-                      key={p.id}
-                      className={`flex items-center gap-2 text-xs rounded px-2 py-1.5 ${
-                        p.id === pharmacyId ? "bg-primary/10 font-semibold" : "hover:bg-secondary/60"
-                      }`}
-                    >
-                      <span className="w-4 text-muted-foreground shrink-0">{i + 1}</span>
-                      <span className="flex-1 truncate">
-                        {p.name}{p.id === pharmacyId ? " ★" : ""}
-                      </span>
-                      {p.distance_m > 0 && (
-                        <span className="font-mono tabular-nums text-muted-foreground shrink-0">
-                          {(p.distance_m / 1609).toFixed(1)} mi
-                        </span>
-                      )}
-                      <span className="font-mono tabular-nums w-12 text-right shrink-0">{fmt(p.share)}%</span>
-                    </div>
-                  ))}
+                <p className="text-xs font-medium mb-2">Local leaderboard <span className="text-muted-foreground font-normal">— ranked by items dispensed (last 12 months)</span></p>
+                <div className="rounded-lg border border-border overflow-hidden">
+                  {/* Column headers */}
+                  <div className="grid grid-cols-[1.5rem_1fr_4.5rem_3.5rem_3.5rem] gap-x-3 px-3 py-2 bg-secondary/40 border-b border-border">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">#</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pharmacy</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right">Items (12m)</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right">YoY</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right">Share</span>
+                  </div>
+
+                  {leaderboard.map((p, i) => {
+                    const isMe = p.id === pharmacyId;
+                    const barW = Math.min(100, p.share / (leaderboard[0]?.share || 1) * 100);
+                    return (
+                      <div key={p.id}
+                        className={`grid grid-cols-[1.5rem_1fr_4.5rem_3.5rem_3.5rem] gap-x-3 px-3 py-2.5 border-b border-border/50 last:border-0 items-center transition-colors ${isMe ? "bg-primary/6" : "hover:bg-secondary/30"}`}
+                      >
+                        <span className={`text-xs font-bold tabular-nums ${isMe ? "text-primary" : "text-muted-foreground"}`}>{i + 1}</span>
+
+                        <div className="min-w-0">
+                          {isMe ? (
+                            <p className="text-xs font-semibold text-primary truncate leading-tight">{p.name} ★</p>
+                          ) : (
+                            <Link to="/pharmacy/$odsCode" params={{ odsCode: p.ods_code }}
+                              className="text-xs font-medium truncate leading-tight hover:text-primary hover:underline block">
+                              {p.name}
+                            </Link>
+                          )}
+                          {/* Mini bar */}
+                          <div className="mt-1 h-1 rounded-full bg-secondary overflow-hidden">
+                            <div className={`h-full rounded-full ${isMe ? "bg-primary" : "bg-primary/40"}`} style={{ width: `${barW}%` }} />
+                          </div>
+                        </div>
+
+                        <p className={`text-xs tabular-nums text-right font-medium ${isMe ? "text-primary" : ""}`}>{fmtN(p.last12)}</p>
+
+                        <div className="flex justify-end"><YoyBadge pct={p.yoyPct} /></div>
+
+                        <p className={`text-xs tabular-nums text-right font-semibold ${isMe ? "text-primary" : "text-muted-foreground"}`}>{fmtPct(p.share)}</p>
+                      </div>
+                    );
+                  })}
                 </div>
+                <p className="text-[10px] text-muted-foreground mt-1.5">YoY = last 12m vs prior 12m · click competitor name to view their profile</p>
               </div>
             )}
 
-            {summary && (
-              <div className="rounded-md bg-primary/5 border border-primary/20 px-3 py-2 text-xs text-muted-foreground">
-                {summary}
+            {/* ── Market opportunity (only if not #1) ── */}
+            {!isLeader && leader && gapItems > 0 && (
+              <div className="rounded-lg border border-border bg-secondary/30 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <ArrowUpRight className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold">Market opportunity</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {leader.name} leads with {fmtN(leader.last12)} items in the last 12 months — {fmtN(gapItems)} more than you.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-md bg-card border border-border px-3 py-2.5">
+                    <p className="text-[10px] text-muted-foreground">Monthly items gap</p>
+                    <p className="text-lg font-bold tabular-nums mt-0.5">{fmtN(gapMonthlyItems)}</p>
+                    <p className="text-[10px] text-muted-foreground">items/month behind #1</p>
+                  </div>
+                  <div className="rounded-md bg-card border border-border px-3 py-2.5">
+                    <p className="text-[10px] text-muted-foreground">Est. income at parity</p>
+                    <p className="text-lg font-bold tabular-nums text-emerald-600 dark:text-emerald-400 mt-0.5">{fmtGbp(gapMonthlyFee)}</p>
+                    <p className="text-[10px] text-muted-foreground">extra/month (dispensing fee only)</p>
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Estimated at £1.27 dispensing fee per item. Does not include drug cost reimbursement or service income.</p>
               </div>
             )}
+
+            {isLeader && (
+              <div className="rounded-lg border border-emerald-300/60 bg-emerald-500/5 px-4 py-3 text-sm flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-emerald-500 shrink-0" />
+                <span><span className="font-semibold text-emerald-700 dark:text-emerald-400">{pharmacyName}</span> is the <span className="font-semibold">market leader</span> within {radius.label} by items dispensed over the last 12 months.</span>
+              </div>
+            )}
+
           </div>
         )}
       </div>

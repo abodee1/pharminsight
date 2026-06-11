@@ -15,12 +15,17 @@ export type TrendRow = {
   pharmacy_first_count: number;
   nms_count: number;
   eps_items: number;
+  eps_nominations: number;
+  flu_vaccinations: number;
+  mcr_registrations: number;
+  methadone_items: number;
+  smoking_cessation: number;
   gross_cost: number | string | null;
   final_payment: number | string | null;
   pharmacy_first_payment?: number | string | null;
 };
 
-type MetricKey = "items" | "pf" | "nms" | "eps" | "gross" | "final";
+type MetricKey = "items" | "pf" | "nms" | "eps" | "nom" | "flu" | "gross" | "final" | "mcr" | "meth" | "smoke";
 type MetricDef = {
   key: MetricKey;
   label: string;
@@ -28,15 +33,21 @@ type MetricDef = {
   field: (r: TrendRow) => number;
   format: (n: number) => string;
   color: string;
+  isMoney?: boolean;
 };
 
 const MET: Record<MetricKey, MetricDef> = {
-  items: { key: "items", label: "Items dispensed", short: "Items", field: (r) => r.items_dispensed || 0, format: (n) => Math.round(n).toLocaleString(), color: "var(--chart-1)" },
-  pf:    { key: "pf",    label: "Pharmacy First",  short: "PF",    field: (r) => r.pharmacy_first_count || 0, format: (n) => Math.round(n).toLocaleString(), color: "var(--chart-2)" },
-  nms:   { key: "nms",   label: "NMS",             short: "NMS",   field: (r) => r.nms_count || 0, format: (n) => Math.round(n).toLocaleString(), color: "var(--chart-3, var(--chart-2))" },
-  eps:   { key: "eps",   label: "EPS items",       short: "EPS",   field: (r) => r.eps_items || 0, format: (n) => Math.round(n).toLocaleString(), color: "var(--chart-4, var(--chart-1))" },
-  gross: { key: "gross", label: "Gross cost (£)",  short: "Gross £", field: (r) => Number(r.gross_cost) || 0, format: (n) => "£" + Math.round(n).toLocaleString(), color: "var(--chart-5, var(--chart-2))" },
-  final: { key: "final", label: "Final NHS payment (£)", short: "Final £", field: (r) => Number(r.final_payment) || 0, format: (n) => "£" + Math.round(n).toLocaleString(), color: "var(--chart-1)" },
+  items: { key: "items", label: "Items dispensed",       short: "Items",   field: (r) => r.items_dispensed || 0,      format: (n) => Math.round(n).toLocaleString(), color: "var(--chart-1)" },
+  pf:    { key: "pf",    label: "Pharmacy First",         short: "PF",      field: (r) => r.pharmacy_first_count || 0, format: (n) => Math.round(n).toLocaleString(), color: "var(--chart-2)" },
+  nms:   { key: "nms",   label: "NMS",                    short: "NMS",     field: (r) => r.nms_count || 0,            format: (n) => Math.round(n).toLocaleString(), color: "var(--chart-3)" },
+  eps:   { key: "eps",   label: "EPS items",              short: "EPS",     field: (r) => r.eps_items || 0,            format: (n) => Math.round(n).toLocaleString(), color: "var(--chart-4)" },
+  nom:   { key: "nom",   label: "EPS nominations",        short: "Nom.",    field: (r) => r.eps_nominations || 0,      format: (n) => Math.round(n).toLocaleString(), color: "var(--chart-5)" },
+  flu:   { key: "flu",   label: "Flu vaccinations",       short: "Flu",     field: (r) => r.flu_vaccinations || 0,     format: (n) => Math.round(n).toLocaleString(), color: "#10b981" },
+  gross: { key: "gross", label: "Gross cost",             short: "Gross £", field: (r) => Number(r.gross_cost) || 0,  format: (n) => "£" + Math.round(n).toLocaleString(), color: "#f59e0b", isMoney: true },
+  final: { key: "final", label: "Final NHS payment",      short: "Final £", field: (r) => Number(r.final_payment) || 0, format: (n) => "£" + Math.round(n).toLocaleString(), color: "#8b5cf6", isMoney: true },
+  mcr:   { key: "mcr",   label: "MCR registrations",      short: "MCR",     field: (r) => r.mcr_registrations || 0,   format: (n) => Math.round(n).toLocaleString(), color: "#06b6d4" },
+  meth:  { key: "meth",  label: "Methadone items",        short: "Meth.",   field: (r) => r.methadone_items || 0,     format: (n) => Math.round(n).toLocaleString(), color: "#f43f5e" },
+  smoke: { key: "smoke", label: "Smoking cessation",      short: "Stop Sm.",field: (r) => r.smoking_cessation || 0,   format: (n) => Math.round(n).toLocaleString(), color: "#84cc16" },
 };
 
 const DEFAULT_WINDOWS: PeriodWindow[] = [6, 12, 18, 24, ALL_PERIOD];
@@ -162,8 +173,8 @@ export function InteractiveTrend({
   // Use a dual y-axis if mixing £ metrics with count metrics. PF in money mode
   // counts as a money metric.
   const pfIsMoney = pfUnit === "money" && activeMetrics.includes("pf");
-  const hasMoney = activeMetrics.some((k) => k === "gross" || k === "final") || pfIsMoney;
-  const hasCount = activeMetrics.some((k) => k !== "gross" && k !== "final" && !(k === "pf" && pfUnit === "money"));
+  const hasMoney = activeMetrics.some((k) => MET[k].isMoney) || pfIsMoney;
+  const hasCount = activeMetrics.some((k) => !MET[k].isMoney && !(k === "pf" && pfUnit === "money"));
   const dualAxis = hasMoney && hasCount;
   // Left axis is money when everything left of it is money (no count metrics present).
   const leftAxisIsMoney = hasMoney && !hasCount;
@@ -314,7 +325,7 @@ export function InteractiveTrend({
             )}
             {activeMetrics.map((k) => {
               const m = M[k];
-              const isMoney = k === "gross" || k === "final" || (k === "pf" && pfUnit === "money");
+              const isMoney = m.isMoney || (k === "pf" && pfUnit === "money");
 
               return (
                 <Line

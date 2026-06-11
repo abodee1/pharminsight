@@ -18,7 +18,6 @@ import { LocalRadiusInsights } from "@/components/LocalRadiusInsights";
 import { InteractiveTrend } from "@/components/InteractiveTrend";
 import { AnalysisPanel } from "@/components/AnalysisPanel";
 import { MarketShareSection } from "@/components/MarketShareSection";
-import { NominationFlow } from "@/components/NominationFlow";
 import { CompetitorDeepDive } from "@/components/CompetitorDeepDive";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetchAll } from "@/lib/fetchAll";
@@ -632,9 +631,11 @@ function PharmacyProfile() {
             <InteractiveTrend
               rows={trimmedRows}
               available={
-                isScotland || isWales ? ["items", "pf", "gross", "final"] :
-                isNI ? ["items", "pf"] :
-                ["items", "eps", "nms", "pf"]
+                isScotland || isWales
+                  ? ["items", "pf", "flu", "gross", "final", "mcr", "meth", "smoke"]
+                  : isNI
+                  ? ["items", "pf", "flu"]
+                  : ["items", "eps", "nom", "nms", "pf", "flu", "gross", "final"]
               }
             />
           </div>
@@ -761,7 +762,7 @@ function PharmacyProfile() {
             <GpPrescribingCard pharmacyOds={pharmacy.ods_code} />
           </section>
 
-          <NominationFlow pharmacyOds={pharmacy.ods_code} country={pharmacy.country} />
+
 
           <LocalLandscape
             pharmacyName={pharmacy.name}

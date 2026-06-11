@@ -392,7 +392,7 @@ export function CompetitorDeepDive({ pharmacyId, pharmacyOds, pharmacyName, coun
   return (
     <div className="mt-4 rounded-xl bg-card border border-border shadow-lg">
       <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Competitor deep dive</h3>
+        <h3 className="text-sm font-semibold">Head-to-Head at a glance</h3>
         <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground">
           <X className="h-4 w-4" />
         </button>
