@@ -29,6 +29,10 @@ type Props = {
   /** When false, keep the query after selection (handy for add-multiple flows). Default true. */
   clearOnSelect?: boolean;
   autoFocus?: boolean;
+  /** Pre-loaded suggestions shown when the query is empty (e.g. nearby pharmacies). */
+  suggestions?: Pharmacy[];
+  /** Label for the suggestions section header. */
+  suggestionsLabel?: string;
 };
 
 export function PharmacySearch({
@@ -38,6 +42,8 @@ export function PharmacySearch({
   excludeIds,
   clearOnSelect = true,
   autoFocus = false,
+  suggestions,
+  suggestionsLabel = "Nearby pharmacies",
 }: Props) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Pharmacy[]>([]);
@@ -149,6 +155,34 @@ export function PharmacySearch({
           <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
         )}
       </div>
+
+      {/* Suggestions panel — shown when query is empty and suggestions provided */}
+      {open && q.trim().length < 2 && suggestions && suggestions.length > 0 && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground shadow-lg max-h-[60vh] overflow-y-auto overscroll-contain">
+          <p className="px-3 pt-2.5 pb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold border-b border-border/50">
+            {suggestionsLabel}
+          </p>
+          {suggestions.filter(p => !excludeSet.has(p.id)).slice(0, 8).map((p) => (
+            <button
+              key={p.id}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => handleSelect(p)}
+              className="w-full text-left flex items-center gap-3 px-3 py-2.5 border-b border-border/50 last:border-b-0 hover:bg-accent hover:text-accent-foreground"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-sm truncate">{p.name}</p>
+                  <CountryBadge country={p.country} />
+                </div>
+                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                  {[p.address, p.postcode].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+              <span className="text-xs font-mono text-muted-foreground shrink-0">{p.ods_code}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {open && q.trim().length >= 2 && (
         <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground shadow-lg max-h-[60vh] overflow-y-auto overscroll-contain">
