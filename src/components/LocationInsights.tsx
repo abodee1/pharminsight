@@ -79,8 +79,8 @@ export function LocationInsights({ pharmacyId, pharmacyName, postcode, address }
     }
   };
 
-  const facts: Array<[string, string | undefined | null]> = catchment
-    ? [
+  const facts: Array<[string, string]> = catchment
+    ? ([
         ["Local authority", catchment.admin_district],
         ["Ward", catchment.admin_ward],
         ["Constituency", catchment.parliamentary_constituency],
@@ -89,7 +89,7 @@ export function LocationInsights({ pharmacyId, pharmacyName, postcode, address }
         ["NHS area (CCG/ICB)", catchment.ccg],
         ["LSOA", catchment.lsoa],
         ["MSOA", catchment.msoa],
-      ].filter(([, v]) => !!v)
+      ].filter(([, v]) => !!v) as Array<[string, string]>)
     : [];
 
   return (
