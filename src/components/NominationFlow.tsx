@@ -253,9 +253,14 @@ export function NominationFlow({ pharmacyOds, country }: Props) {
             </div>
 
             {/* Legend / explainer */}
-            <div className="px-5 py-3 border-t border-border bg-secondary/20 flex items-start gap-6 flex-wrap text-[11px] text-muted-foreground">
-              <span><strong className="text-foreground">Our share</strong> — what % of this pharmacy's total items came from this GP</span>
-              <span><strong className="text-foreground">GP loyalty</strong> — what % of this GP's total prescriptions they directed here</span>
+            <div className="px-5 py-4 border-t border-border bg-secondary/20 space-y-2 text-[11px] text-muted-foreground">
+              <div className="flex flex-wrap gap-x-6 gap-y-1.5">
+                <span><strong className="text-foreground">Our share</strong> — % of this pharmacy's total linked items that originated from this GP</span>
+                <span><strong className="text-foreground">GP loyalty</strong> — % of this GP's total linked prescriptions that were dispensed here</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+                <strong className="text-muted-foreground">Accuracy note:</strong> GP loyalty reflects patient EPS nomination capture — it shows where patients registered with this GP chose to collect their prescriptions, not a GP actively directing business. Figures are based on the NHS linked prescribing dataset and may undercount if some prescriptions are not linked in this dataset.
+              </p>
             </div>
           </>
         )}

@@ -224,7 +224,7 @@ export function MarketShareSection({ pharmacyId, pharmacyOds, pharmacyName, lat,
                     <XAxis dataKey="label" tick={{ fontSize: 9 }} tickLine={false} interval="preserveStartEnd" />
                     <YAxis tick={{ fontSize: 9 }} tickLine={false} domain={["auto", "auto"]} unit="%" />
                     <Tooltip formatter={(v: number) => [`${v.toFixed(1)}%`, "Share"]} />
-                    <Line type="monotone" dataKey="share" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="share" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
