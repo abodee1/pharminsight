@@ -1,5 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import { Loader2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetchAll";
 import { PageHeader } from "@/components/PageHeader";
@@ -8,8 +12,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { PercentileRail, GpPrescribingCard } from "@/components/Infographics";
 import { PharmacySearch } from "@/components/PharmacySearch";
 import { CountryBadge } from "@/components/CountryBadge";
+import { Button } from "@/components/ui/button";
 import { fmtGbpCompact } from "@/lib/utils";
 import { getViewedPharmacy } from "@/lib/viewedPharmacy";
+import { generateInsight } from "@/lib/insights.functions";
 
 export const Route = createFileRoute("/_authenticated/benchmarking")({ component: Benchmarking });
 
@@ -86,6 +92,9 @@ function Benchmarking() {
   // Per-metric snapshots: snapshots[metricKey] = { year, month, regionRows, countryRows }
   const [snapshots, setSnapshots] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
+  const [insightMd, setInsightMd] = useState<string | null>(null);
+  const [insightLoading, setInsightLoading] = useState(false);
+  const runInsight = useServerFn(generateInsight);
 
   // Load the SUBJECT pharmacy. Priority: in-page override > "browsed" pharmacy
   // (set when the user opens another pharmacy via the search bar) > saved
@@ -129,6 +138,11 @@ function Benchmarking() {
       if (ph) setPharmacy(ph);
     })();
   }, [pharmacyOverride]);
+
+  // Reset AI insight whenever the active pharmacy changes
+  useEffect(() => { setInsightMd(null); }, [pharmacy?.id]);
+
+
 
   // When the active pharmacy changes, load cohorts + history
   useEffect(() => {
@@ -509,12 +523,49 @@ function Benchmarking() {
             );
           })}
 
-          <Link
-            to="/insights"
-            className="inline-block rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90 transition active:scale-[0.98]"
-          >
-            Generate Smart Insight for this data
-          </Link>
+          <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
+              <div>
+                <h2 className="text-base font-semibold flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-gold" /> Smart Insight
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  AI commentary tailored to this pharmacy's volume, services, revenue and peer gaps.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                disabled={insightLoading || !pharmacy}
+                onClick={async () => {
+                  if (!pharmacy) return;
+                  setInsightLoading(true);
+                  setInsightMd(null);
+                  try {
+                    const { insight } = await runInsight({
+                      data: { insight_type: "benchmark", pharmacy_id: pharmacy.id },
+                    });
+                    setInsightMd(insight?.insight_text ?? "");
+                  } catch (e: any) {
+                    toast.error(e?.message || "Could not generate Smart Insight");
+                  } finally {
+                    setInsightLoading(false);
+                  }
+                }}
+                className="gap-1.5"
+              >
+                {insightLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {insightMd ? "Regenerate" : "Generate Smart Insight"}
+              </Button>
+            </div>
+            {insightLoading && !insightMd && (
+              <p className="text-sm text-muted-foreground">Crunching the numbers…</p>
+            )}
+            {insightMd && (
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <ReactMarkdown>{insightMd}</ReactMarkdown>
+              </div>
+            )}
+          </div>
         </>
       )}
 

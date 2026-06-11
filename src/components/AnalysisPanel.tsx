@@ -12,6 +12,7 @@ import {
 import { confirmCompany, rejectCandidate, searchCompany } from "@/lib/companiesHouse.functions";
 import { RemunerationReport } from "@/components/RemunerationReport";
 import { InteractiveTrend } from "@/components/InteractiveTrend";
+import { LocationInsights } from "@/components/LocationInsights";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -325,6 +326,13 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
         </div>
       )}
 
+
+      <LocationInsights
+        pharmacyId={pharmacy.id}
+        pharmacyName={pharmacy.name}
+        postcode={pharmacy.postcode}
+        address={pharmacy.address}
+      />
 
       <RemunerationReport pharmacy={pharmacy} rows={rows} />
     </div>
