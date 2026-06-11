@@ -1,5 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import { Loader2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetchAll";
 import { PageHeader } from "@/components/PageHeader";
@@ -8,8 +12,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { PercentileRail, GpPrescribingCard } from "@/components/Infographics";
 import { PharmacySearch } from "@/components/PharmacySearch";
 import { CountryBadge } from "@/components/CountryBadge";
+import { Button } from "@/components/ui/button";
 import { fmtGbpCompact } from "@/lib/utils";
 import { getViewedPharmacy } from "@/lib/viewedPharmacy";
+import { generateInsight } from "@/lib/insights.functions";
 
 export const Route = createFileRoute("/_authenticated/benchmarking")({ component: Benchmarking });
 
