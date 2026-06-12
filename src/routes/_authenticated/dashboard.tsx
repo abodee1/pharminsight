@@ -356,6 +356,38 @@ function Dashboard() {
     [trendKeys, myByKey],
   );
 
+  // Period-aware trailing averages — recompute when trendWindow changes
+  const trailingAvgs = useMemo(() => {
+    const windowKeys = trendKeys.slice(-trendWindow);
+    const avgOf = (field: (r: Row) => number) => {
+      const vals = windowKeys
+        .map(k => myByKey.get(k))
+        .filter((r): r is Row => !!r)
+        .map(r => field(r))
+        .filter(v => v > 0);
+      return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    };
+    return {
+      items: avgOf(r => r.items_dispensed),
+      pf: avgOf(r => r.pharmacy_first_count),
+      nms: avgOf(r => r.nms_count),
+      finalPayment: avgOf(r => Number(r.final_payment)),
+      grossCost: avgOf(r => Number(r.gross_cost)),
+      pfPayment: avgOf(r => Number(r.pharmacy_first_payment)),
+      smkPayment: avgOf(r => Number(r.smoking_cessation_payment)),
+    };
+  }, [trendKeys, myByKey, trendWindow]);
+
+  const countryTrailingAvgItems = useMemo(() => {
+    const windowKeys = trendKeys.slice(-trendWindow);
+    const vals = windowKeys.map(k => aggByKey.get(k)?.avg_items ?? 0).filter(v => v > 0);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  }, [trendKeys, aggByKey, trendWindow]);
+
+  const itemsDeltaTrailing = countryTrailingAvgItems > 0 && trailingAvgs.items > 0
+    ? Math.round(((trailingAvgs.items - countryTrailingAvgItems) / countryTrailingAvgItems) * 100)
+    : stats.itemsDelta;
+
   const greeting = (() => {
     const h = new Date().getHours();
     return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
@@ -386,28 +418,24 @@ function Dashboard() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label={`Items · ${stats.period || "latest"}`}
-          value={stats.items.toLocaleString()}
-          hint={pharmacy?.name}
+          label={trendWindow > 1 ? `Items · ${trendWindow}M avg` : `Items · ${stats.period || "latest"}`}
+          value={Math.round(trendWindow > 1 ? trailingAvgs.items : stats.items).toLocaleString()}
+          hint={trendWindow > 1 ? `avg/month · last ${trendWindow}M` : pharmacy?.name}
           icon={Package}
           accent="indigo"
         />
         <StatCard
           label="Pharmacy First"
-          value={`${stats.pf.toLocaleString()} · ${fmtGbpCompact(stats.pfPayment)}`}
-          hint={
-            stats.pfPeriod
-              ? `Consultations · remunerated · ${stats.pfPeriod}${stats.pfPeriod !== stats.period ? " (lag)" : ""}`
-              : "Consultations · remunerated"
-          }
+          value={`${Math.round(trendWindow > 1 ? trailingAvgs.pf : stats.pf).toLocaleString()} · ${fmtGbpCompact(trendWindow > 1 ? trailingAvgs.pfPayment : stats.pfPayment)}`}
+          hint={trendWindow > 1 ? `avg/month · last ${trendWindow}M` : (stats.pfPeriod ? `Consultations · remunerated · ${stats.pfPeriod}${stats.pfPeriod !== stats.period ? " (lag)" : ""}` : "Consultations · remunerated")}
           icon={Stethoscope}
           accent="emerald"
         />
-        {pharmacy?.country?.toLowerCase() !== "scotland" && (
+        {pharmacy?.country?.toLowerCase() === "england" && (
           <StatCard
             label="NMS"
-            value={stats.nms.toLocaleString()}
-            hint={stats.nmsPeriod && stats.nmsPeriod !== stats.period ? `Latest reported · ${stats.nmsPeriod}` : stats.nmsPeriod || undefined}
+            value={Math.round(trendWindow > 1 ? trailingAvgs.nms : stats.nms).toLocaleString()}
+            hint={trendWindow > 1 ? `avg/month · last ${trendWindow}M` : (stats.nmsPeriod && stats.nmsPeriod !== stats.period ? `Latest reported · ${stats.nmsPeriod}` : stats.nmsPeriod || undefined)}
             icon={ClipboardCheck}
             accent="sky"
           />
@@ -424,30 +452,30 @@ function Dashboard() {
       {pharmacy && (
         <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
-            label={`NHS revenue · ${stats.payPeriod || stats.period || "latest"}`}
-            value={money(stats.finalPayment)}
-            hint={stats.payPeriod && stats.payPeriod !== stats.period ? `Latest reported · ${stats.payPeriod}` : "Final payment after adjustments"}
+            label={trendWindow > 1 ? `NHS revenue · ${trendWindow}M avg` : `NHS revenue · ${stats.payPeriod || stats.period || "latest"}`}
+            value={money(trendWindow > 1 ? trailingAvgs.finalPayment : stats.finalPayment)}
+            hint={trendWindow > 1 ? `avg/month · last ${trendWindow}M` : (stats.payPeriod && stats.payPeriod !== stats.period ? `Latest reported · ${stats.payPeriod}` : "Final payment after adjustments")}
             icon={PoundSterling}
             accent="emerald"
           />
           <StatCard
             label="Gross drug cost"
-            value={money(stats.grossCost)}
-            hint="Reimbursable spend"
+            value={money(trendWindow > 1 ? trailingAvgs.grossCost : stats.grossCost)}
+            hint={trendWindow > 1 ? `avg/month · last ${trendWindow}M` : "Reimbursable spend"}
             icon={Wallet}
             accent="indigo"
           />
           <StatCard
             label="vs country avg"
-            value={`${stats.itemsDelta >= 0 ? "+" : ""}${stats.itemsDelta}%`}
-            hint={`Items vs ${pharmacy.country || "national"} mean`}
-            icon={stats.itemsDelta >= 0 ? TrendingUp : TrendingDown}
-            accent={stats.itemsDelta >= 0 ? "emerald" : "amber"}
+            value={`${itemsDeltaTrailing >= 0 ? "+" : ""}${itemsDeltaTrailing}%`}
+            hint={`Items vs ${pharmacy.country || "national"} mean${trendWindow > 1 ? ` · last ${trendWindow}M` : ""}`}
+            icon={itemsDeltaTrailing >= 0 ? TrendingUp : TrendingDown}
+            accent={itemsDeltaTrailing >= 0 ? "emerald" : "amber"}
           />
           <StatCard
             label="Smoking cessation"
-            value={money(stats.smkPayment)}
-            hint={stats.mcrPayment > 0 ? `MCR ${money(stats.mcrPayment)}` : undefined}
+            value={money(trendWindow > 1 ? trailingAvgs.smkPayment : stats.smkPayment)}
+            hint={trendWindow > 1 ? `avg/month · last ${trendWindow}M` : (stats.mcrPayment > 0 ? `MCR ${money(stats.mcrPayment)}` : undefined)}
             icon={Cigarette}
             accent="sky"
           />
@@ -527,20 +555,20 @@ function Dashboard() {
       {pharmacy && peerItems.length > 0 && (
         <div className="mt-6 grid md:grid-cols-2 gap-4">
           <PercentileRail
-            label={`Items dispensed · ${stats.period}`}
-            value={stats.items}
+            label={trendWindow > 1 ? `Items dispensed · ${trendWindow}M avg` : `Items dispensed · ${stats.period}`}
+            value={Math.round(trendWindow > 1 ? trailingAvgs.items : stats.items)}
             values={peerItems}
             peerLabel={`${pharmacy.country || "Country"} avg`}
             nationalLabel="Highest"
-            caption={`Your pharmacy versus ${peerItems.length.toLocaleString()} reporting peers in ${pharmacy.country}.`}
+            caption={`${trendWindow > 1 ? `${trendWindow}-month average` : "Latest month"} vs ${peerItems.length.toLocaleString()} ${pharmacy.country || "country"} pharmacies.`}
           />
           <PercentileRail
-            label={`Pharmacy First · ${peerPfPeriod || stats.period}`}
-            value={stats.pf}
+            label={trendWindow > 1 ? `Pharmacy First · ${trendWindow}M avg` : `Pharmacy First · ${peerPfPeriod || stats.period}`}
+            value={Math.round(trendWindow > 1 ? trailingAvgs.pf : stats.pf)}
             values={peerPf}
             peerLabel={`${pharmacy.country || "Country"} avg`}
             nationalLabel="Highest"
-            caption={`${stats.pf.toLocaleString()} consultations · ${fmtGbpCompact(stats.pfPayment)} remuneration this month. Country avg remuneration ${fmtGbpCompact(peerPfPayment.length ? peerPfPayment.reduce((a,b)=>a+b,0)/peerPfPayment.length : 0)}.`}
+            caption={`${Math.round(trendWindow > 1 ? trailingAvgs.pf : stats.pf).toLocaleString()} consultations${trendWindow > 1 ? " avg/month" : ""} · ${fmtGbpCompact(trendWindow > 1 ? trailingAvgs.pfPayment : stats.pfPayment)} remuneration${trendWindow > 1 ? " avg/month" : " this month"}. ${pharmacy.country || "Country"} avg ${fmtGbpCompact(peerPfPayment.length ? peerPfPayment.reduce((a,b)=>a+b,0)/peerPfPayment.length : 0)}.`}
           />
         </div>
       )}
@@ -570,6 +598,7 @@ function Dashboard() {
         const hasData = (vals: number[]) =>
           vals.length > 0 && vals.some((v) => v > 0);
         const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
+        const isEngland = (pharmacy.country || "").toLowerCase() === "england";
         const raw: SpotlightMetric[] = [
           {
             key: "items",
@@ -589,16 +618,15 @@ function Dashboard() {
               value: `${fmtGbpCompact(stats.pfPayment)} · cohort avg ${fmtGbpCompact(peerPfPayment.length ? peerPfPayment.reduce((a,b)=>a+b,0)/peerPfPayment.length : 0)}`,
             },
           },
-          {
+          // NMS is England-only
+          ...(isEngland ? [{
             key: "nms",
             label: "NMS",
             values: peerNms,
             yourValue: stats.nms,
             period: stats.nmsPeriod || stats.period,
-          },
-          // Payment metrics are only meaningful for Scotland (only country
-          // publishing per-pharmacy verified payments). Hide elsewhere so
-          // the chart never shows a flat 0 bar.
+          } as SpotlightMetric] : []),
+          // Payment metrics only meaningful for Scotland (only nation publishing verified per-pharmacy payments)
           ...(isScot
             ? [
                 {
@@ -625,10 +653,10 @@ function Dashboard() {
         return (
           <div className="mt-6">
             <MetricSpotlight
-              title={`Cohort spotlight — ${pharmacy.region || pharmacy.country || "your region"}`}
+              title={`Cohort spotlight — ${pharmacy.region || `${pharmacy.country || "country"} pharmacies`}`}
               highlightLabel={pharmacy.name}
               peerLabel={`${pharmacy.country || "Country"} avg`}
-              caption="Switch metrics to see where you sit across reporting peers for the latest published period."
+              caption={`Switch metrics to see where you sit across ${pharmacy.country || "country"} reporting peers for the latest published period.`}
               metrics={metrics}
             />
           </div>

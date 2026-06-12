@@ -111,15 +111,21 @@ export function TrendCard({
   for (let i = sliced.length - 1; i >= 0; i--) {
     if ((sliced[i]?.value ?? 0) > 0) { lastReportedIdx = i; break; }
   }
-  let firstReportedIdx = -1;
-  for (let i = 0; i < sliced.length; i++) {
-    if ((sliced[i]?.value ?? 0) > 0) { firstReportedIdx = i; break; }
-  }
   const hasData = lastReportedIdx >= 0;
-  const latest = hasData ? sliced[lastReportedIdx].value : 0;
-  const first = firstReportedIdx >= 0 ? sliced[firstReportedIdx].value : 0;
-  const canDelta = hasData && firstReportedIdx >= 0 && lastReportedIdx > firstReportedIdx && first > 0;
-  const delta = canDelta ? Math.round(((latest - first) / first) * 100) : 0;
+
+  // Trailing average of non-zero values in the current window
+  const nonZeroVals = hasData
+    ? sliced.slice(0, lastReportedIdx + 1).map(p => p.value).filter(v => v > 0)
+    : [];
+  const avgVal = nonZeroVals.length ? nonZeroVals.reduce((a, b) => a + b, 0) / nonZeroVals.length : 0;
+
+  // Prior period: same window length shifted back — for period-over-period delta
+  const priorSlice = seriesPoints.slice(-(window * 2), -window);
+  const priorNonZero = priorSlice.map(p => p.value).filter(v => v > 0);
+  const priorAvg = priorNonZero.length ? priorNonZero.reduce((a, b) => a + b, 0) / priorNonZero.length : 0;
+
+  const canDelta = hasData && priorAvg > 0;
+  const delta = canDelta ? Math.round(((avgVal - priorAvg) / priorAvg) * 100) : 0;
   const tone = delta > 0 ? "text-emerald-700" : delta < 0 ? "text-rose-700" : "text-muted-foreground";
   const trailingLag = hasData && lastReportedIdx < sliced.length - 1;
   const latestLabel = hasData ? sliced[lastReportedIdx].label : null;
@@ -177,10 +183,17 @@ export function TrendCard({
       </div>
 
       <div className="flex items-baseline justify-between gap-3 mb-2">
-        <p className="text-2xl font-semibold tabular-nums">{activeFormat(latest)}</p>
+        <div>
+          <p className="text-2xl font-semibold tabular-nums">{activeFormat(avgVal)}</p>
+          {hasData && window > 1 && (
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              avg/month{window < ALL_PERIOD ? ` · last ${window}M` : " · all time"}
+            </p>
+          )}
+        </div>
         {canDelta && (
           <p className={`text-xs font-semibold ${tone}`}>
-            {delta >= 0 ? "+" : ""}{delta}% over reported window
+            {delta >= 0 ? "+" : ""}{delta}% vs prior {window < ALL_PERIOD ? `${window}M` : "period"}
           </p>
         )}
       </div>

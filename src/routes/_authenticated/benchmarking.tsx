@@ -414,7 +414,7 @@ function Benchmarking() {
                         {vsRegion >= 0 ? "+" : ""}{vsRegion}% vs {pharmacy.region} avg
                       </p>
                       <p className="mt-2 text-[10px] text-muted-foreground">
-                        #{r.rank.toLocaleString()} of {r.cohortSize.toLocaleString()} nationally · {r.percentile}th %ile
+                        #{r.rank.toLocaleString()} of {r.cohortSize.toLocaleString()} in {pharmacy.country} · {r.percentile}th %ile
                       </p>
                     </div>
                   );
