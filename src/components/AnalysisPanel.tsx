@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { X, Star, Loader2, RefreshCw, Printer, AlertTriangle, CheckCircle2, TrendingUp, TrendingDown, Minus, Upload, FileText, Sparkles } from "lucide-react";
+import { X, Star, Loader2, RefreshCw, AlertTriangle, CheckCircle2, TrendingUp, TrendingDown, Minus, FileText, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar,
@@ -67,7 +67,7 @@ const METRIC_INFO: Record<string, string> = {
   "Conservative · 4x": "Lower-end valuation = EBITDA × 4. Used for pharmacies with declining items, lease risk or single-handed dispensing.",
   "Mid-range · 5x": "Mid-market valuation = EBITDA × 5. The typical going rate for a stable independent community pharmacy.",
   "Premium · 6x": "Premium valuation = EBITDA × 6. Reserved for high-growth, high-margin pharmacies in desirable locations with services income.",
-  "Estimated annual NHS income": "Our estimate of the NHS payment this pharmacy receives per year, based on items, NMS, Pharmacy First and flu volumes multiplied by published Drug Tariff rates, less a 5% clawback. Upload an FP34C to replace with actuals.",
+  "Estimated annual NHS income": "Our estimate of the NHS payment this pharmacy receives per year, based on items, NMS, Pharmacy First and flu volumes multiplied by published Drug Tariff rates, less a 5% clawback. For Scotland, actual payment data is used where available.",
   "Actual annual NHS income": "Annualised NHS payment based on verified monthly payment data (Scotland open data or your uploaded FP34C schedules). This is not an estimate.",
 };
 
@@ -429,7 +429,7 @@ function FinancialsTab({ pharmacy }: { pharmacy: Pharmacy }) {
 
       {state === "none" && (
         <div className="rounded-xl border border-border bg-secondary/40 p-5">
-          <p className="text-sm">Financial data unavailable. Upload FP34C schedules in the Acquisition tab for manual entry.</p>
+          <p className="text-sm">Financial data unavailable. Go to the Financials tab to confirm the Companies House match for this pharmacy.</p>
         </div>
       )}
 
@@ -658,11 +658,44 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
   );
 }
 
+// -------- Income composition donut --------
+function IncomeDonut({ segments }: { segments: { label: string; value: number; color: string }[] }) {
+  const total = segments.reduce((a, s) => a + s.value, 0);
+  if (!total) return null;
+  const r = 42;
+  const c = 2 * Math.PI * r;
+  let offset = 0;
+  return (
+    <div className="flex items-center gap-5">
+      <svg viewBox="0 0 100 100" className="h-28 w-28 -rotate-90 shrink-0">
+        <circle cx="50" cy="50" r={r} fill="none" stroke="var(--secondary)" strokeWidth="14" />
+        {segments.filter(s => s.value > 0).map((s, i) => {
+          const len = (s.value / total) * c;
+          const seg = (
+            <circle key={i} cx="50" cy="50" r={r} fill="none" stroke={s.color} strokeWidth="14"
+              strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-offset} />
+          );
+          offset += len;
+          return seg;
+        })}
+      </svg>
+      <div className="space-y-1.5 text-xs">
+        {segments.filter(s => s.value > 0).map((s, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: s.color }} />
+            <span className="text-muted-foreground">{s.label}</span>
+            <span className="font-semibold ml-2">{Math.round((s.value / total) * 100)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ------------------------- ACQUISITION TAB -------------------------
 function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
-  const { user } = useAuth();
   const [company, setCompany] = useState<Company | null>(null);
-  const [fp34c, setFp34c] = useState<{ actualMonthly: number[]; total: number } | null>(null);
+  const [manualPrivateIncome, setManualPrivateIncome] = useState<number | "">("");
   const [catchment, setCatchment] = useState<{
     competitors: number;
     gpFeeders: number;
@@ -677,18 +710,6 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
   }, [pharmacy.id]);
 
   useEffect(() => {
-    if (!user) return;
-    supabase.from("private_uploads").select("parsed_data")
-      .eq("user_id", user.id).eq("pharmacy_id", pharmacy.id).eq("upload_type", "acquisition_fp34c")
-      .order("created_at", { ascending: false }).limit(1).maybeSingle()
-      .then(({ data }) => {
-        const parsed = (data?.parsed_data as any) || null;
-        if (parsed?.monthly_payments) setFp34c({ actualMonthly: parsed.monthly_payments, total: parsed.monthly_payments.reduce((a: number, b: number) => a + b, 0) });
-      });
-  }, [user, pharmacy.id]);
-
-  // Catchment intelligence (works without uploads)
-  useEffect(() => {
     (async () => {
       const { data: ph } = await supabase.from("pharmacies").select("lat,lng,country,region").eq("id", pharmacy.id).maybeSingle();
       if (!ph?.lat || !ph?.lng) return;
@@ -700,7 +721,6 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
       const compRows = (nearPh || []).filter((p: any) => p.id !== pharmacy.id);
       const nearest = compRows.length ? { name: compRows[0].name, distance_m: compRows[0].distance_m } : null;
 
-      // peer ranking by latest items vs peers within 5km
       const peerIds = (peers || []).map((p: any) => p.id);
       let peerRankPct: number | null = null;
       if (peerIds.length > 5 && rows.length) {
@@ -717,7 +737,6 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
         }
       }
 
-      // GP list-size sum (latest)
       let listSizeTotal = 0;
       const codes = (nearGp || []).map((g: any) => g.practice_code);
       if (codes.length) {
@@ -732,44 +751,56 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
         }
       }
 
-      setCatchment({
-        competitors: compRows.length,
-        gpFeeders: (nearGp || []).length,
-        listSizeTotal,
-        peerRankPct,
-        nearest,
-      });
+      setCatchment({ competitors: compRows.length, gpFeeders: (nearGp || []).length, listSizeTotal, peerRankPct, nearest });
     })().catch(() => {});
   }, [pharmacy.id, rows]);
 
   const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
+  const isEngland = (pharmacy.country || "").toLowerCase() === "england";
   const last12 = rows.slice(-12);
+  const NMS_RATE = 21; // changed April 2025 (£11 intervention + £10 follow-up)
 
-  // Income calc
   let itemsTotal = 0, pfTotal = 0, nmsTotal = 0, fluTotal = 0;
   last12.forEach((r) => { itemsTotal += r.items_dispensed; pfTotal += r.pharmacy_first_count; nmsTotal += r.nms_count; fluTotal += r.flu_vaccinations; });
-  const estimated = itemsTotal * 1.27 + pfTotal * 15 + nmsTotal * 28 + fluTotal * 12.58;
-  const discount = estimated * 0.05;
-  const estimatedNet = estimated - discount;
+  const estimated = itemsTotal * 1.27 + pfTotal * 15 + nmsTotal * NMS_RATE + fluTotal * 12.58;
+  const estimatedNet = estimated * 0.95;
 
   let actualNHS: number | null = null;
   if (isScot) {
     const actuals = last12.filter((r) => r.is_actual_payment);
     if (actuals.length >= 6) actualNHS = actuals.reduce((s, r) => s + (Number(r.final_payment) || 0), 0) * (12 / actuals.length);
   }
-  if (fp34c) actualNHS = fp34c.total;
-
   const nhsIncome = actualNHS ?? estimatedNet;
+  const avgMonthlyIncome = nhsIncome / 12;
   const incomeLabel = actualNHS != null ? "Actual annual NHS income" : "Estimated annual NHS income";
 
+  // NHS-only valuation: 1.0x–1.3x annual income (income-based, standard for independent community pharmacy)
+  const nhsValLow = nhsIncome * 1.0;
+  const nhsValHigh = nhsIncome * 1.3;
+
+  // Companies House private income gap
+  const chTurnover = company?.turnover ?? null;
+  const chPrivateEst = chTurnover != null ? Math.max(0, chTurnover - nhsIncome) : null;
+  const chPrivateRatio = chTurnover && chTurnover > 0 && chPrivateEst != null ? (chPrivateEst / chTurnover) * 100 : null;
+  const chDiscrepancy = chTurnover != null && chTurnover > 0 && chTurnover < nhsIncome * 0.9;
+
+  // Effective private income: manual input takes precedence, then CH estimate, then 0
+  const effectivePrivate = manualPrivateIncome !== "" ? Number(manualPrivateIncome) : (chPrivateEst ?? 0);
+  const hasPrivate = effectivePrivate > 0;
+  const privateRatioPct = hasPrivate ? (effectivePrivate / (nhsIncome + effectivePrivate)) * 100 : 0;
+  const sigPrivate = privateRatioPct > 20;
+
+  // Adjusted valuation (NHS × 1.0–1.3 + private × 0.5–0.8)
+  const adjValLow = nhsValLow + effectivePrivate * 0.5;
+  const adjValHigh = nhsValHigh + effectivePrivate * 0.8;
+
   const monthlyBars = last12.map((r) => ({
-    label: `${MONTHS[r.month - 1]}`,
-    v: Math.round(r.items_dispensed * 1.27 + r.pharmacy_first_count * 15 + r.nms_count * 28 + r.flu_vaccinations * 12.58),
+    label: `${MONTHS[r.month - 1]} ${String(r.year).slice(2)}`,
+    v: Math.round(r.items_dispensed * 1.27 + r.pharmacy_first_count * 15 + r.nms_count * NMS_RATE + r.flu_vaccinations * 12.58),
   }));
 
-  // Service mix + volatility (works without uploads)
   const dispensingRevenue = itemsTotal * 1.27;
-  const servicesRevenue = pfTotal * 15 + nmsTotal * 28 + fluTotal * 12.58;
+  const servicesRevenue = pfTotal * 15 + nmsTotal * NMS_RATE + fluTotal * 12.58;
   const servicesShare = (dispensingRevenue + servicesRevenue) > 0
     ? (servicesRevenue / (dispensingRevenue + servicesRevenue)) * 100 : 0;
   const monthlyItems = last12.map((r) => r.items_dispensed).filter((v) => v > 0);
@@ -780,62 +811,61 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
   const troughIdx = monthlyItems.length ? monthlyItems.indexOf(Math.min(...monthlyItems)) : -1;
   const peakMonth = peakIdx >= 0 ? MONTHS[last12[peakIdx].month - 1] : "—";
   const troughMonth = troughIdx >= 0 ? MONTHS[last12[troughIdx].month - 1] : "—";
+  const incomePerListMember = catchment && catchment.listSizeTotal > 0 ? nhsIncome / catchment.listSizeTotal : null;
 
-  const incomePerListMember = catchment && catchment.listSizeTotal > 0
-    ? nhsIncome / catchment.listSizeTotal : null;
-
-  // Valuation
-  const turnover = company?.turnover || null;
-  const opProfit = company?.operating_profit || null;
-  const ebitda = opProfit != null ? opProfit + (turnover ? turnover * 0.02 : 0) : null;
-  const val = ebitda ? { low: ebitda * 4, mid: ebitda * 5, high: ebitda * 6 } : null;
-
-  // Red flags
-  const flags: { ok: boolean; msg: string }[] = [];
-  if (last12.length >= 12) {
-    const recent6 = last12.slice(-6).reduce((s, r) => s + r.items_dispensed, 0);
-    const prior6 = last12.slice(0, 6).reduce((s, r) => s + r.items_dispensed, 0);
-    if (prior6 > 0 && (recent6 - prior6) / prior6 < -0.10) flags.push({ ok: false, msg: "Items dispensed declined >10% year on year" });
-  }
-  const last3 = rows.slice(-3);
-  let consecutiveDecline = 0;
-  for (let i = rows.length - 1; i > 0; i--) {
-    if (rows[i].eps_nominations < rows[i - 1].eps_nominations) consecutiveDecline++; else break;
-    if (consecutiveDecline >= 3) break;
-  }
-  if (consecutiveDecline >= 3) flags.push({ ok: false, msg: "EPS nominations declining 3+ months consecutively" });
-  if (last3.length === 3 && last3.every((r) => r.nms_count === 0)) flags.push({ ok: false, msg: "NMS count is zero for last 3 months" });
-  if (company?.last_accounts_date) {
-    const months = Math.round((Date.now() - new Date(company.last_accounts_date).getTime()) / (30 * 24 * 3600 * 1000));
-    if (months > 18) flags.push({ ok: false, msg: `Companies House accounts are ${months} months old` });
-  }
-  if (company?.company_status && company.company_status.toLowerCase() !== "active") flags.push({ ok: false, msg: `Company status: ${company.company_status}` });
-  if (company?.net_assets != null && company.net_assets < 0) flags.push({ ok: false, msg: "Net liabilities on balance sheet" });
-
-  const upload = async (file: File, kind: "acquisition_fp34c" | "acquisition_pl") => {
-    if (!user) return toast.error("Sign in");
-    const text = await file.text();
-    let parsed: any = { raw: text.slice(0, 200) };
-    if (file.name.toLowerCase().endsWith(".csv")) {
-      const lines = text.trim().split(/\r?\n/);
-      const rowsCsv = lines.slice(1).map((l) => l.split(",").map((c) => c.trim()));
-      if (kind === "acquisition_fp34c") {
-        const monthly = rowsCsv.map((r) => Number(r[1] ?? r[0]) || 0).filter((n) => n > 0);
-        parsed = { monthly_payments: monthly };
-      } else {
-        const obj: Record<string, number> = {};
-        for (const r of rowsCsv) if (r[0]) obj[r[0]] = Number(r[1]) || 0;
-        parsed = { pl_lines: obj };
-      }
+  // Enhanced red flags
+  const flags: { msg: string; detail?: string }[] = [];
+  const nonZeroRows = last12.filter(r => r.items_dispensed > 0);
+  if (nonZeroRows.length >= 3) {
+    let consDecline = 0;
+    for (let i = nonZeroRows.length - 1; i > 0; i--) {
+      if (nonZeroRows[i].items_dispensed < nonZeroRows[i - 1].items_dispensed) consDecline++;
+      else break;
     }
-    const { error } = await supabase.from("private_uploads").insert({
-      user_id: user.id, pharmacy_id: pharmacy.id, upload_type: kind, file_name: file.name, parsed_data: parsed,
+    if (consDecline >= 3) flags.push({
+      msg: `Declining volume — ${consDecline} consecutive months of falling items`,
+      detail: `${nonZeroRows[nonZeroRows.length - 1].items_dispensed.toLocaleString()} vs ${nonZeroRows[nonZeroRows.length - 1 - consDecline].items_dispensed.toLocaleString()} items`,
     });
-    if (error) return toast.error(error.message);
-    toast.success(`Uploaded ${file.name}`);
-    if (kind === "acquisition_fp34c" && parsed.monthly_payments)
-      setFp34c({ actualMonthly: parsed.monthly_payments, total: parsed.monthly_payments.reduce((a: number, b: number) => a + b, 0) });
-  };
+  }
+  if (last12.length >= 12) {
+    const r6 = last12.slice(-6).reduce((s, r) => s + r.items_dispensed, 0);
+    const p6 = last12.slice(0, 6).reduce((s, r) => s + r.items_dispensed, 0);
+    if (p6 > 0 && (r6 - p6) / p6 < -0.10) {
+      const pctDecline = Math.abs(Math.round(((r6 - p6) / p6) * 100));
+      flags.push({ msg: `Items dispensed down ${pctDecline}% year-on-year`, detail: `Recent 6M: ${r6.toLocaleString()} vs prior 6M: ${p6.toLocaleString()}` });
+    }
+  }
+  let consNomDecline = 0;
+  for (let i = rows.length - 1; i > 0; i--) {
+    if (rows[i].eps_nominations < rows[i - 1].eps_nominations) consNomDecline++;
+    else break;
+    if (consNomDecline >= 3) break;
+  }
+  if (consNomDecline >= 3) flags.push({ msg: "EPS nominations declining 3+ consecutive months", detail: `${consNomDecline} months` });
+  const last3 = rows.slice(-3);
+  if (isEngland && last3.length === 3 && last3.every((r) => r.nms_count === 0))
+    flags.push({ msg: "NMS count is zero for last 3 months — potential revenue leakage", detail: "£0 NMS income reported" });
+  if (company?.last_accounts_date) {
+    const monthsOld = Math.round((Date.now() - new Date(company.last_accounts_date).getTime()) / (30 * 24 * 3600 * 1000));
+    if (monthsOld > 18) flags.push({ msg: `Accounts ${monthsOld} months old`, detail: `Last filed: ${new Date(company.last_accounts_date).toLocaleDateString("en-GB")}` });
+  }
+  if (company?.company_status && company.company_status.toLowerCase() !== "active")
+    flags.push({ msg: `Company status: ${company.company_status}`, detail: "Check Companies House filing" });
+  if (company?.net_assets != null && company.net_assets < 0)
+    flags.push({ msg: `Net liabilities: ${gbp(Math.abs(company.net_assets))}`, detail: "Negative net assets on balance sheet" });
+  if (chDiscrepancy && chTurnover != null)
+    flags.push({ msg: "Data discrepancy: NHS income estimate exceeds Companies House turnover", detail: `NHS est. ${gbp(nhsIncome)} vs CH turnover ${gbp(chTurnover)}` });
+
+  // Opportunity flags
+  const opps: { msg: string; detail?: string }[] = [];
+  if (catchment && catchment.competitors <= 1)
+    opps.push({ msg: "Low local competition — strong catchment moat", detail: `${catchment.competitors} competitor within 1 mile` });
+  if (servicesShare > 15)
+    opps.push({ msg: `Strong clinical services mix — ${servicesShare.toFixed(0)}% from services`, detail: "Good income diversification" });
+  if (cv < 0.05 && monthlyItems.length >= 6)
+    opps.push({ msg: "Highly consistent volume — predictable income stream", detail: `Coefficient of variation: ${(cv * 100).toFixed(1)}%` });
+  if (catchment?.peerRankPct != null && catchment.peerRankPct >= 75)
+    opps.push({ msg: `Top-quartile performer — ${catchment.peerRankPct}th percentile (5-mile catchment)`, detail: "Market leader position" });
 
   return (
     <div className="p-3 md:p-6 space-y-5 md:space-y-6">
@@ -854,35 +884,124 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
         </div>
         {catchment?.nearest && (
           <p className="text-[11px] text-muted-foreground mt-3">
-            Nearest competitor: <span className="font-medium text-foreground">{catchment.nearest.name}</span> ·
-            {" "}{Math.round(catchment.nearest.distance_m)}m away
+            Nearest competitor: <span className="font-medium text-foreground">{catchment.nearest.name}</span> ·{" "}
+            {Math.round(catchment.nearest.distance_m)}m away
             {incomePerListMember != null && (
               <> · NHS income per catchment patient: <span className="font-medium text-foreground">£{incomePerListMember.toFixed(2)}</span></>
             )}
           </p>
         )}
-        <p className="text-[11px] text-muted-foreground mt-2 italic">
-          Computed from public NHS dispensing data, registered GP list sizes, and pharmacy geocoding — no uploads required.
+      </Section>
+
+      <Section title="Income composition">
+        <div className="grid md:grid-cols-2 gap-5 items-start">
+          <div>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="rounded-lg bg-secondary/40 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{incomeLabel}</p>
+                <p className="text-xl font-bold tabular-nums">{gbp(nhsIncome)}</p>
+              </div>
+              <div className="rounded-lg bg-secondary/40 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Avg monthly (NHS)</p>
+                <p className="text-xl font-bold tabular-nums">{gbp(avgMonthlyIncome)}</p>
+              </div>
+            </div>
+            <IncomeDonut segments={[
+              { label: "Est. NHS income", value: nhsIncome, color: "var(--chart-1)" },
+              ...(effectivePrivate > 0 ? [{ label: "Est. private income", value: effectivePrivate, color: "var(--chart-2)" }] : []),
+            ]} />
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Monthly estimated NHS income (last 12 months)</p>
+            <div className="h-48">
+              <ResponsiveContainer>
+                <BarChart data={monthlyBars} margin={{ top: 4, right: 8, bottom: 0, left: 4 }}>
+                  <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+                  <XAxis dataKey="label" tick={{ fontSize: 9 }} />
+                  <YAxis tick={{ fontSize: 9 }} tickFormatter={(v) => v >= 1000 ? `£${Math.round(v / 1000)}k` : `£${v}`} width={46} />
+                  <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                    formatter={(v: any) => [gbp(Number(v)), "Est. income"]} />
+                  <Bar dataKey="v" fill="var(--gold)" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      {chTurnover != null && (
+        <Section title="Private income analysis">
+          {chDiscrepancy ? (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 text-rose-900 p-3 text-sm flex gap-2 mb-3">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>
+                Data discrepancy detected — Companies House turnover ({gbp(chTurnover)}) is lower than estimated NHS income ({gbp(nhsIncome)}).
+                Accounts may be incomplete, filed under a parent company, or cover a different period.
+              </span>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-3 gap-3">
+              <div className="rounded-lg bg-secondary/40 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">CH total turnover</p>
+                <p className="text-xl font-bold tabular-nums">{gbp(chTurnover)}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{company?.accounts_year ?? "Latest filed"}</p>
+              </div>
+              <div className="rounded-lg bg-secondary/40 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Est. private income</p>
+                <p className="text-xl font-bold tabular-nums">{gbp(chPrivateEst)}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Turnover − NHS estimate</p>
+              </div>
+              <div className="rounded-lg bg-secondary/40 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Private income ratio</p>
+                <p className="text-xl font-bold tabular-nums">{chPrivateRatio != null ? `${chPrivateRatio.toFixed(0)}%` : "—"}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Of total turnover</p>
+              </div>
+            </div>
+          )}
+          {sigPrivate && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              This pharmacy appears to have significant private income ({privateRatioPct.toFixed(0)}% est.). NHS metrics alone may not fully represent its performance or value.
+            </div>
+          )}
+          <p className="text-[11px] text-muted-foreground mt-2">Estimated from Companies House turnover vs NHS dispensing data — indicative only.</p>
+        </Section>
+      )}
+
+      <Section title="Valuation estimate">
+        <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4 mb-4">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">NHS-only indicative range</p>
+          <p className="text-2xl font-bold tabular-nums">{gbp(nhsValLow)} – {gbp(nhsValHigh)}</p>
+          <p className="text-xs text-muted-foreground mt-1">{incomeLabel} of {gbp(nhsIncome)} × 1.0–1.3×</p>
+        </div>
+        <div className="rounded-lg border border-border bg-secondary/30 p-4 mb-4">
+          <p className="text-xs font-semibold mb-2">Adjust for private income</p>
+          {chTurnover != null && chPrivateEst != null && chPrivateEst > 0 && !chDiscrepancy && (
+            <p className="text-xs text-muted-foreground mb-2">Companies House estimate: {gbp(chPrivateEst)} ({chPrivateRatio?.toFixed(0)}% of turnover)</p>
+          )}
+          <p className="text-xs text-muted-foreground mb-1.5">Annual private income (£):</p>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm font-medium text-muted-foreground">£</span>
+            <input
+              type="number" min="0"
+              placeholder={chPrivateEst != null && chPrivateEst > 0 ? String(Math.round(chPrivateEst)) : "0"}
+              value={manualPrivateIncome}
+              onChange={e => setManualPrivateIncome(e.target.value === "" ? "" : Number(e.target.value))}
+              className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+          {hasPrivate && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+              <p className="text-[11px] text-muted-foreground">Adjusted range (NHS × 1.0–1.3 + private × 0.5–0.8):</p>
+              <p className="text-lg font-bold text-emerald-900 mt-0.5 tabular-nums">{gbp(adjValLow)} – {gbp(adjValHigh)}</p>
+            </div>
+          )}
+        </div>
+        <p className="text-[11px] text-muted-foreground italic">
+          Indicative estimate based on NHS dispensing data and Companies House filings. Does not account for goodwill, lease terms, or physical assets. Always obtain a professional valuation before any transaction.
         </p>
       </Section>
 
-      <Section title={`Section 1 — ${incomeLabel}`}>
-        <FlipCard
-          title={incomeLabel}
-          value={<span className="text-3xl">{gbp(nhsIncome)}</span>}
-          description={METRIC_INFO[incomeLabel] || ""}
-          className="md:max-w-sm"
-        />
-        <div className="h-40 mt-3"><ResponsiveContainer><BarChart data={monthlyBars} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
-          <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-          <XAxis dataKey="label" tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 10 }} />
-          <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} formatter={(v: any) => [gbp(Number(v)), "Est."]} />
-          <Bar dataKey="v" fill="var(--gold)" radius={[3,3,0,0]} />
-        </BarChart></ResponsiveContainer></div>
-      </Section>
-
-
-      <Section title="Section 2 — Financial performance">
+      <Section title="Financial performance (Companies House)">
         {company?.turnover ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Cell label="Turnover" v={gbp(company.turnover)} />
@@ -890,47 +1009,52 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
             <Cell label="Net profit" v={gbp(company.net_profit)} />
             <Cell label="Payroll" v={gbp(company.total_payroll)} />
           </div>
-        ) : <p className="text-sm text-muted-foreground">Financial data not yet fetched. Go to the Financials tab.</p>}
-      </Section>
-
-      <Section title="Section 3 — Valuation estimate">
-        {val ? (
-          <>
-            <div className="grid grid-cols-3 gap-3">
-              <Cell label="Conservative · 4x" v={gbp(val.low)} />
-              <Cell label="Mid-range · 5x" v={gbp(val.mid)} />
-              <Cell label="Premium · 6x" v={gbp(val.high)} />
-            </div>
-            <div className="mt-4 h-3 rounded-full overflow-hidden bg-gradient-to-r from-rose-200 via-amber-200 to-emerald-200" />
-            <p className="text-[11px] text-muted-foreground mt-2">EBITDA estimated as operating profit + 2% turnover (proxy for depreciation).</p>
-            <p className="text-[11px] text-muted-foreground mt-1 italic">Valuation estimates use publicly filed accounts and estimated NHS income. Always verify with management accounts and FP34C schedules.</p>
-          </>
-        ) : <p className="text-sm text-muted-foreground">Match company and fetch full accounts to estimate valuation.</p>}
-      </Section>
-
-      <Section title="Section 4 — Red flags">
-        {flags.length === 0 ? (
-          <div className="rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900 p-3 text-sm inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> No significant red flags identified from available data.</div>
         ) : (
-          <ul className="space-y-2">{flags.map((f, i) => (
-            <li key={i} className="rounded-lg border border-rose-300 bg-rose-50 text-rose-900 p-3 text-sm flex items-start gap-2"><AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" /><span>{f.msg}</span></li>
-          ))}</ul>
+          <p className="text-sm text-muted-foreground">No financial data available. Go to the Financials tab to find and confirm the Companies House match.</p>
         )}
       </Section>
 
-      <Section title="Section 5 — Upload for accuracy">
-        <div className="grid md:grid-cols-2 gap-4">
-          <UploadBox label="FP34C Payment Schedules" hint="CSV with [month,total] rows for exact NHS income"
-            onFile={(f) => upload(f, "acquisition_fp34c")} done={!!fp34c} />
-          <UploadBox label="P&L / Management Accounts" hint="CSV with [line_item,value] rows for exact profitability"
-            onFile={(f) => upload(f, "acquisition_pl")} done={false} />
-        </div>
+      {opps.length > 0 && (
+        <Section title="Strengths & opportunities">
+          <div className="space-y-2">
+            {opps.map((o, i) => (
+              <div key={i} className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-emerald-900">{o.msg}</p>
+                  {o.detail && <p className="text-xs text-emerald-700 mt-0.5">{o.detail}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      <Section title="Red flags">
+        {flags.length === 0 ? (
+          <div className="rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900 p-3 text-sm inline-flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" /> No significant red flags from available data.
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {flags.map((f, i) => (
+              <li key={i} className="rounded-lg border border-rose-300 bg-rose-50 text-rose-900 p-3 text-sm">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium">{f.msg}</p>
+                    {f.detail && <p className="text-xs text-rose-700 mt-0.5">{f.detail}</p>}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </Section>
 
-      <Button className="w-full bg-gold text-foreground hover:bg-gold/90" onClick={() => window.print()}>
-        <Printer className="h-4 w-4" /> Download Due Diligence Report (PDF)
-      </Button>
-      <p className="text-[11px] text-center text-muted-foreground">Use your browser's "Save as PDF" in the print dialog.</p>
+      <p className="text-[11px] text-muted-foreground text-center">
+        Computed from public NHS dispensing data, registered GP list sizes, pharmacy geocoding, and Companies House filings — no uploads required.
+      </p>
     </div>
   );
 }
@@ -1044,7 +1168,7 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
   const nmsGap = natAvg.nms_count ? Math.max(0, natAvg.nms_count - nmsCount) : 0;
   const pfGap = natAvg.pharmacy_first_count ? Math.max(0, natAvg.pharmacy_first_count - (latest?.pharmacy_first_count || 0)) : 0;
   const fluGap = natAvg.flu_vaccinations ? Math.max(0, natAvg.flu_vaccinations - (latest?.flu_vaccinations || 0)) : 0;
-  const nmsUplift = Math.round(nmsGap * 28);
+  const nmsUplift = Math.round(nmsGap * 21);
   const pfUplift = Math.round(pfGap * 15);
   const fluUplift = Math.round(fluGap * 12.58);
   const totalUplift = nmsUplift + pfUplift + fluUplift;
@@ -1181,10 +1305,10 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
             ) : nmsHeadroom > 0 && nmsUtil < 60 ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-900 p-3 text-xs flex gap-2">
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                <span>Capacity for {nmsHeadroom} more NMS this month — worth up to <span className="font-semibold">£{(nmsHeadroom * 28).toLocaleString()}</span> additional income.</span>
+                <span>Capacity for {nmsHeadroom} more NMS this month — worth up to <span className="font-semibold">£{(nmsHeadroom * 21).toLocaleString()}</span> additional income.</span>
               </div>
             ) : null}
-            <p className="text-[10px] text-muted-foreground mt-3">NMS ~£28/consultation · {MONTHS[latest.month - 1]} {latest.year} data · Cap = items × 0.01</p>
+            <p className="text-[10px] text-muted-foreground mt-3">NMS £21/completed NMS (from April 2025) · {MONTHS[latest.month - 1]} {latest.year} data · Cap = items × 0.01</p>
           </Section>
 
           {/* Underclaimed services */}
@@ -1202,7 +1326,7 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
               ) : (
                 <div className="space-y-3">
                   {nmsGap > 0.5 && (
-                    <ServiceGapRow label="New Medicine Service" current={nmsCount} avg={natAvg.nms_count} gap={nmsGap} rateLabel="~£28/consultation" uplift={nmsUplift} />
+                    <ServiceGapRow label="New Medicine Service" current={nmsCount} avg={natAvg.nms_count} gap={nmsGap} rateLabel="£21/completed NMS" uplift={nmsUplift} />
                   )}
                   {pfGap > 0.5 && (
                     <ServiceGapRow label="Pharmacy First" current={latest.pharmacy_first_count || 0} avg={natAvg.pharmacy_first_count} gap={pfGap} rateLabel="~£15/consultation" uplift={pfUplift} />
@@ -1302,15 +1426,4 @@ function PqsCriterionRow({ label, met, detail, warn }: { label: string; met: boo
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return <div className="rounded-xl border border-border bg-card p-5"><h3 className="text-sm font-semibold mb-3">{title}</h3>{children}</div>;
-}
-function UploadBox({ label, hint, onFile, done }: { label: string; hint: string; onFile: (f: File) => void; done: boolean }) {
-  return (
-    <label className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-6 text-center cursor-pointer hover:bg-secondary/40 transition-colors">
-      <Upload className="h-5 w-5 text-muted-foreground mb-2" />
-      <p className="text-sm font-medium">{label}</p>
-      <p className="text-xs text-muted-foreground mt-1">{hint}</p>
-      {done && <p className="text-xs text-emerald-700 mt-1">Uploaded ✓</p>}
-      <input type="file" className="hidden" accept=".csv,.pdf" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
-    </label>
-  );
 }
