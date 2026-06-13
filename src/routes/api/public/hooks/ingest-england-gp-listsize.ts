@@ -122,13 +122,10 @@ async function discoverAllPatientCsvs(): Promise<Array<{ url: string; year: numb
   function parseCsvLinks(html: string): void {
     for (const m of html.matchAll(/href="([^"]+\.csv)"/gi)) {
       const href = m[1];
-      // Match aggregate practice-level files; skip LSOA/quintile/sex demographic breakdowns.
-      // Primary pattern: gp-reg-pat-prac-all (the canonical NHS Digital filename).
-      // Fallback pattern: any gp-reg-pat file that isn't a demographic breakdown.
-      if (
-        /gp-reg-pat[^"]*prac[-_]all/i.test(href) ||
-        (/gp-reg-pat/i.test(href) && !/lsoa|quin|sex[-_]age|age[-_]sex/i.test(href))
-      ) {
+      // Only ingest the canonical aggregate practice-level extract.
+      // gp-reg-pat-prac-all.csv (or -v2) contains TOTAL_ALL per practice.
+      // Skip demographic breakdowns (sing-age-male/female/regions), maps, quintiles, LSOA.
+      if (/gp-reg-pat-prac-all(?:[-_]v\d+)?\.csv$/i.test(href)) {
         addCsvLink(href);
       }
     }
