@@ -1,7 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   Home,
-  LayoutDashboard,
+  Store,
   Trophy,
   BarChart2,
   GitCompare,
@@ -17,7 +17,7 @@ import { PharmacySearch } from "./PharmacySearch";
 
 const links = [
   { to: "/", label: "Home", icon: Home },
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard", label: "My Pharmacy", icon: Store },
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy },
   { to: "/benchmarking", label: "Benchmarking", icon: BarChart2 },
   { to: "/compare", label: "Compare", icon: GitCompare },

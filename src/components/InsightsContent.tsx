@@ -132,8 +132,8 @@ export function InsightsContent({ isDrawer = false }: { isDrawer?: boolean }) {
           <Sparkles className="h-6 w-6 text-gold" />
         </div>
         <h1 className="text-xl font-semibold">Smart Insights</h1>
-        <p className="text-sm text-muted-foreground">Set your pharmacy in the dashboard to unlock personalised AI-powered analysis.</p>
-        <Button asChild><Link to="/dashboard">Go to dashboard</Link></Button>
+        <p className="text-sm text-muted-foreground">Set your pharmacy in My Pharmacy to unlock personalised AI-powered analysis.</p>
+        <Button asChild><Link to="/dashboard">Go to My Pharmacy</Link></Button>
       </div>
     );
   }
@@ -146,7 +146,7 @@ export function InsightsContent({ isDrawer = false }: { isDrawer?: boolean }) {
       {!isDrawer && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Link to="/dashboard" className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
-            <ArrowLeft className="h-3.5 w-3.5" /> Dashboard
+            <ArrowLeft className="h-3.5 w-3.5" /> My Pharmacy
           </Link>
           <span>/</span>
           <span className="text-foreground font-medium">Smart Insights</span>

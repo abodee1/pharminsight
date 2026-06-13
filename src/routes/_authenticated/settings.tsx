@@ -199,7 +199,7 @@ function SettingsPage() {
           <section className="rounded-xl bg-card border border-border p-6 shadow-sm space-y-5">
             <div>
               <h2 className="font-semibold">Personal details</h2>
-              <p className="text-sm text-muted-foreground">Used to personalise your dashboard and insights.</p>
+              <p className="text-sm text-muted-foreground">Used to personalise your My Pharmacy view and insights.</p>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div>

@@ -101,7 +101,7 @@ function Header() {
         </Link>
         <div className="flex items-center gap-2">
           {loading ? null : user ? (
-            <Button asChild size="sm"><Link to="/dashboard">Dashboard</Link></Button>
+            <Button asChild size="sm"><Link to="/dashboard">My Pharmacy</Link></Button>
           ) : (
             <>
               <Button asChild variant="ghost" size="sm"><Link to="/login">Sign in</Link></Button>

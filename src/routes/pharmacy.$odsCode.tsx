@@ -470,7 +470,7 @@ function PharmacyProfile() {
   const tableRows = [...trimmedRows].slice(-24).reverse();
 
   const backTo = user ? "/dashboard" : "/";
-  const backLabel = user ? "Back to dashboard" : "Back home";
+  const backLabel = user ? "Back to My Pharmacy" : "Back home";
 
   return (
     <>

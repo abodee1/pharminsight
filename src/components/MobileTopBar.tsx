@@ -1,7 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import {
-  LayoutDashboard, Trophy, BarChart2, GitCompare, Settings,
+  Store, Trophy, BarChart2, GitCompare, Settings,
   LogOut, Menu, User as UserIcon, Search as SearchIcon,
   Stethoscope, Bookmark, Upload, Sparkles,
 } from "lucide-react";
@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { PharmacySearch } from "./PharmacySearch";
 
 export const NAV_LINKS = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard", label: "My Pharmacy", icon: Store },
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy },
   { to: "/benchmarking", label: "Benchmarking", icon: BarChart2 },
   { to: "/compare", label: "Compare", icon: GitCompare },

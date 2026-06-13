@@ -63,7 +63,7 @@ function AcquisitionPage() {
     return (
       <div className="p-10">
         <p className="text-sm">Pharmacy not found.</p>
-        <Link to="/dashboard" className="text-primary text-sm underline">Back to dashboard</Link>
+        <Link to="/dashboard" className="text-primary text-sm underline">Back to My Pharmacy</Link>
       </div>
     );
   }

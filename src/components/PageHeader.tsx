@@ -7,7 +7,7 @@ export function PageHeader({
   subtitle,
   action,
   backTo = "/dashboard",
-  backLabel = "Dashboard",
+  backLabel = "My Pharmacy",
   showBack = true,
 }: {
   title: string;
