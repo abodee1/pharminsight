@@ -82,7 +82,7 @@ async function processOne() {
     for (let i = 0; i < practiceRows.length; i += 500) {
       const { error } = await supabaseAdmin.from("gp_practices")
         .upsert(practiceRows.slice(i, i + 500), { onConflict: "practice_code" });
-      if (error) throw error;
+      if (error) throw new Error(error.message || JSON.stringify(error));
     }
 
     const sizeRows = Array.from(sizes.values()).map((s) => ({
@@ -92,7 +92,7 @@ async function processOne() {
     for (let i = 0; i < sizeRows.length; i += 500) {
       const { error } = await supabaseAdmin.from("gp_list_sizes")
         .upsert(sizeRows.slice(i, i + 500), { onConflict: "practice_code,list_size_date" });
-      if (error) throw error;
+      if (error) throw new Error(error.message || JSON.stringify(error));
     }
     await markSuccess({ ...item, source: SOURCE, rows: sizeRows.length });
     return { url: item.resource_url, rows: sizeRows.length };
