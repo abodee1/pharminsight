@@ -985,6 +985,19 @@ export type Database = {
       public_landing_data: { Args: never; Returns: Json }
       public_landing_data_compute: { Args: never; Returns: Json }
       refresh_landing_cache: { Args: never; Returns: undefined }
+      search_pharmacies: {
+        Args: { p_query: string; p_limit?: number }
+        Returns: {
+          id: string
+          ods_code: string
+          name: string
+          trading_name: string | null
+          address: string
+          postcode: string
+          country: string
+          region: string
+        }[]
+      }
       search_pharmacies_fuzzy: {
         Args: { p_limit?: number; p_query: string }
         Returns: {
