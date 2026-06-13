@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowRight, BarChart2, Map, TrendingUp, Pill, Trophy, Building2, Crown,
+  ArrowRight, BarChart2, Map, TrendingUp, Pill, Building2,
+  Stethoscope, ClipboardCheck, Zap, FileBarChart2,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -9,7 +10,6 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 
 export const Route = createFileRoute("/")({
   component: Landing,
@@ -44,7 +44,6 @@ type Dashboard = {
 };
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const fmt = (n: number) => n.toLocaleString("en-GB");
 const fmtCompact = (n: number) => {
   if (n >= 1e9) return (n / 1e9).toFixed(1) + "bn";
   if (n >= 1e6) return (n / 1e6).toFixed(1) + "m";
@@ -53,60 +52,6 @@ const fmtCompact = (n: number) => {
 };
 const monthName = (y: number, m: number) =>
   new Date(y, m - 1, 1).toLocaleString("en-GB", { month: "long", year: "numeric" });
-const titleCase = (s: string) =>
-  s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase())
-    .replace(/\bUk\b/g, "UK").replace(/\bNhs\b/g, "NHS");
-
-// Client-side trading name resolution for leaderboard display
-const CHAIN_NAMES: [string, string][] = [
-  ["BOOTS UK LIMITED", "Boots"],
-  ["BOOTS", "Boots"],
-  ["LLOYDS PHARMACY", "Lloyds Pharmacy"],
-  ["WELL PHARMACY", "Well"],
-  ["BESTWAY NATIONAL CHEMISTS", "Well"],
-  ["BESTWAY MEDICALS", "Well"],
-  ["L ROWLAND & CO", "Rowlands Pharmacy"],
-  ["ROWLANDS PHARMACY", "Rowlands Pharmacy"],
-  ["DAY LEWIS", "Day Lewis Pharmacy"],
-  ["MOSS PHARMACY", "Moss Pharmacy"],
-  ["PEAK PHARMACY", "Peak Pharmacy"],
-  ["NUMARK", "Numark Pharmacy"],
-  ["WELDRICKS", "Weldricks Pharmacy"],
-  ["JHOOTS PHARMACY", "Jhoots Pharmacy"],
-  ["PAYDENS", "Paydens Pharmacy"],
-  ["PHARMACY2U", "Pharmacy2U"],
-  ["CHEMIST DIRECT", "Chemist Direct"],
-  ["SUPERDRUG", "Superdrug Pharmacy"],
-  ["ASDA PHARMACY", "Asda Pharmacy"],
-  ["TESCO PHARMACY", "Tesco Pharmacy"],
-  ["MORRISONS PHARMACY", "Morrisons Pharmacy"],
-  ["SAINSBURYS PHARMACY", "Sainsbury's Pharmacy"],
-  ["CO-OPERATIVE PHARMACY", "Co-op Pharmacy"],
-  ["GORDONS CHEMISTS", "Gordons Chemists"],
-];
-function resolveName(raw: string): string {
-  const upper = raw.toUpperCase();
-  for (const [pattern, trading] of CHAIN_NAMES) {
-    if (upper.includes(pattern)) return trading;
-  }
-  return titleCase(raw);
-}
-
-const COUNTRY_STYLE: Record<string, string> = {
-  England: "bg-blue-50 text-blue-700 border-blue-200",
-  Scotland: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  Wales: "bg-red-50 text-red-700 border-red-200",
-  "Northern Ireland": "bg-emerald-50 text-emerald-700 border-emerald-200",
-};
-function CountryTag({ country }: { country: string | null }) {
-  if (!country) return null;
-  const short = country === "Northern Ireland" ? "NI" : country.slice(0, 3).toUpperCase();
-  return (
-    <span className={["text-[9px] font-bold uppercase tracking-wide border rounded px-1 py-0.5 shrink-0 leading-none", COUNTRY_STYLE[country] || "bg-secondary text-muted-foreground"].join(" ")}>
-      {short}
-    </span>
-  );
-}
 
 const PROOF_POINTS = [
   "Updated monthly from official NHS sources",
@@ -136,7 +81,7 @@ function Landing() {
       <SocialProof />
       <Features />
       <TrendChart data={data?.totals_trend ?? null} />
-      <Boards data={data} error={error} />
+      <DataShowcase data={data} />
       <CTA />
       <Footer />
     </div>
@@ -337,81 +282,143 @@ function TrendChart({ data }: { data: TrendRow[] | null }) {
   );
 }
 
-function Boards({ data, error }: { data: Dashboard | null; error: string | null }) {
-  const boards = [
-    { key: "items",    title: "Items dispensed",  rows: data?.top_items,           fmt: fmtCompact },
-    { key: "pf",       title: "Pharmacy First",   rows: data?.top_pf,              fmt: fmtCompact },
-    { key: "nms",      title: "NMS",              rows: data?.top_nms,             fmt: fmtCompact },
-    { key: "eps",      title: "EPS Items",        rows: data?.top_eps,             fmt: fmtCompact },
-    { key: "fastest",  title: "Fastest growing",  rows: data?.top_fastest_growing, fmt: (v: number) => `+${v.toFixed(1)}%` },
-  ];
+const NATION_DOT: Record<string, string> = {
+  England: "bg-blue-500",
+  Scotland: "bg-indigo-500",
+  Wales: "bg-red-500",
+  "Northern Ireland": "bg-emerald-500",
+};
+
+const TRACKED_METRICS = [
+  {
+    icon: Pill,
+    label: "Items dispensed",
+    desc: "Monthly prescription volume for every NHS contractor across all four nations.",
+  },
+  {
+    icon: Stethoscope,
+    label: "Pharmacy First",
+    desc: "Consultation volumes across 7 clinical pathways including UTI, sinusitis and earache.",
+  },
+  {
+    icon: ClipboardCheck,
+    label: "New Medicine Service",
+    desc: "NMS completion rates and patient engagement trends by contractor.",
+  },
+  {
+    icon: Zap,
+    label: "EPS Items",
+    desc: "Electronic Prescription Service adoption volume and share per pharmacy.",
+  },
+  {
+    icon: BarChart2,
+    label: "Benchmarking",
+    desc: "Rank every pharmacy nationally, regionally, and within peer cohorts.",
+  },
+  {
+    icon: FileBarChart2,
+    label: "Trend analysis",
+    desc: "24-month rolling history to track growth, decline, and service mix shifts.",
+  },
+  {
+    icon: Map,
+    label: "Competitive intelligence",
+    desc: "Map GP feeder patterns, identify nearby competitors and acquisition targets.",
+  },
+  {
+    icon: Building2,
+    label: "Acquisition intelligence",
+    desc: "Automated valuations, Companies House ownership data, and income quality scores.",
+  },
+] as const;
+
+function DataShowcase({ data }: { data: Dashboard | null }) {
+  const countries: CountryRow[] = data?.by_country ?? [];
 
   return (
     <section className="border-t border-border bg-card">
       <div className="mx-auto max-w-6xl px-6 py-16">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h2 className="text-2xl font-bold tracking-tight">Leaderboards</h2>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse motion-reduce:animate-none" />
-              Live · Updated monthly
-            </span>
+
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 mb-10 flex-wrap">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">The UK pharmacy landscape</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Every contractor, every month — across all four nations
+            </p>
           </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground shrink-0">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse motion-reduce:animate-none" />
+            Live · Updated monthly
+          </span>
+        </div>
+
+        {/* Nation cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+          {countries.length > 0
+            ? countries.slice(0, 4).map((c) => (
+                <div key={c.country} className="rounded-xl border border-border bg-background p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className={["h-2 w-2 rounded-full shrink-0", NATION_DOT[c.country] ?? "bg-muted"].join(" ")} />
+                    <span className="text-sm font-semibold truncate">
+                      {c.country === "Northern Ireland" ? "N. Ireland" : c.country}
+                    </span>
+                  </div>
+                  <p className="text-3xl font-bold tabular-nums tracking-tight leading-none">
+                    {fmtCompact(c.pharmacies)}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide mt-1 mb-4">
+                    Pharmacies
+                  </p>
+                  <div className="border-t border-border pt-4 grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-sm font-semibold tabular-nums">{fmtCompact(c.value)}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Items / mo</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold tabular-nums">{fmtCompact(c.pf)}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Pharm First</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            : Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-xl border border-border bg-background p-5 space-y-3">
+                  <div className="h-3 w-20 rounded bg-muted animate-pulse" />
+                  <div className="h-8 w-14 rounded bg-muted animate-pulse" />
+                  <div className="h-3 w-16 rounded bg-muted animate-pulse" />
+                </div>
+              ))}
+        </div>
+
+        {/* What PharmInsight tracks */}
+        <div className="rounded-xl border border-border bg-secondary/30 p-6 md:p-8">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-6">
+            What PharmInsight tracks
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {TRACKED_METRICS.map((m) => (
+              <div key={m.label} className="flex flex-col gap-2.5">
+                <div className="h-9 w-9 rounded-lg bg-card border border-border flex items-center justify-center shrink-0">
+                  <m.icon className="h-4 w-4 text-foreground" />
+                </div>
+                <p className="text-sm font-semibold leading-snug">{m.label}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{m.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Link to full leaderboards */}
+        <div className="mt-6 text-center">
           <Link
             to="/leaderboards"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
-            View all →
+            View full leaderboards →
           </Link>
         </div>
 
-        {error && <p className="text-sm text-destructive mb-6">{error}</p>}
-
-        {/* Mobile: horizontal scroll. md: 2-col, xl: 5-col */}
-        <div className="flex gap-4 overflow-x-auto md:overflow-visible md:grid md:grid-cols-2 xl:grid-cols-5 snap-x md:snap-none -mx-6 px-6 md:mx-0 md:px-0 pb-4 md:pb-0 scrollbar-none">
-          {boards.map((b) => (
-            <Card key={b.key} className="snap-start shrink-0 w-[85vw] sm:w-[55vw] md:w-auto overflow-hidden shadow-sm">
-              <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-secondary/30">
-                <span className="text-sm font-semibold">{b.title}</span>
-                <Trophy className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-              <ol>
-                {(b.rows?.slice(0, 5) || Array.from({ length: 5 })).map((r: any, i: number) => (
-                  <li
-                    key={i}
-                    className={[
-                      "flex items-center gap-2.5 px-4 py-2.5 text-sm border-t border-border first:border-0",
-                      i === 0 ? "bg-gold/8 border-l-2 border-l-gold/50" : "",
-                    ].join(" ")}
-                  >
-                    <span className={["tabular-nums w-5 text-xs font-bold shrink-0", i === 0 ? "text-gold" : "text-muted-foreground"].join(" ")}>
-                      {i === 0 ? <Crown className="h-3.5 w-3.5 inline text-gold" /> : i + 1}
-                    </span>
-                    {r ? (
-                      <>
-                        <span className="flex-1 min-w-0 flex items-center gap-1.5 flex-wrap">
-                          <Link
-                            to="/pharmacy/$odsCode"
-                            params={{ odsCode: r.ods }}
-                            className={["truncate hover:underline underline-offset-2 max-w-[120px]", i === 0 ? "font-semibold" : ""].join(" ")}
-                          >
-                            {resolveName(r.name)}
-                          </Link>
-                          <CountryTag country={r.country} />
-                        </span>
-                        <span className={["tabular-nums text-xs font-semibold shrink-0", i === 0 ? "text-foreground" : "text-muted-foreground"].join(" ")}>
-                          {b.fmt(r.value)}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="flex-1 h-3 rounded bg-muted animate-pulse" />
-                    )}
-                  </li>
-                ))}
-              </ol>
-            </Card>
-          ))}
-        </div>
       </div>
     </section>
   );
