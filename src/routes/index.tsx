@@ -282,12 +282,6 @@ function TrendChart({ data }: { data: TrendRow[] | null }) {
   );
 }
 
-const NATION_DOT: Record<string, string> = {
-  England: "bg-blue-500",
-  Scotland: "bg-indigo-500",
-  Wales: "bg-red-500",
-  "Northern Ireland": "bg-emerald-500",
-};
 
 const TRACKED_METRICS = [
   {
@@ -332,64 +326,10 @@ const TRACKED_METRICS = [
   },
 ] as const;
 
-function DataShowcase({ data }: { data: Dashboard | null }) {
-  const countries: CountryRow[] = data?.by_country ?? [];
-
+function DataShowcase({ data: _ }: { data: Dashboard | null }) {
   return (
     <section className="border-t border-border bg-card">
       <div className="mx-auto max-w-6xl px-6 py-16">
-
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 mb-10 flex-wrap">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">The UK pharmacy landscape</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Every contractor, every month — across all four nations
-            </p>
-          </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground shrink-0">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse motion-reduce:animate-none" />
-            Live · Updated monthly
-          </span>
-        </div>
-
-        {/* Nation cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-          {countries.length > 0
-            ? countries.slice(0, 4).map((c) => (
-                <div key={c.country} className="rounded-xl border border-border bg-background p-5 shadow-sm">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className={["h-2 w-2 rounded-full shrink-0", NATION_DOT[c.country] ?? "bg-muted"].join(" ")} />
-                    <span className="text-sm font-semibold truncate">
-                      {c.country === "Northern Ireland" ? "N. Ireland" : c.country}
-                    </span>
-                  </div>
-                  <p className="text-3xl font-bold tabular-nums tracking-tight leading-none">
-                    {fmtCompact(c.pharmacies)}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide mt-1 mb-4">
-                    Pharmacies
-                  </p>
-                  <div className="border-t border-border pt-4 grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-sm font-semibold tabular-nums">{fmtCompact(c.value)}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Items / mo</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold tabular-nums">{fmtCompact(c.pf)}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Pharm First</p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            : Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="rounded-xl border border-border bg-background p-5 space-y-3">
-                  <div className="h-3 w-20 rounded bg-muted animate-pulse" />
-                  <div className="h-8 w-14 rounded bg-muted animate-pulse" />
-                  <div className="h-3 w-16 rounded bg-muted animate-pulse" />
-                </div>
-              ))}
-        </div>
 
         {/* What PharmInsight tracks */}
         <div className="rounded-xl border border-border bg-secondary/30 p-6 md:p-8">
