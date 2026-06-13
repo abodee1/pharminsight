@@ -234,7 +234,7 @@ async function processPatientsCsv(item: { id: string; resource_url: string; year
   for (let i = 0; i < rows.length; i += 500) {
     const { error } = await supabaseAdmin.from("gp_list_sizes")
       .upsert(rows.slice(i, i + 500), { onConflict: "practice_code,list_size_date" });
-    if (error) throw error;
+    if (error) throw new Error(error.message || JSON.stringify(error));
   }
   return rows.length;
 }
