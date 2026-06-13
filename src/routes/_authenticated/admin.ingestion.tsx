@@ -134,6 +134,19 @@ const DATASETS: Dataset[] = [
     icon: Pill,
   },
   {
+    key: "wales-pharmacy",
+    label: "Wales — community pharmacy dispensing",
+    group: "Pharmacy dispensing",
+    country: "Wales",
+    source: "NWSSP_WALES",
+    hook: "ingest-wales",
+    cadence: "monthly",
+    publisher: "NWSSP / NHS Wales (data.gov.uk + opendata.nwssp.wales.nhs.uk)",
+    publisherUrl: "https://ckan.publishing.service.gov.uk/dataset/dispensing-by-pharmacy-contractor-wales",
+    description: "Monthly community pharmacy dispensing volumes for Welsh contractors, via NWSSP open data.",
+    icon: Pill,
+  },
+  {
     key: "scot-gp",
     label: "Scotland — GP prescribing",
     group: "GP prescribing",
@@ -772,7 +785,7 @@ function emptyStats(): Stats {
 }
 
 function RegionBreakdown({ statsBySource }: { statsBySource: Record<string, Stats> }) {
-  const regions: Array<Dataset["country"]> = ["England", "Scotland", "Northern Ireland"];
+  const regions: Array<Dataset["country"]> = ["England", "Scotland", "Northern Ireland", "Wales"];
   const byRegion = regions.map((region) => {
     const items = DATASETS.filter((d) => d.country === region);
     const stats = items.map((d) => statsBySource[d.source]).filter(Boolean) as Stats[];
@@ -791,7 +804,7 @@ function RegionBreakdown({ statsBySource }: { statsBySource: Record<string, Stat
         <CardTitle className="text-base">Per-region coverage</CardTitle>
         <CardDescription>Quick read of where data gaps live across the UK.</CardDescription>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <CardContent className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {byRegion.map((r) => {
           const tone = r.failing > 0 ? "bad" : r.coverageAvg < 80 ? "neutral" : "good";
           const dot = tone === "good" ? "bg-emerald-500" : tone === "bad" ? "bg-rose-500" : "bg-amber-500";

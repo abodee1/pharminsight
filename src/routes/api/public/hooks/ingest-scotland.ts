@@ -282,10 +282,16 @@ async function processQueueItem(item: {
         itemsIdx = findIdx(["NumberOfPaidItems", "PaidQuantity", "Items"]);
         monthIdx = findIdx(["PaidDateMonth"]);
         yearIdx = findIdx(["Year"]);
+        // These payment amounts are not published in community-pharmacy-contractor-activity
+        // (they're in a separate BSO payments file not on CKAN). Suppress alerts for them.
+        const KNOWN_ABSENT_IN_CONTRACTOR_ACTIVITY: PField[] = ["pharmacy_first_payment", "mcr_payment"];
         for (const f of Object.keys(PAYMENT_FIELDS) as PField[]) {
           const idx = findIdx(PAYMENT_FIELDS[f]);
           if (idx >= 0) paymentIdxByField[f] = idx;
-          else if (item.dataset === "community-pharmacy-contractor-activity") missingPayments.push(f);
+          else if (
+            item.dataset === "community-pharmacy-contractor-activity" &&
+            !KNOWN_ABSENT_IN_CONTRACTOR_ACTIVITY.includes(f)
+          ) missingPayments.push(f);
         }
         for (const s of Object.keys(PF_SERVICE_FIELDS) as PFService[]) {
           const idx = findIdx(PF_SERVICE_FIELDS[s]);

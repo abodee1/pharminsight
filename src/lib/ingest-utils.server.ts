@@ -68,7 +68,8 @@ export async function enqueue(rows: Array<{
 }>) {
   let queued = 0;
   for (let i = 0; i < rows.length; i += 200) {
-    const chunk = rows.slice(i, i + 200).map((r) => ({ ...r, status: "pending", error: null }));
+    // Reset `attempts` so previously-failed items get a fresh retry budget.
+    const chunk = rows.slice(i, i + 200).map((r) => ({ ...r, status: "pending", error: null, attempts: 0 }));
     const { error } = await supabaseAdmin
       .from("ingestion_queue")
       .upsert(chunk, { onConflict: "source,dataset,resource_url" });

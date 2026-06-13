@@ -129,10 +129,22 @@ async function takeNextChunkable(): Promise<QItem | null> {
   return ((processing ?? data[0]) as QItem | undefined) ?? null;
 }
 
-async function logSuccess(item: QItem, rows: number) {
+async function logSuccess(item: QItem, lastChunkRows: number) {
+  // `lastChunkRows` only counts the final chunk; query gp_prescribing for
+  // the true row count across all chunks.
+  let totalRows = lastChunkRows;
+  if (item.year && item.month) {
+    const { count } = await supabaseAdmin
+      .from("gp_prescribing")
+      .select("*", { count: "exact", head: true })
+      .eq("country", "England")
+      .eq("year", item.year)
+      .eq("month", item.month);
+    if (count != null) totalRows = count;
+  }
   await supabaseAdmin.from("ingestion_log").insert({
     source: SOURCE, dataset: item.dataset, resource_url: item.resource_url,
-    year: item.year, month: item.month, status: "success", rows_ingested: rows,
+    year: item.year, month: item.month, status: "success", rows_ingested: totalRows,
   });
   await supabaseAdmin.from("ingestion_queue")
     .update({ status: "done", finished_at: new Date().toISOString() })

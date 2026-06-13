@@ -175,6 +175,17 @@ async function processQueueItem(item: { id: string; resource_url: string; year: 
     });
 
     if (rowCount <= 1) throw new Error("Empty CSV");
+    if (agg.size === 0) {
+      // All rows were skipped — most likely the CSV column names changed.
+      // Report the actual column names found so the alert is actionable.
+      const found = Object.keys(idx).slice(0, 20).join(", ");
+      throw new Error(
+        `Parsed ${rowCount} CSV rows but aggregated 0 pharmacy entries. ` +
+        `Check YEAR_MONTH (idx=${idx["YEAR_MONTH"] ?? "missing"}) and ` +
+        `CONTRACTOR_CODE (idx=${idx["CONTRACTOR_CODE"] ?? "missing"}) columns. ` +
+        `Columns found: ${found}`,
+      );
+    }
 
     const pharmacies = Array.from(
       new Map(Array.from(agg.values()).map((a) => [a.ods_code, {
