@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { fetchAll } from "@/lib/fetchAll";
 import { cn } from "@/lib/utils";
 import { setViewedPharmacy, clearViewedPharmacy } from "@/lib/viewedPharmacy";
+import { pharmacyDisplayName } from "@/lib/pharmacyName";
 
 type WindowKey = 1 | 3 | 6 | 12;
 
@@ -43,7 +44,7 @@ const PF_SERVICES: { key: string; label: string }[] = [
 ];
 
 type Pharmacy = {
-  id: string; ods_code: string; name: string;
+  id: string; ods_code: string; name: string; trading_name: string | null;
   address: string | null; postcode: string | null;
   region: string | null; country: string | null;
   lat: number | null; lng: number | null;
@@ -109,7 +110,7 @@ function PharmacyProfile() {
       setLoading(true);
       const { data: p } = await supabase
         .from("pharmacies")
-        .select("id,ods_code,name,address,postcode,region,country,lat,lng")
+        .select("id,ods_code,name,trading_name,address,postcode,region,country,lat,lng")
         .eq("ods_code", odsCode.toUpperCase())
         .maybeSingle();
       setPharmacy((p as Pharmacy) || null);
@@ -512,7 +513,7 @@ function PharmacyProfile() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{pharmacy.name}</h1>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}</h1>
             {isMine && (
               <span className="inline-flex items-center gap-1 rounded-full bg-gold/15 border border-gold/40 px-2.5 py-0.5 text-xs font-semibold text-gold">
                 <Star className="h-3 w-3 fill-current" /> Your pharmacy

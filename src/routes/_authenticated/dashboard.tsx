@@ -22,6 +22,7 @@ import { fetchAll } from "@/lib/fetchAll";
 import { cn } from "@/lib/utils";
 import { clearViewedPharmacy } from "@/lib/viewedPharmacy";
 import { DataAttribution } from "@/components/DataAttribution";
+import { pharmacyDisplayName } from "@/lib/pharmacyName";
 
 type WindowKey = 1 | 3 | 6 | 12;
 
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({ component: M
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 type Pharmacy = {
-  id: string; ods_code: string; name: string;
+  id: string; ods_code: string; name: string; trading_name: string | null;
   address: string | null; postcode: string | null;
   region: string | null; country: string | null;
   lat: number | null; lng: number | null;
@@ -87,7 +88,7 @@ function MyPharmacy() {
       setNoPharmacy(false);
       const { data: p } = await supabase
         .from("pharmacies")
-        .select("id,ods_code,name,address,postcode,region,country,lat,lng")
+        .select("id,ods_code,name,trading_name,address,postcode,region,country,lat,lng")
         .eq("id", up.pharmacy_id).maybeSingle();
       const ph = (p as Pharmacy) || null;
       setPharmacy(ph);
@@ -425,7 +426,7 @@ function MyPharmacy() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{pharmacy.name}</h1>
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}</h1>
               <span className="inline-flex items-center gap-1 rounded-full bg-gold/15 border border-gold/40 px-2.5 py-0.5 text-xs font-semibold text-gold">
                 <Star className="h-3 w-3 fill-current" /> Your pharmacy
               </span>

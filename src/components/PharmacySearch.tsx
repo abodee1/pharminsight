@@ -4,12 +4,14 @@ import { Search, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { CountryBadge } from "./CountryBadge";
+import { pharmacyDisplayName } from "@/lib/pharmacyName";
 
 
 export type Pharmacy = {
   id: string;
   ods_code: string;
   name: string;
+  trading_name?: string | null;
   address: string | null;
   postcode: string | null;
   country: string | null;
@@ -171,7 +173,7 @@ export function PharmacySearch({
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold text-sm truncate">{p.name}</p>
+                  <p className="font-semibold text-sm truncate">{pharmacyDisplayName(p.name, p.trading_name)}</p>
                   <CountryBadge country={p.country} />
                 </div>
                 <p className="text-xs text-muted-foreground truncate mt-0.5">
@@ -208,7 +210,7 @@ export function PharmacySearch({
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold text-sm truncate">{p.name}</p>
+                    <p className="font-semibold text-sm truncate">{pharmacyDisplayName(p.name, p.trading_name)}</p>
                     <CountryBadge country={p.country} />
                     {already && (
                       <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1.5 py-0.5">
@@ -261,7 +263,7 @@ export function PharmacySearch({
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-semibold text-sm truncate">{p.name}</p>
+                          <p className="font-semibold text-sm truncate">{pharmacyDisplayName(p.name, p.trading_name)}</p>
                           <CountryBadge country={p.country} />
                         </div>
                         <p className="text-xs text-muted-foreground truncate mt-0.5">
@@ -283,7 +285,7 @@ export function PharmacySearch({
 }
 
 async function runSearch(term: string): Promise<Pharmacy[]> {
-  const cols = "id,ods_code,name,address,postcode,country,region";
+  const cols = "id,ods_code,name,trading_name,address,postcode,country,region";
   const looksLikeOds = ODS_RE.test(term);
   const looksLikePostcode = POSTCODE_RE.test(term);
   const upper = term.toUpperCase();

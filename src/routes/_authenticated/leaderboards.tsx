@@ -8,6 +8,7 @@ import { DataAttribution } from "@/components/DataAttribution";
 import { useAuth } from "@/hooks/useAuth";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from "recharts";
 import { DistributionStrip } from "@/components/Infographics";
+import { pharmacyDisplayName } from "@/lib/pharmacyName";
 
 export const Route = createFileRoute("/_authenticated/leaderboards")({ component: Leaderboards });
 
@@ -26,7 +27,7 @@ type Row = {
   pharmacy_id: string; month: number; year: number;
   items_dispensed: number; nms_count: number; pharmacy_first_count: number; flu_vaccinations: number; eps_items: number;
 };
-type Pharm = { id: string; name: string; region: string | null; country: string | null; postcode: string | null };
+type Pharm = { id: string; name: string; trading_name: string | null; region: string | null; country: string | null; postcode: string | null };
 
 function prevPeriod(y: number, m: number): { year: number; month: number } {
   return m === 1 ? { year: y - 1, month: 12 } : { year: y, month: m - 1 };
@@ -82,7 +83,7 @@ function Leaderboards() {
       setLoading(true);
       const [pData, last, upData] = await Promise.all([
         fetchAll<Pharm>((from, to) =>
-          supabase.from("pharmacies").select("id,name,region,country,postcode").eq("country", country).range(from, to)
+          supabase.from("pharmacies").select("id,name,trading_name,region,country,postcode").eq("country", country).range(from, to)
         ),
         getLatestSubstantialPeriod(),
         user ? supabase.from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null }),
@@ -151,7 +152,10 @@ function Leaderboards() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     const base = q
-      ? board.filter((r) => r.ph.name.toLowerCase().includes(q) || (r.ph.region ?? "").toLowerCase().includes(q))
+      ? board.filter((r) => {
+          const dn = pharmacyDisplayName(r.ph.name, r.ph.trading_name).toLowerCase();
+          return dn.includes(q) || r.ph.name.toLowerCase().includes(q) || (r.ph.region ?? "").toLowerCase().includes(q);
+        })
       : board;
     if (sortCol === "rank") return sortDir === "asc" ? base : [...base].reverse();
     return [...base].sort((a, b) => {
@@ -171,7 +175,7 @@ function Leaderboards() {
   const pageRows = filtered.slice(page * pageSize, (page + 1) * pageSize);
 
   const top10 = board.slice(0, 10).map((r) => ({
-    name: r.ph.name.replace(/ Pharmacy$/i, "").replace(/ Chemists?$/i, ""),
+    name: pharmacyDisplayName(r.ph.name, r.ph.trading_name).replace(/ Pharmacy$/i, "").replace(/ Chemists?$/i, ""),
     value: r.value,
     isMe: r.ph.id === myPharmId,
   }));
@@ -294,7 +298,7 @@ function Leaderboards() {
             <button
               onClick={() =>
                 downloadCsv(
-                  filtered.map((r) => ({ rank: r.rank, name: r.ph.name, region: r.ph.region, value: r.value, change: r.change, isNew: r.isNew })),
+                  filtered.map((r) => ({ rank: r.rank, name: pharmacyDisplayName(r.ph.name, r.ph.trading_name), region: r.ph.region, value: r.value, change: r.change, isNew: r.isNew })),
                   service,
                   period,
                 )
@@ -348,7 +352,7 @@ function Leaderboards() {
                     )}
                   </td>
                   <td className="px-4 py-2">
-                    {r.ph.name}
+                    {pharmacyDisplayName(r.ph.name, r.ph.trading_name)}
                     {isMine && <span className="ml-2 text-xs text-gold font-semibold">YOU</span>}
                   </td>
                   <td className="px-4 py-2 text-muted-foreground">{r.ph.region}</td>
