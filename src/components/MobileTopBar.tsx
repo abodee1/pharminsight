@@ -3,7 +3,7 @@ import { useState } from "react";
 import {
   LayoutDashboard, Trophy, BarChart2, GitCompare, Settings,
   LogOut, Menu, User as UserIcon, Search as SearchIcon,
-  Stethoscope, Bookmark, Upload,
+  Stethoscope, Bookmark, Upload, Sparkles,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -16,6 +16,7 @@ export const NAV_LINKS = [
   { to: "/benchmarking", label: "Benchmarking", icon: BarChart2 },
   { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/my-analyses", label: "My Analyses", icon: Bookmark },
+  { to: "/insights", label: "Smart Insights", icon: Sparkles },
   { to: "/settings", label: "My Account", icon: Settings },
 ] as const;
 

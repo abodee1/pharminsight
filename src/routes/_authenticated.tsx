@@ -1,8 +1,11 @@
 import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { AppSidebar } from "@/components/AppSidebar";
 import { MobileTopBar } from "@/components/MobileTopBar";
+import { InsightsContent } from "@/components/InsightsContent";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "@/components/ui/drawer";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -12,6 +15,7 @@ function AuthLayout() {
   const { user, profile, loading, refreshProfile } = useAuth();
   const nav = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [insightsOpen, setInsightsOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) nav({ to: "/login" });
@@ -41,6 +45,40 @@ function AuthLayout() {
           </div>
         </main>
       </div>
+      {/* Smart Insights FAB — mobile only, hidden on the insights page itself */}
+      {pathname !== "/insights" && (
+        <button
+          onClick={() => setInsightsOpen(true)}
+          aria-label="Smart Insights"
+          className="md:hidden fixed bottom-5 right-4 z-40 flex items-center gap-2 rounded-full bg-primary text-primary-foreground shadow-lg px-4 py-3 text-sm font-semibold hover:bg-primary/90 active:scale-95 transition-all"
+        >
+          <Sparkles className="h-4 w-4 shrink-0" />
+          Insights
+        </button>
+      )}
+
+      {/* Smart Insights bottom sheet — mobile only */}
+      <Drawer open={insightsOpen} onOpenChange={setInsightsOpen} shouldScaleBackground={false}>
+        <DrawerContent className="md:hidden max-h-[92vh] flex flex-col">
+          <DrawerHeader className="flex-row items-center justify-between pb-0 border-b border-border">
+            <DrawerTitle className="flex items-center gap-2 text-base">
+              <Sparkles className="h-4 w-4 text-gold" />
+              Smart Insights
+            </DrawerTitle>
+            <DrawerClose asChild>
+              <button
+                aria-label="Close"
+                className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </DrawerClose>
+          </DrawerHeader>
+          <div className="flex-1 overflow-y-auto">
+            <InsightsContent isDrawer />
+          </div>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }
