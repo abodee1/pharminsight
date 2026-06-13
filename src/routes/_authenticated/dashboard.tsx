@@ -474,7 +474,7 @@ function MyPharmacy() {
           <CompetitorDeepDive
             pharmacyId={pharmacy.id}
             pharmacyOds={pharmacy.ods_code}
-            pharmacyName={pharmacy.name}
+            pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}
             country={pharmacy.country}
             onClose={() => setDeepDiveOpen(false)}
           />
@@ -548,7 +548,7 @@ function MyPharmacy() {
             <div className="mt-6">
               <LocalRadiusInsights
                 pharmacyId={pharmacy.id}
-                pharmacyName={pharmacy.name}
+                pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}
                 postcode={pharmacy.postcode}
                 lat={pharmacy.lat}
                 lng={pharmacy.lng}
@@ -670,7 +670,7 @@ function MyPharmacy() {
 
             {/* Local landscape */}
             <LocalLandscape
-              pharmacyName={pharmacy.name}
+              pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}
               postcode={pharmacy.postcode}
               address={pharmacy.address}
             />
@@ -679,7 +679,7 @@ function MyPharmacy() {
             <MarketShareSection
               pharmacyId={pharmacy.id}
               pharmacyOds={pharmacy.ods_code}
-              pharmacyName={pharmacy.name}
+              pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}
               lat={pharmacy.lat}
               lng={pharmacy.lng}
             />

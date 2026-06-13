@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Stethoscope, Pill, Loader2, GitCompare } from "lucide-react";
 import { GPPracticeDialog } from "@/components/GPPracticeDialog";
+import { pharmacyDisplayName } from "@/lib/pharmacyName";
 
 type Props = {
   pharmacyName: string;
@@ -14,6 +15,7 @@ type NearbyPharmacy = {
   id: string;
   ods_code: string;
   name: string;
+  trading_name: string | null;
   address: string | null;
   postcode: string | null;
   distance_m: number;
@@ -194,7 +196,7 @@ export function LocalLandscape({ pharmacyName, postcode, address }: Props) {
                     className="block flex-1 min-w-0"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <p className="font-medium text-sm">{p.name}</p>
+                      <p className="font-medium text-sm">{pharmacyDisplayName(p.name, p.trading_name)}</p>
                       <span className="text-xs text-muted-foreground shrink-0 flex items-center gap-1">
                         <MapPin className="h-3 w-3" /> {fmtDist(p.distance_m)}
                       </span>
@@ -209,7 +211,7 @@ export function LocalLandscape({ pharmacyName, postcode, address }: Props) {
                     search={{ add: p.ods_code }}
                     className="shrink-0 inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
                     title="Add to comparison"
-                    aria-label={`Add ${p.name} to comparison`}
+                    aria-label={`Add ${pharmacyDisplayName(p.name, p.trading_name)} to comparison`}
                   >
                     <GitCompare className="h-3 w-3" /> Compare
                   </Link>

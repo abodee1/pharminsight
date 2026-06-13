@@ -6,12 +6,13 @@ import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Star, Trash2, GitCompare, Loader2, Printer } from "lucide-react";
 import { toast } from "sonner";
+import { pharmacyDisplayName } from "@/lib/pharmacyName";
 
 export const Route = createFileRoute("/_authenticated/my-analyses")({ component: MyAnalyses });
 
 type Row = {
   id: string; pharmacy_id: string; notes: string | null; is_shortlisted: boolean; created_at: string;
-  pharmacy: { id: string; ods_code: string; name: string; address: string | null; postcode: string | null; region: string | null; country: string | null } | null;
+  pharmacy: { id: string; ods_code: string; name: string; trading_name: string | null; address: string | null; postcode: string | null; region: string | null; country: string | null } | null;
   items_last: number; income_est: number; turnover: number | null;
   net_margin: number | null; eps_rate: number | null; red_flags: number; valuation_mid: number | null;
 };
@@ -28,7 +29,7 @@ function MyAnalyses() {
       setLoading(true);
       const { data: sa } = await supabase
         .from("saved_analyses")
-        .select("id,pharmacy_id,notes,is_shortlisted,created_at,pharmacies(id,ods_code,name,address,postcode,region,country)")
+        .select("id,pharmacy_id,notes,is_shortlisted,created_at,pharmacies(id,ods_code,name,trading_name,address,postcode,region,country)")
         .eq("user_id", user.id).order("created_at", { ascending: false });
       const list = (sa || []) as any[];
       const enriched: Row[] = [];
@@ -110,7 +111,7 @@ function MyAnalyses() {
               {rows.map((r) => (
                 <tr key={r.id} className="border-t border-border">
                   <td className="px-4 py-3">
-                    <Link to="/pharmacy/$odsCode" params={{ odsCode: r.pharmacy?.ods_code || "" }} className="font-medium hover:underline">{r.pharmacy?.name}</Link>
+                    <Link to="/pharmacy/$odsCode" params={{ odsCode: r.pharmacy?.ods_code || "" }} className="font-medium hover:underline">{r.pharmacy ? pharmacyDisplayName(r.pharmacy.name, r.pharmacy.trading_name) : ""}</Link>
                     <p className="text-xs text-muted-foreground">{r.pharmacy?.region} · {r.pharmacy?.country}</p>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{r.items_last.toLocaleString()}</td>
@@ -150,7 +151,7 @@ function CompareTable({ rows }: { rows: Row[] }) {
       <table className="w-full text-sm">
         <thead className="bg-secondary text-muted-foreground"><tr>
           <th className="text-left px-4 py-2 font-medium">Metric</th>
-          {rows.map((r) => <th key={r.id} className="text-right px-4 py-2 font-medium truncate max-w-[180px]">{r.pharmacy?.name}</th>)}
+          {rows.map((r) => <th key={r.id} className="text-right px-4 py-2 font-medium truncate max-w-[180px]">{r.pharmacy ? pharmacyDisplayName(r.pharmacy.name, r.pharmacy.trading_name) : ""}</th>)}
         </tr></thead>
         <tbody>
           {metrics.map((m) => (

@@ -436,6 +436,7 @@ function DataIngestionAdmin() {
   const [freshness, setFreshness] = useState<FreshnessRow[]>([]);
   const [schemaAlerts, setSchemaAlerts] = useState<SchemaAlertRow[]>([]);
   const [checkingFreshness, setCheckingFreshness] = useState(false);
+  const [backfillingOds, setBackfillingOds] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
@@ -558,6 +559,26 @@ function DataIngestionAdmin() {
     return { total: totals.length, healthy, failing, queued, records30 };
   }, [statsBySource]);
 
+  const runOdsBackfill = async () => {
+    setBackfillingOds(true);
+    toast.info("Running ODS name backfill — this may take a minute…");
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      const res = await fetch(`/api/public/hooks/ingest-ods-names`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(humanizeHookError(j, res.status));
+      toast.success(`ODS backfill done: ${j.updated ?? 0} updated, ${j.found ?? 0} found with code-as-name`);
+    } catch (e: any) {
+      toast.error("ODS backfill failed", { description: friendlyMessage(e), duration: 12000 });
+    } finally {
+      setBackfillingOds(false);
+    }
+  };
+
   const triggerHook = async (ds: Dataset) => {
     setRunning((s) => ({ ...s, [ds.source]: true }));
     toast.info(`Triggering ${ds.label}…`);
@@ -599,6 +620,9 @@ function DataIngestionAdmin() {
         <div className="flex items-center gap-2 flex-wrap">
           <Button variant="default" size="sm" onClick={triggerFreshness} disabled={checkingFreshness}>
             {checkingFreshness ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radar className="h-4 w-4" />} Run change-detection
+          </Button>
+          <Button variant="outline" size="sm" onClick={runOdsBackfill} disabled={backfillingOds} title="Fix pharmacies whose name was stored as their ODS code">
+            {backfillingOds ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />} Fix ODS names
           </Button>
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Refresh

@@ -21,6 +21,7 @@ import {
   PieChart, Pie, Cell,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { pharmacyDisplayName } from "@/lib/pharmacyName";
 
 export const Route = createFileRoute("/_authenticated/compare")({
   component: Compare,
@@ -156,7 +157,7 @@ function appliesToCountry(applies: Applies, country: string | null | undefined) 
   return !isScot(country);
 }
 
-type Pharm = { id: string; name: string; region: string | null; country: string | null; postcode: string | null; lat?: number | null; lng?: number | null };
+type Pharm = { id: string; name: string; trading_name?: string | null; region: string | null; country: string | null; postcode: string | null; lat?: number | null; lng?: number | null };
 type Row = {
   pharmacy_id: string; month: number; year: number;
   items_dispensed: number; nms_count: number; pharmacy_first_count: number;
@@ -290,7 +291,7 @@ function Compare() {
       }
       if (!subjectId) return;
       const { data: ph } = await supabase
-        .from("pharmacies").select("id,name,region,country,postcode,lat,lng")
+        .from("pharmacies").select("id,name,trading_name,region,country,postcode,lat,lng")
         .eq("id", subjectId).maybeSingle();
       if (ph) {
         setPharms(cur => cur.some(x => x.id === ph.id) ? cur : [...cur, ph as Pharm]);
@@ -304,7 +305,7 @@ function Compare() {
     if (!addOds) return;
     (async () => {
       const { data: ph } = await supabase
-        .from("pharmacies").select("id,name,region,country,postcode,lat,lng")
+        .from("pharmacies").select("id,name,trading_name,region,country,postcode,lat,lng")
         .eq("ods_code", addOds).maybeSingle();
       if (ph) {
         setPharms(cur => cur.some(x => x.id === ph.id) ? cur : [...cur, ph as Pharm]);
@@ -478,7 +479,7 @@ function Compare() {
     return selectedPharms.map(ph => {
       const phRows = rows.filter(r => r.pharmacy_id === ph.id && windowPeriods.has(periodKey(r)));
       const total = phRows.reduce((s, r) => s + (r.items_dispensed || 0), 0);
-      return { id: ph.id, name: ph.name, value: total };
+      return { id: ph.id, name: pharmacyDisplayName(ph.name, ph.trading_name), value: total };
     });
   }, [selectedPharms, rows, windowPeriods]);
   const itemsTotal = itemsShare.reduce((s, x) => s + x.value, 0);
@@ -510,7 +511,7 @@ function Compare() {
   function exportCsv() {
     const aggLabel = aggMode === "latest" ? "Latest" : aggMode === "total" ? "Total" : "Monthly avg";
     const lines: string[] = [];
-    const header = ["Metric", "Group", ...selectedPharms.flatMap(ph => [`"${ph.name}" ${aggLabel}`, `${ph.name} YoY%`])];
+    const header = ["Metric", "Group", ...selectedPharms.flatMap(ph => { const dn = pharmacyDisplayName(ph.name, ph.trading_name); return [`"${dn}" ${aggLabel}`, `${dn} YoY%`]; })];
     lines.push(header.join(","));
     visibleMetrics.forEach(mt => {
       const row = [`"${mt.label}"`, mt.group];
@@ -547,14 +548,14 @@ function Compare() {
                 excludeIds={selected}
                 clearOnSelect
                 suggestions={nearbyPharms}
-                suggestionsLabel={selectedPharms[0] ? `Nearby ${selectedPharms[0].name}` : "Nearby pharmacies"}
+                suggestionsLabel={selectedPharms[0] ? `Nearby ${pharmacyDisplayName(selectedPharms[0].name, selectedPharms[0].trading_name)}` : "Nearby pharmacies"}
                 onSelect={async (p) => {
                   if (selected.includes(p.id) || selected.length >= MAX_SELECT) return;
                   const { data: geo } = await supabase
                     .from("pharmacies").select("lat,lng").eq("id", p.id).maybeSingle();
                   setPharms(cur =>
                     cur.some(x => x.id === p.id) ? cur :
-                    [...cur, { id: p.id, name: p.name, region: p.region ?? null, country: p.country ?? null, postcode: p.postcode ?? null, lat: geo?.lat ?? null, lng: geo?.lng ?? null }]
+                    [...cur, { id: p.id, name: p.name, trading_name: p.trading_name ?? null, region: p.region ?? null, country: p.country ?? null, postcode: p.postcode ?? null, lat: geo?.lat ?? null, lng: geo?.lng ?? null }]
                   );
                   setSelected(cur => [...cur, p.id]);
                 }}
@@ -573,7 +574,7 @@ function Compare() {
               <span key={ph.id}
                 className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary pl-3 pr-1 py-1 text-sm max-w-full">
                 <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: colorFor(ph.id) }} />
-                <span className="font-medium truncate max-w-[180px]">{ph.name}</span>
+                <span className="font-medium truncate max-w-[180px]">{pharmacyDisplayName(ph.name, ph.trading_name)}</span>
                 <CountryBadge country={ph.country} />
                 {ph.region && <span className="text-xs text-muted-foreground truncate max-w-[100px]">{ph.region}</span>}
                 <button onClick={() => remove(ph.id)} className="ml-1 rounded-full p-1 hover:bg-background" aria-label="Remove">
@@ -665,7 +666,7 @@ function Compare() {
                     style={{ borderTop: `3px solid ${colorFor(ph.id)}` }}>
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold truncate">{ph.name}</p>
+                        <p className="text-sm font-semibold truncate">{pharmacyDisplayName(ph.name, ph.trading_name)}</p>
                         <p className="text-[11px] text-muted-foreground truncate">{ph.region}</p>
                       </div>
                       {wins > 0 && (
@@ -714,7 +715,7 @@ function Compare() {
                   {selectedPharms.map(ph => (
                     <span key={ph.id} className="inline-flex items-center gap-1.5">
                       <span className="h-2 w-4 rounded-sm" style={{ background: colorFor(ph.id) }} />
-                      <span className="text-muted-foreground truncate max-w-[100px]">{ph.name}</span>
+                      <span className="text-muted-foreground truncate max-w-[100px]">{pharmacyDisplayName(ph.name, ph.trading_name)}</span>
                     </span>
                   ))}
                 </div>
@@ -746,7 +747,7 @@ function Compare() {
                       contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
                       formatter={(v: number, _name: string, ctx: any) => {
                         const ph = pharms.find(p => p.id === ctx.dataKey);
-                        return [trendMetricDef.format(v), ph?.name ?? ctx.dataKey];
+                        return [trendMetricDef.format(v), ph ? pharmacyDisplayName(ph.name, ph.trading_name) : ctx.dataKey];
                       }}
                     />
                     {selectedPharms
@@ -784,7 +785,7 @@ function Compare() {
                         <th key={ph.id} className="px-3 sm:px-4 py-3 text-[11px] uppercase tracking-wider text-muted-foreground font-semibold text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <span className="h-2 w-2 rounded-full" style={{ background: colorFor(ph.id) }} />
-                            <span className="truncate max-w-[120px]">{ph.name}</span>
+                            <span className="truncate max-w-[120px]">{pharmacyDisplayName(ph.name, ph.trading_name)}</span>
                           </div>
                         </th>
                       ))}
@@ -878,7 +879,7 @@ function Compare() {
                     <div key={ph.id} className="rounded-lg border border-border bg-secondary/30 p-4">
                       <div className="flex items-center gap-2 mb-3">
                         <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: colorFor(ph.id) }} />
-                        <p className="text-xs font-semibold truncate">{ph.name}</p>
+                        <p className="text-xs font-semibold truncate">{pharmacyDisplayName(ph.name, ph.trading_name)}</p>
                       </div>
                       <p className="text-3xl font-bold tabular-nums">
                         {wins}<span className="text-sm text-muted-foreground font-normal">/{total}</span>
@@ -920,7 +921,7 @@ function Compare() {
                         <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
                         <PolarRadiusAxis tick={{ fontSize: 9 }} angle={30} domain={[0, 100]} />
                         {selectedPharms.map(ph => (
-                          <Radar key={ph.id} name={ph.name} dataKey={ph.id}
+                          <Radar key={ph.id} name={pharmacyDisplayName(ph.name, ph.trading_name)} dataKey={ph.id}
                             stroke={colorFor(ph.id)} fill={colorFor(ph.id)} fillOpacity={0.18} />
                         ))}
                         <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
@@ -996,7 +997,7 @@ function Compare() {
                     </div>
                   </div>
                   <GpFeederOverlap
-                    pharms={selectedPharms.map(p => ({ id: p.id, name: p.name, country: p.country }))}
+                    pharms={selectedPharms.map(p => ({ id: p.id, name: pharmacyDisplayName(p.name, p.trading_name), country: p.country }))}
                     colorFor={colorFor}
                     monthsWindow={gpFeederWindow}
                   />
@@ -1008,7 +1009,7 @@ function Compare() {
           {/* ── Competitor geography heatmap ──────────────────────────── */}
           {selectedPharms.some(p => p.lat != null && p.lng != null) && (
             <CompetitorHeatmap
-              pharms={selectedPharms.map(p => ({ id: p.id, name: p.name, country: p.country, lat: p.lat, lng: p.lng }))}
+              pharms={selectedPharms.map(p => ({ id: p.id, name: pharmacyDisplayName(p.name, p.trading_name), country: p.country, lat: p.lat, lng: p.lng }))}
               colorFor={colorFor}
             />
           )}

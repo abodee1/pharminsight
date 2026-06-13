@@ -11,7 +11,7 @@ export const Route = createFileRoute("/_authenticated/acquisition/$odsCode")({
   component: AcquisitionPage,
 });
 
-type Pharmacy = { id: string; ods_code: string; name: string; address: string | null; postcode: string | null; country: string | null; region: string | null };
+type Pharmacy = { id: string; ods_code: string; name: string; trading_name: string | null; address: string | null; postcode: string | null; country: string | null; region: string | null };
 
 function AcquisitionPage() {
   const { odsCode } = Route.useParams();
@@ -26,7 +26,7 @@ function AcquisitionPage() {
     (async () => {
       setBootstrapping(true);
       const { data: p } = await supabase
-        .from("pharmacies").select("id,ods_code,name,address,postcode,country,region")
+        .from("pharmacies").select("id,ods_code,name,trading_name,address,postcode,country,region")
         .eq("ods_code", odsCode.toUpperCase()).maybeSingle();
       setPharmacy(p as Pharmacy | null);
       setBootstrapping(false);

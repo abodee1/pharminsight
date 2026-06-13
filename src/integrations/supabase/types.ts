@@ -979,6 +979,7 @@ export type Database = {
           ods_code: string
           postcode: string
           region: string
+          trading_name: string | null
         }[]
       }
       public_landing_data: { Args: never; Returns: Json }

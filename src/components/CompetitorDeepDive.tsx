@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PharmacySearch, type Pharmacy as SearchPharmacy } from "@/components/PharmacySearch";
+import { pharmacyDisplayName } from "@/lib/pharmacyName";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
@@ -377,7 +378,7 @@ export function CompetitorDeepDive({ pharmacyId, pharmacyOds, pharmacyName, coun
 
   const short = (s: string) => s.length > 22 ? s.slice(0, 22) + "…" : s;
   const myShort    = short(pharmacyName);
-  const theirShort = competitor ? short(competitor.name) : "Competitor";
+  const theirShort = competitor ? short(pharmacyDisplayName(competitor.name, competitor.trading_name)) : "Competitor";
 
   type TallyPair = [keyof Computed, boolean];
   const tallyPairs: TallyPair[] = [
@@ -426,7 +427,7 @@ export function CompetitorDeepDive({ pharmacyId, pharmacyOds, pharmacyName, coun
               <p className="text-center text-base font-black text-muted-foreground">VS</p>
               <div className="min-w-0 text-right">
                 <p className="text-[10px] uppercase tracking-widest font-bold text-amber-600 dark:text-amber-400 mb-1">Them</p>
-                <p className="text-sm font-bold leading-snug">{competitor.name}</p>
+                <p className="text-sm font-bold leading-snug">{pharmacyDisplayName(competitor.name, competitor.trading_name)}</p>
                 {competitor.postcode && <p className="text-[11px] text-muted-foreground mt-0.5">{competitor.postcode}</p>}
               </div>
             </div>

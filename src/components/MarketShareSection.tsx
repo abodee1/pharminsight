@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetchAll";
+import { pharmacyDisplayName } from "@/lib/pharmacyName";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
@@ -25,9 +26,9 @@ const RADIUS_OPTIONS = [
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-type NearbyPharm = { id: string; ods_code: string; name: string; distance_m: number };
+type NearbyPharm = { id: string; ods_code: string; name: string; trading_name: string | null; distance_m: number };
 type PharmTotals = {
-  id: string; ods_code: string; name: string; distance_m: number;
+  id: string; ods_code: string; name: string; trading_name: string | null; distance_m: number;
   last12: number; prev12: number; yoyPct: number | null;
   totalNms: number; totalPf: number; share: number;
 };
@@ -153,11 +154,11 @@ export function MarketShareSection({ pharmacyId, pharmacyOds, pharmacyName, lat,
         // Leaderboard sorted by last 12m items
         const sorted: PharmTotals[] = Array.from(byPharm.entries()).map(([id, data]) => {
           const info = id === pharmacyId
-            ? { ods_code: pharmacyOds, name: pharmacyName, distance_m: 0 }
-            : nearbyPharms.find(p => p.id === id) ?? { ods_code: id, name: id, distance_m: 0 };
+            ? { ods_code: pharmacyOds, name: pharmacyName, trading_name: null as string | null, distance_m: 0 }
+            : nearbyPharms.find(p => p.id === id) ?? { ods_code: id, name: id, trading_name: null as string | null, distance_m: 0 };
           const yoyPct = data.p12 > 0 ? ((data.l12 - data.p12) / data.p12) * 100 : null;
           return {
-            id, ods_code: info.ods_code, name: info.name, distance_m: info.distance_m,
+            id, ods_code: info.ods_code, name: info.name, trading_name: info.trading_name, distance_m: info.distance_m,
             last12: data.l12, prev12: data.p12, yoyPct,
             totalNms: data.lNms, totalPf: data.lPf,
             share: mktL12 > 0 ? (data.l12 / mktL12) * 100 : 0,
@@ -337,11 +338,11 @@ export function MarketShareSection({ pharmacyId, pharmacyOds, pharmacyName, lat,
 
                         <div className="min-w-0">
                           {isMe ? (
-                            <p className="text-xs font-semibold text-primary truncate leading-tight">{p.name} ★</p>
+                            <p className="text-xs font-semibold text-primary truncate leading-tight">{pharmacyDisplayName(p.name, p.trading_name)} ★</p>
                           ) : (
                             <Link to="/pharmacy/$odsCode" params={{ odsCode: p.ods_code }}
                               className="text-xs font-medium truncate leading-tight hover:text-primary hover:underline block">
-                              {p.name}
+                              {pharmacyDisplayName(p.name, p.trading_name)}
                             </Link>
                           )}
                           {/* Mini bar */}
@@ -371,7 +372,7 @@ export function MarketShareSection({ pharmacyId, pharmacyOds, pharmacyName, lat,
                   <div>
                     <p className="text-sm font-semibold">Market opportunity</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {leader.name} leads with {fmtN(leader.last12)} items in the last 12 months — {fmtN(gapItems)} more than you.
+                      {pharmacyDisplayName(leader.name, leader.trading_name)} leads with {fmtN(leader.last12)} items in the last 12 months — {fmtN(gapItems)} more than you.
                     </p>
                   </div>
                 </div>

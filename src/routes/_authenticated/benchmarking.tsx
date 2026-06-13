@@ -18,6 +18,7 @@ import { fmtGbpCompact } from "@/lib/utils";
 import { getViewedPharmacy } from "@/lib/viewedPharmacy";
 import { generateInsight } from "@/lib/insights.functions";
 import { cn } from "@/lib/utils";
+import { pharmacyDisplayName } from "@/lib/pharmacyName";
 
 export const Route = createFileRoute("/_authenticated/benchmarking")({ component: Benchmarking });
 
@@ -326,7 +327,7 @@ function Benchmarking() {
           {pharmacy && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
               <span>Benchmarking</span>
-              <span className="font-semibold text-foreground">{pharmacy.name}</span>
+              <span className="font-semibold text-foreground">{pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}</span>
               <CountryBadge country={pharmacy.country} />
               {pharmacyOverride && (
                 <button type="button" onClick={() => { setPharmacyOverride(null); setPharmacy(null); }}
@@ -390,7 +391,7 @@ function Benchmarking() {
               {/* Context bar */}
               <div className="rounded-lg bg-card border border-border px-5 py-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-base font-semibold">{pharmacy.name}</p>
+                  <p className="text-base font-semibold">{pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}</p>
                   <p className="text-sm text-muted-foreground">
                     {pharmacy.region} · {pharmacy.country} · {regionAggs.length.toLocaleString()} regional / {cohortAggs.length.toLocaleString()} national pharmacies
                   </p>
@@ -435,7 +436,7 @@ function Benchmarking() {
                   <h2 className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Market position</h2>
                   <MarketShareSection
                     pharmacyId={pharmacy.id} pharmacyOds={pharmacy.ods_code}
-                    pharmacyName={pharmacy.name} lat={pharmacy.lat} lng={pharmacy.lng}
+                    pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)} lat={pharmacy.lat} lng={pharmacy.lng}
                   />
                 </section>
               )}

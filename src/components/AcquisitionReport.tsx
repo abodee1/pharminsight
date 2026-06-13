@@ -1,4 +1,5 @@
 import { Printer, TrendingUp, TrendingDown, Minus, MapPin, Stethoscope, Pill, AlertTriangle, Sparkles, CheckCircle2, Target, Building2, Banknote, Star, ShieldAlert } from "lucide-react";
+import { pharmacyDisplayName } from "@/lib/pharmacyName";
 
 type Opportunity = { title: string; annual_uplift_gbp_low: number; annual_uplift_gbp_high: number; rationale: string };
 type Competitor = { name: string; distance_m: number; threat: "low" | "med" | "high"; note: string };
@@ -76,7 +77,7 @@ function paragraphs(text: string) {
 
 type Props = {
   report: AcquisitionReportData;
-  pharmacy: { name: string; ods_code: string; address: string | null; postcode: string | null; country: string | null; region: string | null };
+  pharmacy: { name: string; trading_name?: string | null; ods_code: string; address: string | null; postcode: string | null; country: string | null; region: string | null };
   generatedAt: string;
 };
 
@@ -101,7 +102,7 @@ export function AcquisitionReport({ report, pharmacy, generatedAt }: Props) {
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] opacity-70">Acquisition intelligence report</p>
-            <h1 className="mt-2 text-3xl md:text-4xl font-bold tracking-tight">{pharmacy.name}</h1>
+            <h1 className="mt-2 text-3xl md:text-4xl font-bold tracking-tight">{pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}</h1>
             <p className="mt-2 text-sm opacity-80">
               {[pharmacy.address, pharmacy.postcode].filter(Boolean).join(", ")}
             </p>
