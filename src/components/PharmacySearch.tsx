@@ -1,152 +1,40 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Search, Loader2, X, Clock } from "lucide-react";
+import { Search, Loader2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { CountryBadge } from "./CountryBadge";
+
 
 export type Pharmacy = {
   id: string;
   ods_code: string;
   name: string;
-  trading_name?: string | null;
   address: string | null;
   postcode: string | null;
   country: string | null;
   region?: string | null;
-  chain_group?: string | null;
 };
+
+const ODS_RE = /^[A-Za-z][A-Za-z0-9]{2,9}$/;
+const POSTCODE_RE = /^[A-Za-z]{1,2}[0-9][A-Za-z0-9]?(\s*[0-9][A-Za-z]{2})?$/;
 
 type Props = {
   compact?: boolean;
   placeholder?: string;
+  /** Override what happens when a result is picked. Default: navigate to /pharmacy/[ods]. */
   onSelect?: (p: Pharmacy) => void;
+  /** Pharmacy ids already chosen — shown with a "Selected" badge and de-prioritised. */
   excludeIds?: string[];
+  /** When false, keep the query after selection (handy for add-multiple flows). Default true. */
   clearOnSelect?: boolean;
   autoFocus?: boolean;
+  /** Pre-loaded suggestions shown when the query is empty (e.g. nearby pharmacies). */
   suggestions?: Pharmacy[];
+  /** Label for the suggestions section header. */
   suggestionsLabel?: string;
 };
 
-// ---- Recent searches helpers ----
-const LS_KEY = "pharminsight_recent_searches";
-const MAX_RECENT = 10;
-
-function getLocalRecent(): Pharmacy[] {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }
-  catch { return []; }
-}
-function saveLocalRecent(p: Pharmacy) {
-  const list = getLocalRecent().filter(r => r.id !== p.id);
-  localStorage.setItem(LS_KEY, JSON.stringify([p, ...list].slice(0, MAX_RECENT)));
-}
-function removeLocalRecentById(id: string) {
-  localStorage.setItem(LS_KEY, JSON.stringify(getLocalRecent().filter(r => r.id !== id)));
-}
-function clearLocalRecent() {
-  localStorage.removeItem(LS_KEY);
-}
-
-// ---- Match highlight ----
-function highlightMatch(text: string, query: string): React.ReactNode {
-  const q = query.trim().toLowerCase();
-  if (!q || q.length < 2) return text;
-  const idx = text.toLowerCase().indexOf(q);
-  if (idx === -1) return text;
-  return (
-    <>
-      {text.slice(0, idx)}
-      <span className="bg-amber-100 dark:bg-amber-900/40 rounded-sm">{text.slice(idx, idx + q.length)}</span>
-      {text.slice(idx + q.length)}
-    </>
-  );
-}
-
-// ---- Unified search via enhanced fuzzy RPC ----
-async function runSearch(term: string): Promise<Pharmacy[]> {
-  if (term.length < 2) return [];
-  const { data, error } = await supabase.rpc("search_pharmacies_fuzzy", {
-    p_query: term,
-    p_limit: 10,
-  });
-  if (error || !data) return [];
-  return (data as any[]).map(r => ({
-    id: r.id,
-    ods_code: r.ods_code,
-    name: r.name,
-    trading_name: r.trading_name ?? null,
-    address: r.address,
-    postcode: r.postcode,
-    country: r.country,
-    region: r.region ?? null,
-    chain_group: r.chain_group ?? null,
-  }));
-}
-
-// ---- Supabase recent search helpers ----
-// Cast to any because the generated types don't reflect the migration until it's applied
-const db = supabase as any;
-
-async function loadDbRecent(userId: string): Promise<Pharmacy[]> {
-  const { data } = await db
-    .from("recent_searches")
-    .select("pharmacy_id,ods_code,name,trading_name,address,postcode,country,region")
-    .eq("user_id", userId)
-    .order("searched_at", { ascending: false })
-    .limit(MAX_RECENT);
-  return ((data as any[]) || []).map(r => ({
-    id: r.pharmacy_id || r.ods_code,
-    ods_code: r.ods_code,
-    name: r.name,
-    trading_name: r.trading_name ?? null,
-    address: r.address,
-    postcode: r.postcode,
-    country: r.country,
-    region: r.region ?? null,
-  }));
-}
-
-async function saveDbRecent(userId: string, p: Pharmacy) {
-  await db.from("recent_searches").upsert(
-    {
-      user_id: userId,
-      pharmacy_id: p.id,
-      ods_code: p.ods_code,
-      name: p.name,
-      trading_name: p.trading_name,
-      address: p.address,
-      postcode: p.postcode,
-      country: p.country,
-      region: p.region,
-      searched_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,ods_code" }
-  );
-  // Trim oldest beyond MAX_RECENT
-  const { data: all } = await db
-    .from("recent_searches")
-    .select("id,searched_at")
-    .eq("user_id", userId)
-    .order("searched_at", { ascending: false });
-  if (all && all.length > MAX_RECENT) {
-    const toDelete = ((all as any[]).slice(MAX_RECENT)).map((r: any) => r.id);
-    await db.from("recent_searches").delete().in("id", toDelete);
-  }
-}
-
-async function removeDbRecent(userId: string, odsCode: string) {
-  await db
-    .from("recent_searches")
-    .delete()
-    .eq("user_id", userId)
-    .eq("ods_code", odsCode);
-}
-
-async function clearDbRecent(userId: string) {
-  await db.from("recent_searches").delete().eq("user_id", userId);
-}
-
-// ---- Main component ----
 export function PharmacySearch({
   compact = false,
   placeholder,
@@ -157,32 +45,25 @@ export function PharmacySearch({
   suggestions,
   suggestionsLabel = "Nearby pharmacies",
 }: Props) {
-  const { user } = useAuth();
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Pharmacy[]>([]);
+  const [fuzzyResults, setFuzzyResults] = useState<Pharmacy[]>([]);
+  const [fuzzyLoading, setFuzzyLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [recentSearches, setRecentSearches] = useState<Pharmacy[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const excludeSet = new Set(excludeIds ?? []);
 
-  // Load recent searches when auth state known
-  useEffect(() => {
-    if (user) {
-      loadDbRecent(user.id).then(setRecentSearches).catch(() => setRecentSearches([]));
-    } else {
-      setRecentSearches(getLocalRecent());
-    }
-  }, [user]);
-
-  // Close on outside click / escape
+  // close on outside click / escape
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("mousedown", onClick);
     document.addEventListener("keydown", onKey);
     return () => {
@@ -195,46 +76,48 @@ export function PharmacySearch({
     if (autoFocus) inputRef.current?.focus();
   }, [autoFocus]);
 
-  // Debounced search
+  // debounced search
   useEffect(() => {
     const term = q.trim();
-    if (term.length < 2) { setResults([]); setLoading(false); return; }
+    if (term.length < 2) {
+      setResults([]);
+      setFuzzyResults([]);
+      setLoading(false);
+      setFuzzyLoading(false);
+      return;
+    }
     setLoading(true);
     const t = setTimeout(() => {
-      runSearch(term).then(setResults).finally(() => setLoading(false));
+      runSearch(term)
+        .then((r) => setResults(r))
+        .finally(() => setLoading(false));
     }, 300);
     return () => clearTimeout(t);
   }, [q]);
 
-  const saveRecent = useCallback((p: Pharmacy) => {
-    if (user) {
-      saveDbRecent(user.id, p).catch(() => {});
-    } else {
-      saveLocalRecent(p);
+  const runFuzzySearch = async () => {
+    const term = q.trim();
+    if (term.length < 2) return;
+    setFuzzyLoading(true);
+    setFuzzyResults([]);
+    try {
+      const { data, error } = await supabase.rpc("search_pharmacies_fuzzy", {
+        p_query: term,
+        p_limit: 10,
+      });
+      if (error) throw error;
+      const existing = new Set(results.map((r) => r.id));
+      const extras = ((data || []) as Pharmacy[]).filter((r) => !existing.has(r.id));
+      setFuzzyResults(extras);
+      if (extras.length === 0) toast.info("No close matches found.");
+    } catch (e: any) {
+      toast.error(e?.message || "Fuzzy search failed.");
+    } finally {
+      setFuzzyLoading(false);
     }
-    setRecentSearches(prev => [p, ...prev.filter(r => r.id !== p.id)].slice(0, MAX_RECENT));
-  }, [user]);
-
-  const removeRecent = useCallback((p: Pharmacy) => {
-    if (user) {
-      removeDbRecent(user.id, p.ods_code).catch(() => {});
-    } else {
-      removeLocalRecentById(p.id);
-    }
-    setRecentSearches(prev => prev.filter(r => r.id !== p.id));
-  }, [user]);
-
-  const clearAllRecent = useCallback(() => {
-    if (user) {
-      clearDbRecent(user.id).catch(() => {});
-    } else {
-      clearLocalRecent();
-    }
-    setRecentSearches([]);
-  }, [user]);
+  };
 
   const handleSelect = (p: Pharmacy) => {
-    saveRecent(p);
     if (onSelect) {
       onSelect(p);
     } else {
@@ -244,14 +127,11 @@ export function PharmacySearch({
       setOpen(false);
       setQ("");
       setResults([]);
+      setFuzzyResults([]);
     } else {
       inputRef.current?.focus();
     }
   };
-
-  const showRecent = open && q.trim().length < 2 && recentSearches.length > 0;
-  const showSuggestions = open && q.trim().length < 2 && suggestions && suggestions.length > 0 && recentSearches.length === 0;
-  const showResults = open && q.trim().length >= 2;
 
   return (
     <div ref={containerRef} className="relative w-full">
@@ -261,10 +141,13 @@ export function PharmacySearch({
           ref={inputRef}
           type="text"
           value={q}
-          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setOpen(true);
+          }}
           onFocus={() => setOpen(true)}
           placeholder={
-            placeholder ?? (compact ? "Search pharmacies…" : "Search by name, postcode, or ODS code...")
+            placeholder ?? (compact ? "Search pharmacies…" : "Search by pharmacy name, postcode, or ODS code...")
           }
           className="w-full h-9 rounded-md border border-input bg-background text-foreground pl-9 pr-9 text-sm placeholder:text-muted-foreground caret-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
@@ -273,149 +156,236 @@ export function PharmacySearch({
         )}
       </div>
 
-      {/* Recent searches panel */}
-      {showRecent && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground shadow-lg max-h-[60vh] overflow-y-auto overscroll-contain">
-          <div className="flex items-center justify-between px-3 pt-2.5 pb-1.5 border-b border-border/50">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Recent searches</p>
-            <button
-              onMouseDown={e => e.preventDefault()}
-              onClick={clearAllRecent}
-              className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Clear all
-            </button>
-          </div>
-          {recentSearches.filter(p => !excludeSet.has(p.id)).map(p => {
-            const displayName = p.trading_name || p.name;
-            const showLegal = p.trading_name && p.trading_name !== p.name;
-            return (
-              <div key={p.id} className="flex items-stretch border-b border-border/50 last:border-0">
-                <button
-                  onMouseDown={e => e.preventDefault()}
-                  onClick={() => handleSelect(p)}
-                  className="flex-1 text-left flex items-center gap-2.5 px-3 py-2.5 hover:bg-accent hover:text-accent-foreground transition-colors min-w-0"
-                >
-                  <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="font-medium text-sm truncate">{displayName}</p>
-                      <CountryBadge country={p.country} />
-                    </div>
-                    {showLegal && (
-                      <p className="text-[11px] text-muted-foreground truncate">{p.name}</p>
-                    )}
-                    {p.postcode && (
-                      <p className="text-xs text-muted-foreground truncate">{p.postcode}</p>
-                    )}
-                  </div>
-                </button>
-                <button
-                  onMouseDown={e => e.preventDefault()}
-                  onClick={() => removeRecent(p)}
-                  className="px-3 text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                  aria-label="Remove from recent searches"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            );
-          })}
-          {/* Fall through to suggestions below recent */}
-          {suggestions && suggestions.length > 0 && (
-            <>
-              <p className="px-3 pt-2.5 pb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold border-b border-border/50">
-                {suggestionsLabel}
-              </p>
-              {suggestions.filter(p => !excludeSet.has(p.id)).slice(0, 5).map(p => (
-                <PharmResultRow key={p.id} p={p} query="" already={false} onSelect={() => handleSelect(p)} />
-              ))}
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Nearby suggestions panel (no recent searches yet) */}
-      {showSuggestions && (
+      {/* Suggestions panel — shown when query is empty and suggestions provided */}
+      {open && q.trim().length < 2 && suggestions && suggestions.length > 0 && (
         <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground shadow-lg max-h-[60vh] overflow-y-auto overscroll-contain">
           <p className="px-3 pt-2.5 pb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold border-b border-border/50">
             {suggestionsLabel}
           </p>
-          {suggestions!.filter(p => !excludeSet.has(p.id)).slice(0, 8).map(p => (
-            <PharmResultRow key={p.id} p={p} query="" already={false} onSelect={() => handleSelect(p)} />
+          {suggestions.filter(p => !excludeSet.has(p.id)).slice(0, 8).map((p) => (
+            <button
+              key={p.id}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => handleSelect(p)}
+              className="w-full text-left flex items-center gap-3 px-3 py-2.5 border-b border-border/50 last:border-b-0 hover:bg-accent hover:text-accent-foreground"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-sm truncate">{p.name}</p>
+                  <CountryBadge country={p.country} />
+                </div>
+                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                  {[p.address, p.postcode].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+              <span className="text-xs font-mono text-muted-foreground shrink-0">{p.ods_code}</span>
+            </button>
           ))}
         </div>
       )}
 
-      {/* Search results panel */}
-      {showResults && (
+      {open && q.trim().length >= 2 && (
         <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground shadow-lg max-h-[60vh] overflow-y-auto overscroll-contain">
           {!loading && results.length === 0 && (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-              No results found — try a different spelling or postcode
+              No pharmacies found. Try a different name or postcode.
             </p>
           )}
-          {results.map(p => {
+          {results.slice(0, 10).map((p) => {
             const already = excludeSet.has(p.id);
             return (
-              <PharmResultRow
+              <button
                 key={p.id}
-                p={p}
-                query={q}
-                already={already}
-                onSelect={() => !already && handleSelect(p)}
-              />
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => !already && handleSelect(p)}
+                disabled={already}
+                className={[
+                  "w-full text-left flex items-center gap-3 px-3 py-2.5 border-b border-border/50 last:border-b-0",
+                  already
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-accent hover:text-accent-foreground",
+                ].join(" ")}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-sm truncate">{p.name}</p>
+                    <CountryBadge country={p.country} />
+                    {already && (
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1.5 py-0.5">
+                        Selected
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {[p.address, p.postcode, p.region].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+                <span className="text-xs font-mono text-muted-foreground shrink-0">{p.ods_code}</span>
+              </button>
             );
           })}
+
+          {/* Fuzzy match fallback */}
+          <div className="border-t border-border bg-secondary/30">
+            {fuzzyResults.length === 0 ? (
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={runFuzzySearch}
+                disabled={fuzzyLoading}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                {fuzzyLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                {fuzzyLoading ? "Searching…" : `Can't find it? Try a fuzzy match for "${q.trim()}"`}
+              </button>
+            ) : (
+              <>
+                <p className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                  <Sparkles className="h-3 w-3" /> Fuzzy matches
+                </p>
+                {fuzzyResults.map((p) => {
+                  const already = excludeSet.has(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => !already && handleSelect(p)}
+                      disabled={already}
+                      className={[
+                        "w-full text-left flex items-center gap-3 px-3 py-2.5 border-t border-border/30",
+                        already ? "opacity-50 cursor-not-allowed" : "hover:bg-accent hover:text-accent-foreground",
+                      ].join(" ")}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-sm truncate">{p.name}</p>
+                          <CountryBadge country={p.country} />
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          {[p.address, p.postcode, p.region].filter(Boolean).join(" · ")}
+                        </p>
+                      </div>
+                      <span className="text-xs font-mono text-muted-foreground shrink-0">{p.ods_code}</span>
+                    </button>
+                  );
+                })}
+              </>
+            )}
+          </div>
+
         </div>
       )}
     </div>
   );
 }
 
-// ---- Shared result row ----
-function PharmResultRow({
-  p, query, already, onSelect,
-}: { p: Pharmacy; query: string; already: boolean; onSelect: () => void }) {
-  const displayName = p.trading_name || p.name;
-  const showLegal = p.trading_name && p.trading_name !== p.name;
-  return (
-    <button
-      onMouseDown={e => e.preventDefault()}
-      onClick={onSelect}
-      disabled={already}
-      className={[
-        "w-full text-left flex items-center gap-3 px-3 py-2.5 border-b border-border/50 last:border-0",
-        already
-          ? "opacity-50 cursor-not-allowed"
-          : "hover:bg-accent hover:text-accent-foreground",
-      ].join(" ")}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <p className="font-semibold text-sm truncate">
-            {query.trim().length >= 2 ? highlightMatch(displayName, query) : displayName}
-          </p>
-          <CountryBadge country={p.country} />
-          {p.chain_group && (
-            <span className="text-[10px] bg-secondary text-muted-foreground px-1.5 py-0.5 rounded shrink-0">
-              {p.chain_group}
-            </span>
-          )}
-          {already && (
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1.5 py-0.5 shrink-0">
-              Selected
-            </span>
-          )}
-        </div>
-        {showLegal && (
-          <p className="text-[11px] text-muted-foreground truncate">{p.name}</p>
-        )}
-        <p className="text-xs text-muted-foreground truncate mt-0.5">
-          {[p.address, p.postcode].filter(Boolean).join(" · ")}
-        </p>
-      </div>
-      <span className="text-xs font-mono text-muted-foreground shrink-0">{p.ods_code}</span>
-    </button>
-  );
+async function runSearch(term: string): Promise<Pharmacy[]> {
+  const cols = "id,ods_code,name,address,postcode,country,region";
+  const looksLikeOds = ODS_RE.test(term);
+  const looksLikePostcode = POSTCODE_RE.test(term);
+  const upper = term.toUpperCase();
+  const esc = (s: string) => s.replace(/[%_,()]/g, " ").trim();
+
+  const queries: PromiseLike<Pharmacy[]>[] = [];
+
+  // 1. Exact ODS match
+  if (looksLikeOds) {
+    queries.push(
+      supabase.from("pharmacies").select(cols).eq("ods_code", upper).limit(1).then((r) => (r.data || []) as Pharmacy[])
+    );
+  }
+
+  // 2. Postcode prefix (also try with whitespace stripped, since stored postcodes
+  // sometimes lack the space e.g. "KY112RA")
+  if (looksLikePostcode || /^[A-Za-z]{1,2}[0-9]/.test(term)) {
+    const compact = term.replace(/\s+/g, "");
+    queries.push(
+      supabase
+        .from("pharmacies")
+        .select(cols)
+        .or(`postcode.ilike.${esc(term)}%,postcode.ilike.${esc(compact)}%`)
+        .order("postcode", { ascending: true })
+        .limit(20)
+        .then((r) => (r.data || []) as Pharmacy[])
+    );
+  }
+
+  // 3. Tokenised multi-word search. Each token must appear in at least one of
+  // name/address/postcode/region. We seed with the most distinctive token
+  // (longest) via an OR filter, then AND the rest in-memory.
+  const tokens = term.split(/\s+/).map(esc).filter((t) => t.length >= 2);
+  if (tokens.length) {
+    const seed = [...tokens].sort((a, b) => b.length - a.length)[0];
+    queries.push(
+      supabase
+        .from("pharmacies")
+        .select(cols)
+        .or(
+          `name.ilike.%${seed}%,address.ilike.%${seed}%,postcode.ilike.%${seed}%,region.ilike.%${seed}%`,
+        )
+        .limit(200)
+        .then((r) => {
+          const rows = (r.data || []) as Pharmacy[];
+          const lowers = tokens.map((t) => t.toLowerCase());
+          return rows.filter((p) => {
+            const hay = [p.name, p.address, p.postcode, (p as any).region]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase();
+            return lowers.every((t) => hay.includes(t));
+          });
+        })
+    );
+  }
+
+  // 4. ODS prefix (fallback)
+  if (!looksLikeOds && /^[A-Za-z][A-Za-z0-9]/.test(term) && !term.includes(" ")) {
+    queries.push(
+      supabase
+        .from("pharmacies")
+        .select(cols)
+        .ilike("ods_code", `${upper}%`)
+        .limit(10)
+        .then((r) => (r.data || []) as Pharmacy[])
+    );
+  }
+
+  const all = await Promise.all(queries);
+
+  // dedupe by id, preserve priority order
+  const seen = new Set<string>();
+  const merged: Pharmacy[] = [];
+  const lowerTerm = term.toLowerCase();
+  for (const list of all) {
+    for (const p of list) {
+      if (seen.has(p.id)) continue;
+      seen.add(p.id);
+      merged.push(p);
+    }
+  }
+
+  // Re-rank name results so starts-with beats contains
+  merged.sort((a, b) => {
+    const aRank = rank(a, lowerTerm, upper);
+    const bRank = rank(b, lowerTerm, upper);
+    return aRank - bRank;
+  });
+
+  return merged.slice(0, 8);
+}
+
+function rank(p: Pharmacy, lower: string, upper: string): number {
+  if (p.ods_code?.toUpperCase() === upper) return 0;
+  const pc = (p.postcode || "").toLowerCase().replace(/\s+/g, "");
+  const t = lower.replace(/\s+/g, "");
+  if (pc === t) return 1;
+  if (pc.startsWith(t)) return 2;
+  const name = (p.name || "").toLowerCase();
+  if (name.startsWith(lower)) return 3;
+  if (name.includes(lower)) return 4;
+  if (p.ods_code?.toUpperCase().startsWith(upper)) return 5;
+  return 6;
 }
