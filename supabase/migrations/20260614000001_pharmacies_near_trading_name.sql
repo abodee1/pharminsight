@@ -1,3 +1,6 @@
+-- Ensure trading_name column exists before the function references it
+ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS trading_name text;
+
 -- Add trading_name to pharmacies_near RPC return so UI can apply proper display names
 CREATE OR REPLACE FUNCTION public.pharmacies_near(
   p_lat double precision,

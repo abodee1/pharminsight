@@ -108,11 +108,20 @@ function PharmacyProfile() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const { data: p } = await supabase
+      let { data: p, error: pErr } = await supabase
         .from("pharmacies")
         .select("id,ods_code,name,trading_name,address,postcode,region,country,lat,lng")
         .eq("ods_code", odsCode.toUpperCase())
         .maybeSingle();
+      // Fallback: if trading_name column doesn't exist yet, retry without it
+      if (pErr) {
+        const { data: p2 } = await supabase
+          .from("pharmacies")
+          .select("id,ods_code,name,address,postcode,region,country,lat,lng")
+          .eq("ods_code", odsCode.toUpperCase())
+          .maybeSingle();
+        p = p2 as any;
+      }
       setPharmacy((p as Pharmacy) || null);
       if (p) {
         const { data: d } = await supabase

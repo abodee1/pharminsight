@@ -285,18 +285,24 @@ export function PharmacySearch({
 }
 
 async function runSearch(term: string): Promise<Pharmacy[]> {
+  // Prefer trading_name; fall back gracefully if the column isn't in the DB yet
   const cols = "id,ods_code,name,trading_name,address,postcode,country,region";
+  const colsFallback = "id,ods_code,name,address,postcode,country,region";
   const looksLikeOds = ODS_RE.test(term);
   const looksLikePostcode = POSTCODE_RE.test(term);
   const upper = term.toUpperCase();
   const esc = (s: string) => s.replace(/[%_,()]/g, " ").trim();
+
+  // Test whether trading_name column exists with a cheap probe query
+  const probe = await supabase.from("pharmacies").select(cols).limit(0);
+  const activeCols = probe.error ? colsFallback : cols;
 
   const queries: PromiseLike<Pharmacy[]>[] = [];
 
   // 1. Exact ODS match
   if (looksLikeOds) {
     queries.push(
-      supabase.from("pharmacies").select(cols).eq("ods_code", upper).limit(1).then((r) => (r.data || []) as Pharmacy[])
+      supabase.from("pharmacies").select(activeCols).eq("ods_code", upper).limit(1).then((r) => (r.data || []) as Pharmacy[])
     );
   }
 
@@ -307,7 +313,7 @@ async function runSearch(term: string): Promise<Pharmacy[]> {
     queries.push(
       supabase
         .from("pharmacies")
-        .select(cols)
+        .select(activeCols)
         .or(`postcode.ilike.${esc(term)}%,postcode.ilike.${esc(compact)}%`)
         .order("postcode", { ascending: true })
         .limit(20)
@@ -324,7 +330,7 @@ async function runSearch(term: string): Promise<Pharmacy[]> {
     queries.push(
       supabase
         .from("pharmacies")
-        .select(cols)
+        .select(activeCols)
         .or(
           `name.ilike.%${seed}%,address.ilike.%${seed}%,postcode.ilike.%${seed}%,region.ilike.%${seed}%`,
         )
@@ -348,7 +354,7 @@ async function runSearch(term: string): Promise<Pharmacy[]> {
     queries.push(
       supabase
         .from("pharmacies")
-        .select(cols)
+        .select(activeCols)
         .ilike("ods_code", `${upper}%`)
         .limit(10)
         .then((r) => (r.data || []) as Pharmacy[])
