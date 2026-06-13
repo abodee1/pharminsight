@@ -81,10 +81,22 @@ function Leaderboards() {
   useEffect(() => {
     (async () => {
       setLoading(true);
+      const fetchPharms = async (): Promise<Pharm[]> => {
+        try {
+          return await fetchAll<Pharm>((from, to) =>
+            supabase.from("pharmacies").select("id,name,trading_name,region,country,postcode").eq("country", country).range(from, to)
+          );
+        } catch {
+          // trading_name column may not exist yet — fall back without it
+          const rows = await fetchAll<Omit<Pharm, "trading_name">>((from, to) =>
+            supabase.from("pharmacies").select("id,name,region,country,postcode").eq("country", country).range(from, to)
+          );
+          return rows.map((r) => ({ ...r, trading_name: null }));
+        }
+      };
+
       const [pData, last, upData] = await Promise.all([
-        fetchAll<Pharm>((from, to) =>
-          supabase.from("pharmacies").select("id,name,trading_name,region,country,postcode").eq("country", country).range(from, to)
-        ),
+        fetchPharms(),
         getLatestSubstantialPeriod(),
         user ? supabase.from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null }),
       ]);

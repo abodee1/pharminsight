@@ -86,10 +86,18 @@ function MyPharmacy() {
         .from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle();
       if (!up) { setNoPharmacy(true); setLoading(false); return; }
       setNoPharmacy(false);
-      const { data: p } = await supabase
+      let { data: p, error: pErr } = await supabase
         .from("pharmacies")
         .select("id,ods_code,name,trading_name,address,postcode,region,country,lat,lng")
         .eq("id", up.pharmacy_id).maybeSingle();
+      if (pErr) {
+        // trading_name column may not exist yet — retry without it
+        const { data: p2 } = await supabase
+          .from("pharmacies")
+          .select("id,ods_code,name,address,postcode,region,country,lat,lng")
+          .eq("id", up.pharmacy_id).maybeSingle();
+        p = p2 as any;
+      }
       const ph = (p as Pharmacy) || null;
       setPharmacy(ph);
       if (ph) {

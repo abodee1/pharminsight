@@ -155,7 +155,10 @@ function ResultRow({
   onSelect: (p: Pharmacy) => void;
 }) {
   const displayName = pharmacyDisplayName(p.name, p.trading_name);
-  const location = [p.address, p.postcode].filter(Boolean).join(", ");
+  // Address line: street + postcode
+  const addressLine = [p.address, p.postcode].filter(Boolean).join(", ");
+  // Right-side area: region or outer postcode district (e.g. "SW1A")
+  const area = p.region || p.postcode?.split(" ")[0] || "";
 
   return (
     <button
@@ -179,11 +182,13 @@ function ResultRow({
             </span>
           )}
         </div>
-        {location && (
-          <p className="text-xs text-muted-foreground truncate mt-0.5">{location}</p>
+        {addressLine && (
+          <p className="text-xs text-muted-foreground truncate mt-0.5">{addressLine}</p>
         )}
       </div>
-      <span className="text-[11px] font-mono text-muted-foreground/70 shrink-0">{p.ods_code}</span>
+      {area && (
+        <span className="text-xs text-muted-foreground/80 shrink-0 text-right max-w-[90px] truncate">{area}</span>
+      )}
     </button>
   );
 }
