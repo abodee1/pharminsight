@@ -157,7 +157,7 @@ function appliesToCountry(applies: Applies, country: string | null | undefined) 
   return !isScot(country);
 }
 
-type Pharm = { id: string; name: string; trading_name?: string | null; region: string | null; country: string | null; postcode: string | null; lat?: number | null; lng?: number | null };
+type Pharm = { id: string; ods_code: string; name: string; trading_name?: string | null; region: string | null; country: string | null; postcode: string | null; lat?: number | null; lng?: number | null };
 type Row = {
   pharmacy_id: string; month: number; year: number;
   items_dispensed: number; nms_count: number; pharmacy_first_count: number;
@@ -555,7 +555,7 @@ function Compare() {
                     .from("pharmacies").select("lat,lng").eq("id", p.id).maybeSingle();
                   setPharms(cur =>
                     cur.some(x => x.id === p.id) ? cur :
-                    [...cur, { id: p.id, name: p.name, trading_name: p.trading_name ?? null, region: p.region ?? null, country: p.country ?? null, postcode: p.postcode ?? null, lat: geo?.lat ?? null, lng: geo?.lng ?? null }]
+                    [...cur, { id: p.id, ods_code: p.ods_code, name: p.name, trading_name: p.trading_name ?? null, region: p.region ?? null, country: p.country ?? null, postcode: p.postcode ?? null, lat: geo?.lat ?? null, lng: geo?.lng ?? null }]
                   );
                   setSelected(cur => [...cur, p.id]);
                 }}

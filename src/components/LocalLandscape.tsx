@@ -117,7 +117,7 @@ export function LocalLandscape({ pharmacyName, postcode, address }: Props) {
 
         const selfName = pharmacyName.toLowerCase().trim();
         const pcCompact = postcode.toUpperCase().replace(/\s+/g, "");
-        const others = ((pRes.data ?? []) as NearbyPharmacy[]).filter((p) => {
+        const others = ((pRes.data ?? []) as unknown as NearbyPharmacy[]).filter((p) => {
           const samePc = (p.postcode || "").toUpperCase().replace(/\s+/g, "") === pcCompact;
           const sameName = (p.name || "").toLowerCase().trim() === selfName;
           return !(samePc && sameName);

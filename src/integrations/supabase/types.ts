@@ -979,30 +979,15 @@ export type Database = {
           ods_code: string
           postcode: string
           region: string
-          trading_name: string | null
         }[]
       }
       public_landing_data: { Args: never; Returns: Json }
       public_landing_data_compute: { Args: never; Returns: Json }
       refresh_landing_cache: { Args: never; Returns: undefined }
       search_pharmacies: {
-        Args: { p_query: string; p_limit?: number }
-        Returns: {
-          id: string
-          ods_code: string
-          name: string
-          trading_name: string | null
-          address: string
-          postcode: string
-          country: string
-          region: string
-        }[]
-      }
-      search_pharmacies_fuzzy: {
         Args: { p_limit?: number; p_query: string }
         Returns: {
           address: string
-          chain_group: string | null
           country: string
           id: string
           name: string
@@ -1010,7 +995,20 @@ export type Database = {
           postcode: string
           region: string
           score: number
-          trading_name: string | null
+          trading_name: string
+        }[]
+      }
+      search_pharmacies_fuzzy: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          address: string
+          country: string
+          id: string
+          name: string
+          ods_code: string
+          postcode: string
+          region: string
+          score: number
         }[]
       }
       show_limit: { Args: never; Returns: number }
