@@ -555,7 +555,7 @@ function Compare() {
                     .from("pharmacies").select("lat,lng").eq("id", p.id).maybeSingle();
                   setPharms(cur =>
                     cur.some(x => x.id === p.id) ? cur :
-                    [...cur, { id: p.id, name: p.name, trading_name: p.trading_name ?? null, region: p.region ?? null, country: p.country ?? null, postcode: p.postcode ?? null, lat: geo?.lat ?? null, lng: geo?.lng ?? null }]
+                    [...cur, { id: p.id, ods_code: p.ods_code, name: p.name, trading_name: p.trading_name ?? null, region: p.region ?? null, country: p.country ?? null, postcode: p.postcode ?? null, lat: geo?.lat ?? null, lng: geo?.lng ?? null }]
                   );
                   setSelected(cur => [...cur, p.id]);
                 }}
