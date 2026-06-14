@@ -34,6 +34,7 @@ import { Route as ApiPublicHooksIngestWalesRouteImport } from './routes/api/publ
 import { Route as ApiPublicHooksIngestScotlandGpListsizeRouteImport } from './routes/api/public/hooks/ingest-scotland-gp-listsize'
 import { Route as ApiPublicHooksIngestScotlandGpLinkageRouteImport } from './routes/api/public/hooks/ingest-scotland-gp-linkage'
 import { Route as ApiPublicHooksIngestScotlandGpRouteImport } from './routes/api/public/hooks/ingest-scotland-gp'
+import { Route as ApiPublicHooksIngestScotlandDispenserDetailsRouteImport } from './routes/api/public/hooks/ingest-scotland-dispenser-details'
 import { Route as ApiPublicHooksIngestScotlandRouteImport } from './routes/api/public/hooks/ingest-scotland'
 import { Route as ApiPublicHooksIngestOdsNamesRouteImport } from './routes/api/public/hooks/ingest-ods-names'
 import { Route as ApiPublicHooksIngestNiRouteImport } from './routes/api/public/hooks/ingest-ni'
@@ -180,6 +181,12 @@ const ApiPublicHooksIngestScotlandGpRoute =
     path: '/api/public/hooks/ingest-scotland-gp',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksIngestScotlandDispenserDetailsRoute =
+  ApiPublicHooksIngestScotlandDispenserDetailsRouteImport.update({
+    id: '/api/public/hooks/ingest-scotland-dispenser-details',
+    path: '/api/public/hooks/ingest-scotland-dispenser-details',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksIngestScotlandRoute =
   ApiPublicHooksIngestScotlandRouteImport.update({
     id: '/api/public/hooks/ingest-scotland',
@@ -249,6 +256,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/ingest-ni': typeof ApiPublicHooksIngestNiRoute
   '/api/public/hooks/ingest-ods-names': typeof ApiPublicHooksIngestOdsNamesRoute
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
+  '/api/public/hooks/ingest-scotland-dispenser-details': typeof ApiPublicHooksIngestScotlandDispenserDetailsRoute
   '/api/public/hooks/ingest-scotland-gp': typeof ApiPublicHooksIngestScotlandGpRoute
   '/api/public/hooks/ingest-scotland-gp-linkage': typeof ApiPublicHooksIngestScotlandGpLinkageRoute
   '/api/public/hooks/ingest-scotland-gp-listsize': typeof ApiPublicHooksIngestScotlandGpListsizeRoute
@@ -282,6 +290,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/ingest-ni': typeof ApiPublicHooksIngestNiRoute
   '/api/public/hooks/ingest-ods-names': typeof ApiPublicHooksIngestOdsNamesRoute
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
+  '/api/public/hooks/ingest-scotland-dispenser-details': typeof ApiPublicHooksIngestScotlandDispenserDetailsRoute
   '/api/public/hooks/ingest-scotland-gp': typeof ApiPublicHooksIngestScotlandGpRoute
   '/api/public/hooks/ingest-scotland-gp-linkage': typeof ApiPublicHooksIngestScotlandGpLinkageRoute
   '/api/public/hooks/ingest-scotland-gp-listsize': typeof ApiPublicHooksIngestScotlandGpListsizeRoute
@@ -317,6 +326,7 @@ export interface FileRoutesById {
   '/api/public/hooks/ingest-ni': typeof ApiPublicHooksIngestNiRoute
   '/api/public/hooks/ingest-ods-names': typeof ApiPublicHooksIngestOdsNamesRoute
   '/api/public/hooks/ingest-scotland': typeof ApiPublicHooksIngestScotlandRoute
+  '/api/public/hooks/ingest-scotland-dispenser-details': typeof ApiPublicHooksIngestScotlandDispenserDetailsRoute
   '/api/public/hooks/ingest-scotland-gp': typeof ApiPublicHooksIngestScotlandGpRoute
   '/api/public/hooks/ingest-scotland-gp-linkage': typeof ApiPublicHooksIngestScotlandGpLinkageRoute
   '/api/public/hooks/ingest-scotland-gp-listsize': typeof ApiPublicHooksIngestScotlandGpListsizeRoute
@@ -352,6 +362,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/ingest-ni'
     | '/api/public/hooks/ingest-ods-names'
     | '/api/public/hooks/ingest-scotland'
+    | '/api/public/hooks/ingest-scotland-dispenser-details'
     | '/api/public/hooks/ingest-scotland-gp'
     | '/api/public/hooks/ingest-scotland-gp-linkage'
     | '/api/public/hooks/ingest-scotland-gp-listsize'
@@ -385,6 +396,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/ingest-ni'
     | '/api/public/hooks/ingest-ods-names'
     | '/api/public/hooks/ingest-scotland'
+    | '/api/public/hooks/ingest-scotland-dispenser-details'
     | '/api/public/hooks/ingest-scotland-gp'
     | '/api/public/hooks/ingest-scotland-gp-linkage'
     | '/api/public/hooks/ingest-scotland-gp-listsize'
@@ -419,6 +431,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/ingest-ni'
     | '/api/public/hooks/ingest-ods-names'
     | '/api/public/hooks/ingest-scotland'
+    | '/api/public/hooks/ingest-scotland-dispenser-details'
     | '/api/public/hooks/ingest-scotland-gp'
     | '/api/public/hooks/ingest-scotland-gp-linkage'
     | '/api/public/hooks/ingest-scotland-gp-listsize'
@@ -439,6 +452,7 @@ export interface RootRouteChildren {
   ApiPublicHooksIngestNiRoute: typeof ApiPublicHooksIngestNiRoute
   ApiPublicHooksIngestOdsNamesRoute: typeof ApiPublicHooksIngestOdsNamesRoute
   ApiPublicHooksIngestScotlandRoute: typeof ApiPublicHooksIngestScotlandRoute
+  ApiPublicHooksIngestScotlandDispenserDetailsRoute: typeof ApiPublicHooksIngestScotlandDispenserDetailsRoute
   ApiPublicHooksIngestScotlandGpRoute: typeof ApiPublicHooksIngestScotlandGpRoute
   ApiPublicHooksIngestScotlandGpLinkageRoute: typeof ApiPublicHooksIngestScotlandGpLinkageRoute
   ApiPublicHooksIngestScotlandGpListsizeRoute: typeof ApiPublicHooksIngestScotlandGpListsizeRoute
@@ -623,6 +637,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksIngestScotlandGpRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/ingest-scotland-dispenser-details': {
+      id: '/api/public/hooks/ingest-scotland-dispenser-details'
+      path: '/api/public/hooks/ingest-scotland-dispenser-details'
+      fullPath: '/api/public/hooks/ingest-scotland-dispenser-details'
+      preLoaderRoute: typeof ApiPublicHooksIngestScotlandDispenserDetailsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/ingest-scotland': {
       id: '/api/public/hooks/ingest-scotland'
       path: '/api/public/hooks/ingest-scotland'
@@ -741,6 +762,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksIngestNiRoute: ApiPublicHooksIngestNiRoute,
   ApiPublicHooksIngestOdsNamesRoute: ApiPublicHooksIngestOdsNamesRoute,
   ApiPublicHooksIngestScotlandRoute: ApiPublicHooksIngestScotlandRoute,
+  ApiPublicHooksIngestScotlandDispenserDetailsRoute:
+    ApiPublicHooksIngestScotlandDispenserDetailsRoute,
   ApiPublicHooksIngestScotlandGpRoute: ApiPublicHooksIngestScotlandGpRoute,
   ApiPublicHooksIngestScotlandGpLinkageRoute:
     ApiPublicHooksIngestScotlandGpLinkageRoute,
@@ -752,13 +775,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

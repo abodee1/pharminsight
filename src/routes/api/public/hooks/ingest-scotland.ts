@@ -386,7 +386,12 @@ async function processQueueItem(item: {
 
 
 
-    // Upsert pharmacies in chunks
+    // Build upsert payload. CRITICAL: when the CSV row has no real name
+    // (so `a.name === a.ods_code`) or no resolved health board, we must NOT
+    // downgrade an existing row's good name/region. We split into two passes:
+    //   - "rich" rows: full upsert (CSV had a name AND a HB)
+    //   - "poor" rows: insert-only (ignoreDuplicates) so the row is created
+    //     if missing, but existing values are preserved.
     const pharmacies = Array.from(
       new Map(
         Array.from(agg.values()).map((a) => [a.ods_code, {
@@ -398,14 +403,27 @@ async function processQueueItem(item: {
       ).values(),
     );
 
-    // Upsert name+country for all pharmacies
-    for (let i = 0; i < pharmacies.length; i += 500) {
-      const rows = pharmacies.slice(i, i + 500).map(({ region, ...r }) => r);
+    const rich = pharmacies.filter((p) => p.name && p.name !== p.ods_code);
+    const poor = pharmacies.filter((p) => !p.name || p.name === p.ods_code);
+
+    // Rich pass: full upsert without region (region handled separately below)
+    for (let i = 0; i < rich.length; i += 500) {
+      const rows = rich.slice(i, i + 500).map(({ region, ...r }) => r);
       const { error } = await supabaseAdmin
         .from("pharmacies")
         .upsert(rows, { onConflict: "ods_code" });
-      if (error) throw error;
+      if (error) throw new Error(error.message || JSON.stringify(error));
     }
+
+    // Poor pass: insert only, never overwrite an existing real name.
+    for (let i = 0; i < poor.length; i += 500) {
+      const rows = poor.slice(i, i + 500).map(({ region, ...r }) => r);
+      const { error } = await supabaseAdmin
+        .from("pharmacies")
+        .upsert(rows, { onConflict: "ods_code", ignoreDuplicates: true });
+      if (error) throw new Error(error.message || JSON.stringify(error));
+    }
+
     // Update region grouped by health board — only when we actually resolved one,
     // so we never overwrite a good value with null
     const byHB = new Map<string, string[]>();
@@ -421,9 +439,10 @@ async function processQueueItem(item: {
           .from("pharmacies")
           .update({ region })
           .in("ods_code", codes.slice(i, i + 500));
-        if (error) throw error;
+        if (error) throw new Error(error.message || JSON.stringify(error));
       }
     }
+
 
     // Look up pharmacy ids
     const odsList = pharmacies.map((p) => p.ods_code);
