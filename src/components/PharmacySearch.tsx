@@ -18,6 +18,7 @@ export type Pharmacy = {
 
 type Props = {
   compact?: boolean;
+  large?: boolean;
   placeholder?: string;
   onSelect?: (p: Pharmacy) => void;
   excludeIds?: string[];
@@ -29,6 +30,7 @@ type Props = {
 
 export function PharmacySearch({
   compact = false,
+  large = false,
   placeholder,
   onSelect,
   excludeIds,
@@ -87,7 +89,7 @@ export function PharmacySearch({
   return (
     <div ref={containerRef} className="relative w-full">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Search className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground ${large ? "h-5 w-5" : "h-4 w-4"}`} />
         <input
           ref={inputRef}
           type="text"
@@ -98,10 +100,10 @@ export function PharmacySearch({
             placeholder ??
             (compact ? "Search pharmacies…" : "Search by name, trading name, postcode or ODS code…")
           }
-          className="w-full h-9 rounded-md border border-input bg-background text-foreground pl-9 pr-9 text-sm placeholder:text-muted-foreground caret-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className={`w-full rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground caret-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${large ? "h-11 pl-10 pr-10 text-base" : "h-9 pl-9 pr-9 text-sm"}`}
         />
         {loading && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
+          <Loader2 className={`absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground animate-spin ${large ? "h-5 w-5" : "h-4 w-4"}`} />
         )}
       </div>
 

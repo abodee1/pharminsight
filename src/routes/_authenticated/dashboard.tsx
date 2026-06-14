@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   TrendingUp, TrendingDown, Minus, Star, ShieldCheck, Sparkles,
   Package, Stethoscope, ClipboardCheck, FileText, PoundSterling,
-  Cigarette, Pill, Syringe, HeartPulse, Activity, GitCompare, Search,
+  Cigarette, Pill, Syringe, HeartPulse, Activity, GitCompare,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PercentileRail, AnnotatedSparkline, ShareDonut, GpPrescribingCard } from "@/components/Infographics";
@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { clearViewedPharmacy } from "@/lib/viewedPharmacy";
 import { DataAttribution } from "@/components/DataAttribution";
 import { pharmacyDisplayName } from "@/lib/pharmacyName";
+import { PharmacySearch } from "@/components/PharmacySearch";
 
 type WindowKey = 1 | 3 | 6 | 12;
 
@@ -391,20 +392,23 @@ function MyPharmacy() {
   if (noPharmacy || !pharmacy) {
     return (
       <div className="p-6 md:p-10 max-w-7xl mx-auto animate-fade-in">
-        <div className="mb-2">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">My Pharmacy</p>
-          <h1 className="text-2xl font-semibold tracking-tight mt-1">{greeting}, {firstName}</h1>
+        <div className="mb-6 flex flex-col items-center text-center">
+          <div className="mb-4">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">My Pharmacy</p>
+            <h1 className="text-2xl font-semibold tracking-tight mt-1">{greeting}, {firstName}</h1>
+          </div>
+          <div className="w-full max-w-lg rounded-xl border border-gold/40 bg-gold/5 px-4 py-3 shadow-sm">
+            <p className="text-xs font-semibold text-gold/80 mb-2 uppercase tracking-wider">Find a pharmacy</p>
+            <PharmacySearch large placeholder="Search by postcode, name or ODS code…" />
+          </div>
         </div>
-        <div className="mt-8 rounded-lg border border-gold/40 bg-gold/10 p-6 text-sm max-w-xl">
+        <div className="rounded-lg border border-gold/40 bg-gold/10 p-6 text-sm max-w-xl mx-auto">
           <p className="font-semibold text-base">No pharmacy set yet</p>
           <p className="text-muted-foreground mt-1">
             Set your pharmacy to unlock personalised benchmarks, performance trends, and smart insights.
           </p>
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4">
             <Link to="/settings"><Button size="sm">Set in Settings</Button></Link>
-            <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground pt-1.5">
-              or search for your pharmacy →
-            </Link>
           </div>
         </div>
       </div>
@@ -417,17 +421,15 @@ function MyPharmacy() {
       <div className="p-4 sm:p-6 md:p-10 max-w-6xl mx-auto overflow-x-hidden">
 
         {/* Page identity */}
-        <div className="mb-5 flex items-center justify-between gap-3 flex-wrap">
-          <div>
+        <div className="mb-6 flex flex-col items-center text-center">
+          <div className="mb-4">
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">My Pharmacy</p>
             <p className="text-sm text-muted-foreground mt-0.5">{greeting}, {firstName}</p>
           </div>
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-3 py-1.5 transition-colors"
-          >
-            <Search className="h-3.5 w-3.5" /> Search another pharmacy
-          </Link>
+          <div className="w-full max-w-lg rounded-xl border border-gold/40 bg-gold/5 px-4 py-3 shadow-sm">
+            <p className="text-xs font-semibold text-gold/80 mb-2 uppercase tracking-wider">Find a pharmacy</p>
+            <PharmacySearch large placeholder="Search by postcode, name or ODS code…" />
+          </div>
         </div>
 
         {/* Pharmacy header — mirrors pharmacy profile */}
