@@ -83,7 +83,7 @@ export function MarketShareSection({ pharmacyId, pharmacyOds, pharmacyName, lat,
         });
         if (nearbyErr) throw nearbyErr;
 
-        const nearbyPharms = ((nearbyData ?? []) as NearbyPharm[]).filter(p => p.ods_code !== pharmacyOds);
+        const nearbyPharms = ((nearbyData ?? []) as unknown as NearbyPharm[]).filter(p => p.ods_code !== pharmacyOds);
         setNearby(nearbyPharms);
 
         const allIds = [pharmacyId, ...nearbyPharms.map(p => p.id)];
