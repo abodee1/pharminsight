@@ -3,8 +3,8 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { authorizeHookRequest } from "@/lib/hook-auth.server";
 
 const ODS_API = "https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations";
-const PAGE = 1000;
-const CONCURRENT = 15;
+const BATCH_SIZE = 250;   // pharmacies resolved per invocation
+const CONCURRENT = 10;
 
 export const Route = createFileRoute("/api/public/hooks/ingest-ods-names")({
   server: {
@@ -14,35 +14,35 @@ export const Route = createFileRoute("/api/public/hooks/ingest-ods-names")({
         if (!auth.ok) return new Response(auth.message, { status: auth.status });
 
         try {
-          // Fetch all pharmacies in pages, filter where name === ods_code client-side
-          // (PostgREST can't compare two columns in a WHERE clause directly)
-          const targets: { id: string; ods_code: string }[] = [];
-          let from = 0;
-          while (true) {
-            const { data, error } = await supabaseAdmin
-              .from("pharmacies")
-              .select("id, ods_code, name")
-              .range(from, from + PAGE - 1);
-            if (error || !data?.length) break;
-            for (const p of data) {
-              if (p.name === p.ods_code) targets.push({ id: p.id, ods_code: p.ods_code });
-            }
-            if (data.length < PAGE) break;
-            from += PAGE;
-          }
+          // Only grab a slice per invocation — the ODS API + per-row updates
+          // easily exceed the 110s worker budget if we try to process all
+          // ~1.7k unresolved pharmacies in one go.
+          const { data: targets, error: fetchErr } = await supabaseAdmin
+            .from("pharmacies")
+            .select("id, ods_code, name")
+            .filter("name", "eq", "ods_code")  // hint; refined below
+            .order("ods_code", { ascending: true })
+            .limit(BATCH_SIZE * 4);
 
-          const results = { found: targets.length, updated: 0, notFound: 0, errors: 0 };
+          // PostgREST can't compare two columns, so the filter above is a
+          // no-op string match. Do the real comparison client-side.
+          const pending = (targets ?? [])
+            .filter((p) => p.name === p.ods_code)
+            .slice(0, BATCH_SIZE);
 
-          // Resolve names from ODS API concurrently in batches
-          for (let i = 0; i < targets.length; i += CONCURRENT) {
-            await Promise.all(targets.slice(i, i + CONCURRENT).map(async (p) => {
+          if (fetchErr) throw new Error(fetchErr.message);
+
+          const results = { batch: pending.length, updated: 0, notFound: 0, errors: 0 };
+
+          for (let i = 0; i < pending.length; i += CONCURRENT) {
+            await Promise.all(pending.slice(i, i + CONCURRENT).map(async (p) => {
               try {
                 const res = await fetch(`${ODS_API}/${encodeURIComponent(p.ods_code)}`, {
                   headers: { Accept: "application/json" },
                 });
                 if (res.status === 404) { results.notFound++; return; }
                 if (!res.ok) { results.errors++; return; }
-                const json = await res.json();
+                const json: any = await res.json().catch(() => null);
                 const fetchedName: string | undefined = json?.Organisation?.Name;
                 if (!fetchedName?.trim()) { results.notFound++; return; }
                 const { error } = await supabaseAdmin
@@ -57,19 +57,28 @@ export const Route = createFileRoute("/api/public/hooks/ingest-ods-names")({
             }));
           }
 
-          return Response.json({ ok: true, ...results });
+          const { count: remaining } = await supabaseAdmin
+            .from("pharmacies")
+            .select("id", { count: "exact", head: true })
+            .filter("name", "eq", "ods_code");
+
+          return Response.json({ ok: true, ...results, remaining: remaining ?? null });
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
+          console.error("[ingest-ods-names]", msg);
           return Response.json({ ok: false, error: msg }, { status: 500 });
         }
       },
 
       GET: async () => {
-        const { count } = await supabaseAdmin
+        // Two-column compare not possible in PostgREST; count client-side.
+        const { data, error } = await supabaseAdmin
           .from("pharmacies")
-          .select("id", { count: "exact", head: true })
-          .filter("name", "eq", "ods_code");
-        return Response.json({ pending: count ?? 0 });
+          .select("id, ods_code, name")
+          .limit(20000);
+        if (error) return Response.json({ pending: 0, error: error.message }, { status: 500 });
+        const pending = (data ?? []).filter((p) => p.name === p.ods_code).length;
+        return Response.json({ pending });
       },
     },
   },
