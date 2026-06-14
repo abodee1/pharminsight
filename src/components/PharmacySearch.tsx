@@ -154,7 +154,7 @@ function ResultRow({
   already: boolean;
   onSelect: (p: Pharmacy) => void;
 }) {
-  const displayName = pharmacyDisplayName(p.name, p.trading_name);
+  const displayName = pharmacyDisplayName(p.name, p.trading_name, p.ods_code);
   // Address line: street + postcode
   const addressLine = [p.address, p.postcode].filter(Boolean).join(", ");
   // Right-side area: region or outer postcode district (e.g. "SW1A")

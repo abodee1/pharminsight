@@ -338,11 +338,11 @@ export function MarketShareSection({ pharmacyId, pharmacyOds, pharmacyName, lat,
 
                         <div className="min-w-0">
                           {isMe ? (
-                            <p className="text-xs font-semibold text-primary truncate leading-tight">{pharmacyDisplayName(p.name, p.trading_name)} ★</p>
+                            <p className="text-xs font-semibold text-primary truncate leading-tight">{pharmacyDisplayName(p.name, p.trading_name, p.ods_code)} ★</p>
                           ) : (
                             <Link to="/pharmacy/$odsCode" params={{ odsCode: p.ods_code }}
                               className="text-xs font-medium truncate leading-tight hover:text-primary hover:underline block">
-                              {pharmacyDisplayName(p.name, p.trading_name)}
+                              {pharmacyDisplayName(p.name, p.trading_name, p.ods_code)}
                             </Link>
                           )}
                           {/* Mini bar */}
@@ -372,7 +372,7 @@ export function MarketShareSection({ pharmacyId, pharmacyOds, pharmacyName, lat,
                   <div>
                     <p className="text-sm font-semibold">Market opportunity</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {pharmacyDisplayName(leader.name, leader.trading_name)} leads with {fmtN(leader.last12)} items in the last 12 months — {fmtN(gapItems)} more than you.
+                      {pharmacyDisplayName(leader.name, leader.trading_name, leader.ods_code)} leads with {fmtN(leader.last12)} items in the last 12 months — {fmtN(gapItems)} more than you.
                     </p>
                   </div>
                 </div>

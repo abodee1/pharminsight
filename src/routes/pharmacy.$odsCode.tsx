@@ -522,7 +522,7 @@ function PharmacyProfile() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}</h1>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{pharmacyDisplayName(pharmacy.name, pharmacy.trading_name, pharmacy.ods_code)}</h1>
             {isMine && (
               <span className="inline-flex items-center gap-1 rounded-full bg-gold/15 border border-gold/40 px-2.5 py-0.5 text-xs font-semibold text-gold">
                 <Star className="h-3 w-3 fill-current" /> Your pharmacy
@@ -581,7 +581,7 @@ function PharmacyProfile() {
         <CompetitorDeepDive
           pharmacyId={pharmacy.id}
           pharmacyOds={pharmacy.ods_code}
-          pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}
+          pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name, pharmacy.ods_code)}
           country={pharmacy.country}
           onClose={() => setDeepDiveOpen(false)}
         />
@@ -653,7 +653,7 @@ function PharmacyProfile() {
           <div className="mt-6">
             <LocalRadiusInsights
               pharmacyId={pharmacy.id}
-              pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}
+              pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name, pharmacy.ods_code)}
               postcode={pharmacy.postcode}
               lat={pharmacy.lat}
               lng={pharmacy.lng}
@@ -775,7 +775,7 @@ function PharmacyProfile() {
 
 
           <LocalLandscape
-            pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}
+            pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name, pharmacy.ods_code)}
             postcode={pharmacy.postcode}
             address={pharmacy.address}
           />
@@ -783,7 +783,7 @@ function PharmacyProfile() {
           <MarketShareSection
             pharmacyId={pharmacy.id}
             pharmacyOds={pharmacy.ods_code}
-            pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}
+            pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name, pharmacy.ods_code)}
             lat={pharmacy.lat}
             lng={pharmacy.lng}
           />

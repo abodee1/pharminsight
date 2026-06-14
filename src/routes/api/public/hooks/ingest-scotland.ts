@@ -29,6 +29,34 @@ const MONTH_NAMES: Record<string, number> = {
   july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
 };
 
+// PHS Scotland Health Board codes → full NHS names
+const SCOTLAND_HB_CODES: Record<string, string> = {
+  S08000015: "NHS Ayrshire and Arran",
+  S08000016: "NHS Borders",
+  S08000017: "NHS Dumfries and Galloway",
+  S08000018: "NHS Fife",
+  S08000019: "NHS Forth Valley",
+  S08000020: "NHS Grampian",
+  S08000021: "NHS Greater Glasgow and Clyde",
+  S08000022: "NHS Highland",
+  S08000023: "NHS Lanarkshire",
+  S08000024: "NHS Lothian",
+  S08000025: "NHS Orkney",
+  S08000026: "NHS Shetland",
+  S08000027: "NHS Tayside",
+  S08000028: "NHS Western Isles",
+  // Post-2019 remapped codes
+  S08000029: "NHS Fife",
+  S08000030: "NHS Tayside",
+  S08000031: "NHS Greater Glasgow and Clyde",
+  S08000032: "NHS Lanarkshire",
+};
+
+function resolveScotlandHB(raw: string | null): string | null {
+  if (!raw) return null;
+  return SCOTLAND_HB_CODES[raw.toUpperCase()] ?? raw;
+}
+
 type CkanResource = {
   id: string;
   name: string;
@@ -278,7 +306,7 @@ async function processQueueItem(item: {
         headers.forEach((h, i) => { headerIdx[h.toLowerCase().replace(/[\s_]/g, "")] = i; });
         odsIdx = findIdx(["DispensLocationCode", "DispenserLocationCode", "DispLocationCode", "DispenserLocation", "ContractorCode", "Contractor"]);
         nameIdx = findIdx(["DispensLocationName", "DispenserLocationName", "DispLocationName", "ContractorName"]);
-        regionIdx = findIdx(["HBName", "HealthBoardName", "HBT", "HB"]);
+        regionIdx = findIdx(["HBName", "HealthBoardName", "HBTName", "HBT", "HB", "HBCode", "HealthBoard", "HealthBoardCode"]);
         itemsIdx = findIdx(["NumberOfPaidItems", "PaidQuantity", "Items"]);
         monthIdx = findIdx(["PaidDateMonth"]);
         yearIdx = findIdx(["Year"]);
@@ -327,7 +355,7 @@ async function processQueueItem(item: {
         cur = {
           ods_code: ods,
           name: nameIdx >= 0 ? ((cells[nameIdx] ?? "").trim() || ods) : ods,
-          region: regionIdx >= 0 ? ((cells[regionIdx] ?? "").trim() || null) : null,
+          region: resolveScotlandHB(regionIdx >= 0 ? ((cells[regionIdx] ?? "").trim() || null) : null),
           year, month, items: 0, payments: blankPayments(), pf_services: blankPFServices(),
         };
         agg.set(key, cur);
@@ -370,11 +398,31 @@ async function processQueueItem(item: {
       ).values(),
     );
 
+    // Upsert name+country for all pharmacies
     for (let i = 0; i < pharmacies.length; i += 500) {
+      const rows = pharmacies.slice(i, i + 500).map(({ region, ...r }) => r);
       const { error } = await supabaseAdmin
         .from("pharmacies")
-        .upsert(pharmacies.slice(i, i + 500), { onConflict: "ods_code" });
+        .upsert(rows, { onConflict: "ods_code" });
       if (error) throw error;
+    }
+    // Update region grouped by health board — only when we actually resolved one,
+    // so we never overwrite a good value with null
+    const byHB = new Map<string, string[]>();
+    for (const p of pharmacies) {
+      if (p.region) {
+        if (!byHB.has(p.region)) byHB.set(p.region, []);
+        byHB.get(p.region)!.push(p.ods_code);
+      }
+    }
+    for (const [region, codes] of byHB) {
+      for (let i = 0; i < codes.length; i += 500) {
+        const { error } = await supabaseAdmin
+          .from("pharmacies")
+          .update({ region })
+          .in("ods_code", codes.slice(i, i + 500));
+        if (error) throw error;
+      }
     }
 
     // Look up pharmacy ids

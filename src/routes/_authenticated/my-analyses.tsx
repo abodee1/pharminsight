@@ -111,7 +111,7 @@ function MyAnalyses() {
               {rows.map((r) => (
                 <tr key={r.id} className="border-t border-border">
                   <td className="px-4 py-3">
-                    <Link to="/pharmacy/$odsCode" params={{ odsCode: r.pharmacy?.ods_code || "" }} className="font-medium hover:underline">{r.pharmacy ? pharmacyDisplayName(r.pharmacy.name, r.pharmacy.trading_name) : ""}</Link>
+                    <Link to="/pharmacy/$odsCode" params={{ odsCode: r.pharmacy?.ods_code || "" }} className="font-medium hover:underline">{r.pharmacy ? pharmacyDisplayName(r.pharmacy.name, r.pharmacy.trading_name, r.pharmacy.ods_code) : ""}</Link>
                     <p className="text-xs text-muted-foreground">{r.pharmacy?.region} · {r.pharmacy?.country}</p>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{r.items_last.toLocaleString()}</td>
@@ -151,7 +151,7 @@ function CompareTable({ rows }: { rows: Row[] }) {
       <table className="w-full text-sm">
         <thead className="bg-secondary text-muted-foreground"><tr>
           <th className="text-left px-4 py-2 font-medium">Metric</th>
-          {rows.map((r) => <th key={r.id} className="text-right px-4 py-2 font-medium truncate max-w-[180px]">{r.pharmacy ? pharmacyDisplayName(r.pharmacy.name, r.pharmacy.trading_name) : ""}</th>)}
+          {rows.map((r) => <th key={r.id} className="text-right px-4 py-2 font-medium truncate max-w-[180px]">{r.pharmacy ? pharmacyDisplayName(r.pharmacy.name, r.pharmacy.trading_name, r.pharmacy.ods_code) : ""}</th>)}
         </tr></thead>
         <tbody>
           {metrics.map((m) => (

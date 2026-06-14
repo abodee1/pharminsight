@@ -170,7 +170,7 @@ export function AnalysisPanel({ pharmacy, open, onClose }: { pharmacy: Pharmacy;
       <aside className="w-full md:w-[85%] bg-background border-l border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
         <header className="flex items-center gap-2 border-b border-border px-3 md:px-6 py-2.5 sticky top-0 bg-background z-10">
           <div className="min-w-0 flex-1">
-            <h2 className="font-bold text-base md:text-lg truncate">{pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}</h2>
+            <h2 className="font-bold text-base md:text-lg truncate">{pharmacyDisplayName(pharmacy.name, pharmacy.trading_name, pharmacy.ods_code)}</h2>
             <p className="text-[11px] md:text-xs text-muted-foreground truncate">{pharmacy.address} · {pharmacy.postcode}</p>
           </div>
           <Button variant="outline" size="sm" onClick={saveAnalysis} className="hidden sm:inline-flex">{saved ? "Saved" : "Save"}</Button>
@@ -334,7 +334,7 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
 
       <LocationInsights
         pharmacyId={pharmacy.id}
-        pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}
+        pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name, pharmacy.ods_code)}
         postcode={pharmacy.postcode}
         address={pharmacy.address}
       />
@@ -1229,7 +1229,7 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
         {generating && (
           <div className="rounded-xl border border-border bg-secondary/30 p-6 text-center space-y-2">
             <Loader2 className="h-6 w-6 animate-spin text-gold mx-auto" />
-            <p className="text-sm font-medium">Analysing {pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}…</p>
+            <p className="text-sm font-medium">Analysing {pharmacyDisplayName(pharmacy.name, pharmacy.trading_name, pharmacy.ods_code)}…</p>
             <p className="text-xs text-muted-foreground">Processing 24 months of NHS dispensing data and local landscape intelligence. Takes 15–30 seconds.</p>
           </div>
         )}

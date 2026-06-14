@@ -102,7 +102,7 @@ export function AcquisitionReport({ report, pharmacy, generatedAt }: Props) {
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] opacity-70">Acquisition intelligence report</p>
-            <h1 className="mt-2 text-3xl md:text-4xl font-bold tracking-tight">{pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}</h1>
+            <h1 className="mt-2 text-3xl md:text-4xl font-bold tracking-tight">{pharmacyDisplayName(pharmacy.name, pharmacy.trading_name, pharmacy.ods_code)}</h1>
             <p className="mt-2 text-sm opacity-80">
               {[pharmacy.address, pharmacy.postcode].filter(Boolean).join(", ")}
             </p>

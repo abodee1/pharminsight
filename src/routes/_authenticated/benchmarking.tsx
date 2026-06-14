@@ -327,7 +327,7 @@ function Benchmarking() {
           {pharmacy && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
               <span>Benchmarking</span>
-              <span className="font-semibold text-foreground">{pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}</span>
+              <span className="font-semibold text-foreground">{pharmacyDisplayName(pharmacy.name, pharmacy.trading_name, pharmacy.ods_code)}</span>
               <CountryBadge country={pharmacy.country} />
               {pharmacyOverride && (
                 <button type="button" onClick={() => { setPharmacyOverride(null); setPharmacy(null); }}
@@ -391,7 +391,7 @@ function Benchmarking() {
               {/* Context bar */}
               <div className="rounded-lg bg-card border border-border px-5 py-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-base font-semibold">{pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)}</p>
+                  <p className="text-base font-semibold">{pharmacyDisplayName(pharmacy.name, pharmacy.trading_name, pharmacy.ods_code)}</p>
                   <p className="text-sm text-muted-foreground">
                     {pharmacy.region} · {pharmacy.country} · {regionAggs.length.toLocaleString()} regional / {cohortAggs.length.toLocaleString()} national pharmacies
                   </p>
@@ -436,7 +436,7 @@ function Benchmarking() {
                   <h2 className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Market position</h2>
                   <MarketShareSection
                     pharmacyId={pharmacy.id} pharmacyOds={pharmacy.ods_code}
-                    pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name)} lat={pharmacy.lat} lng={pharmacy.lng}
+                    pharmacyName={pharmacyDisplayName(pharmacy.name, pharmacy.trading_name, pharmacy.ods_code)} lat={pharmacy.lat} lng={pharmacy.lng}
                   />
                 </section>
               )}

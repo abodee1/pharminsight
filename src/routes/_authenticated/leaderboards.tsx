@@ -27,7 +27,7 @@ type Row = {
   pharmacy_id: string; month: number; year: number;
   items_dispensed: number; nms_count: number; pharmacy_first_count: number; flu_vaccinations: number; eps_items: number;
 };
-type Pharm = { id: string; name: string; trading_name: string | null; region: string | null; country: string | null; postcode: string | null };
+type Pharm = { id: string; ods_code: string; name: string; trading_name: string | null; region: string | null; country: string | null; postcode: string | null };
 
 function prevPeriod(y: number, m: number): { year: number; month: number } {
   return m === 1 ? { year: y - 1, month: 12 } : { year: y, month: m - 1 };
@@ -84,14 +84,14 @@ function Leaderboards() {
       const fetchPharms = async (): Promise<Pharm[]> => {
         try {
           return await fetchAll<Pharm>((from, to) =>
-            supabase.from("pharmacies").select("id,name,trading_name,region,country,postcode").eq("country", country).range(from, to)
+            supabase.from("pharmacies").select("id,ods_code,name,trading_name,region,country,postcode").eq("country", country).range(from, to)
           );
         } catch {
           // trading_name column may not exist yet — fall back without it
           const rows = await fetchAll<Omit<Pharm, "trading_name">>((from, to) =>
-            supabase.from("pharmacies").select("id,name,region,country,postcode").eq("country", country).range(from, to)
+            supabase.from("pharmacies").select("id,ods_code,name,region,country,postcode").eq("country", country).range(from, to)
           );
-          return rows.map((r) => ({ ...r, trading_name: null }));
+          return rows.map((r) => ({ ...r, trading_name: null as string | null }));
         }
       };
 
@@ -165,7 +165,7 @@ function Leaderboards() {
     const q = search.toLowerCase().trim();
     const base = q
       ? board.filter((r) => {
-          const dn = pharmacyDisplayName(r.ph.name, r.ph.trading_name).toLowerCase();
+          const dn = pharmacyDisplayName(r.ph.name, r.ph.trading_name, r.ph.ods_code).toLowerCase();
           return dn.includes(q) || r.ph.name.toLowerCase().includes(q) || (r.ph.region ?? "").toLowerCase().includes(q);
         })
       : board;
@@ -187,7 +187,7 @@ function Leaderboards() {
   const pageRows = filtered.slice(page * pageSize, (page + 1) * pageSize);
 
   const top10 = board.slice(0, 10).map((r) => ({
-    name: pharmacyDisplayName(r.ph.name, r.ph.trading_name).replace(/ Pharmacy$/i, "").replace(/ Chemists?$/i, ""),
+    name: pharmacyDisplayName(r.ph.name, r.ph.trading_name, r.ph.ods_code).replace(/ Pharmacy$/i, "").replace(/ Chemists?$/i, ""),
     value: r.value,
     isMe: r.ph.id === myPharmId,
   }));
@@ -310,7 +310,7 @@ function Leaderboards() {
             <button
               onClick={() =>
                 downloadCsv(
-                  filtered.map((r) => ({ rank: r.rank, name: pharmacyDisplayName(r.ph.name, r.ph.trading_name), region: r.ph.region, value: r.value, change: r.change, isNew: r.isNew })),
+                  filtered.map((r) => ({ rank: r.rank, name: pharmacyDisplayName(r.ph.name, r.ph.trading_name, r.ph.ods_code), region: r.ph.region, value: r.value, change: r.change, isNew: r.isNew })),
                   service,
                   period,
                 )
@@ -364,7 +364,7 @@ function Leaderboards() {
                     )}
                   </td>
                   <td className="px-4 py-2">
-                    {pharmacyDisplayName(r.ph.name, r.ph.trading_name)}
+                    {pharmacyDisplayName(r.ph.name, r.ph.trading_name, r.ph.ods_code)}
                     {isMine && <span className="ml-2 text-xs text-gold font-semibold">YOU</span>}
                   </td>
                   <td className="px-4 py-2 text-muted-foreground">{r.ph.region}</td>
