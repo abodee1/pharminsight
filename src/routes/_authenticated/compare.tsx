@@ -157,7 +157,7 @@ function appliesToCountry(applies: Applies, country: string | null | undefined) 
   return !isScot(country);
 }
 
-type Pharm = { id: string; name: string; trading_name?: string | null; region: string | null; country: string | null; postcode: string | null; lat?: number | null; lng?: number | null };
+type Pharm = { id: string; ods_code: string; name: string; trading_name?: string | null; region: string | null; country: string | null; postcode: string | null; lat?: number | null; lng?: number | null };
 type Row = {
   pharmacy_id: string; month: number; year: number;
   items_dispensed: number; nms_count: number; pharmacy_first_count: number;
