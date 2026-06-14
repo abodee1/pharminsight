@@ -236,7 +236,7 @@ async function basicSearch(term: string): Promise<Pharmacy[]> {
     ...(byOds.data || []),
     ...(byPostcode.data || []),
     ...(byName.data || []),
-  ] as Pharmacy[]) {
+  ] as unknown as Pharmacy[]) {
     if (!seen.has(row.id)) { seen.add(row.id); merged.push(row); }
   }
   return merged.slice(0, 10);
