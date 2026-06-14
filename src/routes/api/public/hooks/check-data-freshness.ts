@@ -200,7 +200,7 @@ export const Route = createFileRoute("/api/public/hooks/check-data-freshness")({
                 status: "failed",
                 error,
                 details: { hook: src.hook },
-              }).catch(() => {});
+              }).then(() => {}, () => {});
               results.push({ source: src.source, status: "failed", error });
             }
           }));
