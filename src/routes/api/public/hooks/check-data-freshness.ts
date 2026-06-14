@@ -60,8 +60,19 @@ function parseYearMonth(s: string): { y: number; m: number } | null {
   return { y: +m[1], m: +m[2] };
 }
 
+// Fetch with a hard 8-second timeout so slow CKAN portals don't stall the handler
+async function fetchWithTimeout(url: string, opts?: RequestInit, ms = 8000): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function upstreamLatest(src: CkanSource): Promise<{ y: number; m: number } | null> {
-  const res = await fetch(`${src.ckanBase}/package_show?id=${encodeURIComponent(src.dataset)}`);
+  const res = await fetchWithTimeout(`${src.ckanBase}/package_show?id=${encodeURIComponent(src.dataset)}`);
   if (!res.ok) throw new Error(`CKAN ${res.status}`);
   const j: any = await res.json();
   const resources: CkanResource[] = j?.result?.resources ?? [];
@@ -89,11 +100,6 @@ async function ingestedLatest(source: string): Promise<{ y: number; m: number } 
   return { y: row.year as number, m: row.month as number };
 }
 
-async function originUrl(request: Request): Promise<string> {
-  const u = new URL(request.url);
-  return `${u.protocol}//${u.host}`;
-}
-
 export const Route = createFileRoute("/api/public/hooks/check-data-freshness")({
   server: {
     handlers: {
@@ -106,93 +112,104 @@ export const Route = createFileRoute("/api/public/hooks/check-data-freshness")({
           });
         }
 
-        const origin = await originUrl(request);
-        const hookSecret = process.env.INGEST_HOOK_SECRET ?? "";
+        try {
+          const u = new URL(request.url);
+          const origin = `${u.protocol}//${u.host}`;
+          const hookSecret = process.env.INGEST_HOOK_SECRET ?? "";
 
-        const results: any[] = [];
+          const results: any[] = [];
 
-        for (const src of CKAN_SOURCES) {
-          const startedAt = new Date();
-          let upstream: { y: number; m: number } | null = null;
-          let ingested: { y: number; m: number } | null = null;
-          let queued = 0;
-          let triggered = false;
-          let status = "ok";
-          let error: string | null = null;
+          // Check all sources in parallel to avoid serial CKAN timeout accumulation
+          await Promise.all(CKAN_SOURCES.map(async (src) => {
+            const startedAt = new Date();
+            let upstream: { y: number; m: number } | null = null;
+            let ingested: { y: number; m: number } | null = null;
+            let queued = 0;
+            let triggered = false;
+            let status = "ok";
+            let error: string | null = null;
 
-          try {
-            [upstream, ingested] = await Promise.all([
-              upstreamLatest(src),
-              ingestedLatest(src.source),
-            ]);
+            try {
+              [upstream, ingested] = await Promise.all([
+                upstreamLatest(src),
+                ingestedLatest(src.source),
+              ]);
 
-            const upstreamScore = upstream ? upstream.y * 12 + upstream.m : 0;
-            const ingestedScore = ingested ? ingested.y * 12 + ingested.m : 0;
-            const newDataFound = upstreamScore > ingestedScore;
+              const upstreamScore = upstream ? upstream.y * 12 + upstream.m : 0;
+              const ingestedScore = ingested ? ingested.y * 12 + ingested.m : 0;
+              const newDataFound = upstreamScore > ingestedScore;
 
-            if (newDataFound) {
-              // Fire-and-forget trigger of the corresponding ingest hook.
-              // The hook itself is idempotent (skips already-successful resources).
-              const r = await fetch(`${origin}/api/public/hooks/${src.hook}`, {
-                method: "POST",
-                headers: hookSecret ? { "x-hook-secret": hookSecret } : {},
-              });
-              triggered = r.ok;
-              if (!r.ok) {
-                status = "trigger_failed";
-                error = `Trigger HTTP ${r.status}`;
-              } else {
-                const j: any = await r.json().catch(() => ({}));
-                queued = Number(j?.queued ?? 0) || 0;
+              if (newDataFound) {
+                try {
+                  const r = await fetchWithTimeout(
+                    `${origin}/api/public/hooks/${src.hook}`,
+                    {
+                      method: "POST",
+                      headers: hookSecret ? { "x-hook-secret": hookSecret } : {},
+                    },
+                    15000,
+                  );
+                  triggered = r.ok;
+                  if (!r.ok) {
+                    status = "trigger_failed";
+                    error = `Trigger HTTP ${r.status}`;
+                  } else {
+                    const j: any = await r.json().catch(() => ({}));
+                    queued = Number(j?.queued ?? 0) || 0;
+                  }
+                } catch (trigErr: any) {
+                  status = "trigger_failed";
+                  error = String(trigErr?.message ?? trigErr).slice(0, 200);
+                }
               }
+
+              await supabaseAdmin.from("ingestion_freshness_check").insert({
+                source: src.source,
+                checked_at: startedAt.toISOString(),
+                upstream_latest_year: upstream?.y ?? null,
+                upstream_latest_month: upstream?.m ?? null,
+                ingested_latest_year: ingested?.y ?? null,
+                ingested_latest_month: ingested?.m ?? null,
+                new_data_found: newDataFound,
+                items_queued: queued,
+                status,
+                error,
+                details: { triggered, hook: src.hook },
+              });
+
+              results.push({
+                source: src.source,
+                upstream,
+                ingested,
+                new_data_found: newDataFound,
+                triggered,
+                queued,
+                status,
+              });
+            } catch (e: any) {
+              error = String(e?.message ?? e).slice(0, 500);
+              await supabaseAdmin.from("ingestion_freshness_check").insert({
+                source: src.source,
+                checked_at: startedAt.toISOString(),
+                upstream_latest_year: upstream?.y ?? null,
+                upstream_latest_month: upstream?.m ?? null,
+                ingested_latest_year: ingested?.y ?? null,
+                ingested_latest_month: ingested?.m ?? null,
+                new_data_found: false,
+                items_queued: 0,
+                status: "failed",
+                error,
+                details: { hook: src.hook },
+              }).catch(() => {});
+              results.push({ source: src.source, status: "failed", error });
             }
+          }));
 
-            await supabaseAdmin.from("ingestion_freshness_check").insert({
-              source: src.source,
-              checked_at: startedAt.toISOString(),
-              upstream_latest_year: upstream?.y ?? null,
-              upstream_latest_month: upstream?.m ?? null,
-              ingested_latest_year: ingested?.y ?? null,
-              ingested_latest_month: ingested?.m ?? null,
-              new_data_found: newDataFound,
-              items_queued: queued,
-              status,
-              error,
-              details: { triggered, hook: src.hook },
-            });
-
-            results.push({
-              source: src.source,
-              upstream,
-              ingested,
-              new_data_found: newDataFound,
-              triggered,
-              queued,
-              status,
-            });
-          } catch (e: any) {
-            error = String(e?.message ?? e).slice(0, 500);
-            await supabaseAdmin.from("ingestion_freshness_check").insert({
-              source: src.source,
-              checked_at: startedAt.toISOString(),
-              upstream_latest_year: upstream?.y ?? null,
-              upstream_latest_month: upstream?.m ?? null,
-              ingested_latest_year: ingested?.y ?? null,
-              ingested_latest_month: ingested?.m ?? null,
-              new_data_found: false,
-              items_queued: 0,
-              status: "failed",
-              error,
-              details: { hook: src.hook },
-            });
-            results.push({ source: src.source, status: "failed", error });
-          }
+          return Response.json({ ok: true, checked: results.length, results });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          return Response.json({ ok: false, error: msg }, { status: 500 });
         }
-
-        return new Response(JSON.stringify({ ok: true, checked: results.length, results }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
       },
     },
   },
