@@ -125,7 +125,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-scotland-dispense
             total++;
             const { error } = await supabaseAdmin
               .from("pharmacies")
-              .update(patch)
+              .update(patch as never)
               .eq("id", cur.id);
             if (error) throw new Error(error.message);
           }
