@@ -407,3 +407,68 @@ export const generateAcquisitionReport = createServerFn({ method: "POST" })
 
     return { report, context: aiContext, generated_at: saved.generated_at, cached: false };
   });
+
+// ============================================================
+// Peer benchmark snapshot — quick stat cards
+// ============================================================
+
+export const getInsightsSnapshot = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ pharmacy_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const ctx = await buildPharmacyContext(supabase, data.pharmacy_id);
+    return {
+      pharmacy: ctx.pharmacy,
+      reporting_period: ctx.reporting_period,
+      twelve_month: ctx.twelve_month,
+      peer_benchmark: ctx.peer_benchmark,
+      monthly_items_last_24: ctx.monthly_items_last_24,
+    };
+  });
+
+// ============================================================
+// AI Q&A — chat grounded in the pharmacy's data pack
+// ============================================================
+
+const QA_SYSTEM = EXPERT_SYSTEM + `\n\nYou are answering ad-hoc questions from the pharmacy owner/operator. Keep replies tight (under ~250 words unless a table is needed). Use British English. Quote figures from the data pack. If a question cannot be answered from the pack, say so plainly and suggest what data would unlock it. Output markdown only.`;
+
+export const askInsightsQuestion = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      pharmacy_id: z.string().uuid(),
+      question: z.string().min(1).max(2000),
+      history: z.array(z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1).max(8000),
+      })).max(20).optional(),
+    }).parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("AI gateway not configured");
+
+    const aiContext = await buildPharmacyContext(supabase, data.pharmacy_id);
+    const dataBlock = `TARGET DATA PACK:\n\`\`\`json\n${JSON.stringify(aiContext, null, 2)}\n\`\`\``;
+
+    const messages: { role: string; content: string }[] = [
+      { role: "system", content: QA_SYSTEM },
+      { role: "system", content: dataBlock },
+      ...(data.history ?? []),
+      { role: "user", content: data.question },
+    ];
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: "google/gemini-2.5-flash", messages }),
+    });
+    if (res.status === 429) throw new Error("Rate limit exceeded. Please try again shortly.");
+    if (res.status === 402) throw new Error("AI credits exhausted. Add credits in Workspace Settings.");
+    if (!res.ok) throw new Error(`AI gateway error (${res.status})`);
+    const json = await res.json();
+    const answer: string = json.choices?.[0]?.message?.content ?? "";
+    return { answer };
+  });
