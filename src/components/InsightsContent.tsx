@@ -14,7 +14,7 @@ import { toast } from "sonner";
 type PharmacyRow = { id: string; ods_code: string; name: string; country: string | null; region: string | null; address: string | null };
 type CachedInsight = { id: string; insight_type: string; insight_text: string; generated_at: string };
 type ChatMsg = { role: "user" | "assistant"; content: string };
-type Snapshot = Awaited<ReturnType<ReturnType<typeof useServerFn<typeof getInsightsSnapshot>>>>;
+type Snapshot = Awaited<ReturnType<typeof getInsightsSnapshot>>;
 
 function timeAgo(ts: string) {
   const h = Math.round((Date.now() - new Date(ts).getTime()) / 3600000);
