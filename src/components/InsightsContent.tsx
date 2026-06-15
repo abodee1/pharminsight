@@ -1,21 +1,20 @@
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { generateInsight } from "@/lib/insights.functions";
+import { generateInsight, getInsightsSnapshot, askInsightsQuestion } from "@/lib/insights.functions";
 import { Button } from "@/components/ui/button";
 import {
-  Sparkles, Loader2, RefreshCw, Clock, TrendingUp,
-  Building2, ArrowLeft, ChevronRight, AlertTriangle,
+  Sparkles, Loader2, RefreshCw, Clock, TrendingUp, TrendingDown, Minus,
+  ArrowLeft, MessageSquare, Send, BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
 
-const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
 type PharmacyRow = { id: string; ods_code: string; name: string; country: string | null; region: string | null; address: string | null };
 type CachedInsight = { id: string; insight_type: string; insight_text: string; generated_at: string };
-type MarketMover = { ods_code: string; name: string; country: string | null; region: string | null };
+type ChatMsg = { role: "user" | "assistant"; content: string };
+type Snapshot = Awaited<ReturnType<ReturnType<typeof useServerFn<typeof getInsightsSnapshot>>>>;
 
 function timeAgo(ts: string) {
   const h = Math.round((Date.now() - new Date(ts).getTime()) / 3600000);
@@ -41,6 +40,11 @@ function renderMd(text: string): React.ReactNode[] {
   });
 }
 
+const fmtNum = (n: number | null | undefined) =>
+  n == null ? "—" : new Intl.NumberFormat("en-GB").format(Math.round(n));
+const fmtGbp = (n: number | null | undefined) =>
+  n == null ? "—" : "£" + new Intl.NumberFormat("en-GB").format(Math.round(n));
+
 export function InsightsContent({ isDrawer = false }: { isDrawer?: boolean }) {
   const { user } = useAuth();
   const [pharmacy, setPharmacy] = useState<PharmacyRow | null>(null);
@@ -48,10 +52,11 @@ export function InsightsContent({ isDrawer = false }: { isDrawer?: boolean }) {
   const [insights, setInsights] = useState<CachedInsight[]>([]);
   const [activeInsight, setActiveInsight] = useState<CachedInsight | null>(null);
   const [generating, setGenerating] = useState<"swot" | "benchmark" | null>(null);
-  const [movers, setMovers] = useState<MarketMover[]>([]);
-  const [moverContext, setMoverContext] = useState<string>("");
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [snapLoading, setSnapLoading] = useState(false);
 
   const gen = useServerFn(generateInsight);
+  const snap = useServerFn(getInsightsSnapshot);
 
   useEffect(() => {
     if (!user) return;
@@ -76,34 +81,16 @@ export function InsightsContent({ isDrawer = false }: { isDrawer?: boolean }) {
         const arr = (ins as CachedInsight[]) ?? [];
         setInsights(arr);
         setActiveInsight(arr[0] ?? null);
+
+        setSnapLoading(true);
+        try {
+          const s = await snap({ data: { pharmacy_id: ph.id } });
+          setSnapshot(s);
+        } catch { /* non-critical */ }
+        finally { setSnapLoading(false); }
       }
     })();
   }, [user]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const now = new Date();
-        const ly = now.getUTCMonth() >= 2 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
-        const lm = now.getUTCMonth() >= 2 ? now.getUTCMonth() - 1 : now.getUTCMonth() + 11;
-        const [{ data: cur }, { data: prev }] = await Promise.all([
-          supabase.from("dispensing_data").select("pharmacy_id").eq("year", ly).eq("month", lm).gt("items_dispensed", 0).limit(3000),
-          supabase.from("dispensing_data").select("pharmacy_id").eq("year", ly - 1).eq("month", lm).gt("items_dispensed", 0).limit(3000),
-        ]);
-        const prevSet = new Set((prev ?? []).map((r: any) => r.pharmacy_id));
-        const newIds = (cur ?? []).filter((r: any) => !prevSet.has(r.pharmacy_id)).map((r: any) => r.pharmacy_id).slice(0, 12);
-        if (newIds.length > 0) {
-          const { data: ph } = await supabase
-            .from("pharmacies")
-            .select("ods_code,name,country,region")
-            .in("id", newIds)
-            .not("country", "eq", "England");
-          setMovers((ph as MarketMover[]) ?? []);
-          setMoverContext(`${MONTHS[lm - 1]} ${ly} vs ${MONTHS[lm - 1]} ${ly - 1}`);
-        }
-      } catch { /* non-critical */ }
-    })();
-  }, []);
 
   const handleGenerate = async (type: "swot" | "benchmark") => {
     if (!pharmacy) return;
@@ -166,6 +153,8 @@ export function InsightsContent({ isDrawer = false }: { isDrawer?: boolean }) {
         </div>
       </div>
 
+      <PeerSnapshot snapshot={snapshot} loading={snapLoading} />
+
       <div className="grid sm:grid-cols-2 gap-4">
         <InsightTypeCard
           title="SWOT Analysis"
@@ -211,38 +200,193 @@ export function InsightsContent({ isDrawer = false }: { isDrawer?: boolean }) {
         />
       )}
 
-      {movers.length > 0 && (
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center gap-2 mb-1">
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Market movers — recently active</h2>
-          </div>
-          <p className="text-xs text-muted-foreground mb-4">
-            Pharmacies with dispensing activity in {moverContext} that were not seen in the same month one year prior.
-            May include newly registered contractors or pharmacies returning from inactivity.
-          </p>
-          <div className="space-y-2">
-            {movers.map((p) => (
-              <Link
-                key={p.ods_code}
-                to="/pharmacy/$odsCode"
-                params={{ odsCode: p.ods_code }}
-                className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 px-3 py-2.5 hover:bg-secondary transition-colors"
-              >
-                <div>
-                  <p className="text-sm font-medium">{p.name}</p>
-                  <p className="text-xs text-muted-foreground">{[p.country, p.region].filter(Boolean).join(" · ")} · {p.ods_code}</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-              </Link>
-            ))}
-          </div>
-          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 p-2.5 text-xs flex gap-2">
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-            <span>England excluded — detecting new pharmacies across 16,000+ contractors requires a dedicated pipeline (on roadmap). Scotland and Northern Ireland shown here.</span>
-          </div>
-        </div>
+      <AskAnything pharmacy={pharmacy} />
+    </div>
+  );
+}
+
+// ============================================================
+// Peer Snapshot — quick stat cards
+// ============================================================
+
+function PeerSnapshot({ snapshot, loading }: { snapshot: Snapshot | null; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-5 flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading peer snapshot…
+      </div>
+    );
+  }
+  if (!snapshot?.twelve_month) return null;
+
+  const tm = snapshot.twelve_month;
+  const peer = snapshot.peer_benchmark;
+  const items = tm.items_dispensed;
+  const pf = tm.pharmacy_first;
+  const nms = tm.nms;
+
+  const pct = (a: number, b: number) => b > 0 ? Math.round(((a - b) / b) * 100) : null;
+  const itemsVsPeer = peer ? pct(items.current, peer.avg_items_12m) : null;
+  const pfVsPeer = peer ? pct(pf.current, peer.avg_pf_12m) : null;
+  const nmsVsPeer = peer ? pct(nms.current, peer.avg_nms_12m) : null;
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="px-5 py-3 border-b border-border bg-secondary/20 flex items-center gap-2">
+        <BarChart3 className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-sm font-semibold">Peer benchmark snapshot</h2>
+        <span className="text-xs text-muted-foreground ml-auto">
+          Last 12 months{peer ? ` · vs ${peer.n} ${peer.country ?? ""} peers` : ""}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border">
+        <SnapStat label="Items dispensed" value={fmtNum(items.current)} yoy={items.yoy_pct} vsPeer={itemsVsPeer} peerVal={peer ? fmtNum(peer.avg_items_12m) : undefined} />
+        <SnapStat label="Pharmacy First" value={fmtNum(pf.current)} yoy={pf.yoy_pct} vsPeer={pfVsPeer} peerVal={peer ? fmtNum(peer.avg_pf_12m) : undefined} />
+        <SnapStat label="NMS" value={fmtNum(nms.current)} yoy={nms.yoy_pct} vsPeer={nmsVsPeer} peerVal={peer ? fmtNum(peer.avg_nms_12m) : undefined} />
+        <SnapStat label="NHS payment" value={fmtGbp(tm.final_nhs_payment_gbp.current)} yoy={tm.final_nhs_payment_gbp.yoy_pct} />
+      </div>
+    </div>
+  );
+}
+
+function SnapStat({ label, value, yoy, vsPeer, peerVal }: {
+  label: string; value: string; yoy: number | null;
+  vsPeer?: number | null; peerVal?: string;
+}) {
+  const yoyColor = yoy == null ? "text-muted-foreground" : yoy > 0 ? "text-emerald-600" : yoy < 0 ? "text-rose-600" : "text-muted-foreground";
+  const YoyIcon = yoy == null ? Minus : yoy > 0 ? TrendingUp : yoy < 0 ? TrendingDown : Minus;
+  const peerColor = vsPeer == null ? "text-muted-foreground" : vsPeer > 0 ? "text-emerald-600" : vsPeer < 0 ? "text-rose-600" : "text-muted-foreground";
+
+  return (
+    <div className="bg-card p-4">
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
+      <p className="text-xl font-bold mt-1 tabular-nums">{value}</p>
+      <div className="mt-1.5 flex items-center gap-1.5 text-xs">
+        <span className={`inline-flex items-center gap-0.5 font-medium ${yoyColor}`}>
+          <YoyIcon className="h-3 w-3" />{yoy == null ? "—" : `${yoy > 0 ? "+" : ""}${yoy}%`}
+        </span>
+        <span className="text-muted-foreground">YoY</span>
+      </div>
+      {peerVal && (
+        <p className="text-[11px] text-muted-foreground mt-1">
+          Peer avg {peerVal}
+          {vsPeer != null && <span className={`ml-1 font-medium ${peerColor}`}>({vsPeer > 0 ? "+" : ""}{vsPeer}%)</span>}
+        </p>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// AI Q&A chat
+// ============================================================
+
+const SUGGESTIONS = [
+  "What's my biggest opportunity to grow income in 90 days?",
+  "How am I performing on Pharmacy First vs peers?",
+  "Why might my dispensing volume be trending the way it is?",
+  "What service is most underused relative to peers?",
+];
+
+function AskAnything({ pharmacy }: { pharmacy: PharmacyRow }) {
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const ask = useServerFn(askInsightsQuestion);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, busy]);
+
+  const send = async (q: string) => {
+    const question = q.trim();
+    if (!question || busy) return;
+    setInput("");
+    const next: ChatMsg[] = [...messages, { role: "user", content: question }];
+    setMessages(next);
+    setBusy(true);
+    try {
+      const r = await ask({
+        data: {
+          pharmacy_id: pharmacy.id,
+          question,
+          history: messages.slice(-10),
+        },
+      });
+      setMessages([...next, { role: "assistant", content: r.answer }]);
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to get answer");
+      setMessages(next);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="px-5 py-3 border-b border-border bg-secondary/20 flex items-center gap-2">
+        <MessageSquare className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-sm font-semibold">Ask anything about {pharmacy.name}</h2>
+        <span className="text-[10px] bg-gold/10 text-amber-700 border border-gold/25 rounded-full px-2 py-0.5 font-semibold uppercase tracking-wider ml-auto">AI</span>
+      </div>
+
+      <div className="px-5 py-4 max-h-[50vh] overflow-y-auto space-y-4">
+        {messages.length === 0 && !busy && (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Ask free-form questions about your NHS dispensing data, service mix, peer comparison or local landscape. Try one:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => send(s)}
+                  className="text-xs text-left rounded-full border border-border bg-secondary/40 hover:bg-secondary px-3 py-1.5 transition-colors"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {messages.map((m, i) => (
+          <div key={i} className={m.role === "user" ? "flex justify-end" : ""}>
+            {m.role === "user" ? (
+              <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary text-primary-foreground px-3.5 py-2 text-sm">
+                {m.content}
+              </div>
+            ) : (
+              <div className="space-y-0.5">{renderMd(m.content)}</div>
+            )}
+          </div>
+        ))}
+
+        {busy && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Thinking…
+          </div>
+        )}
+        <div ref={endRef} />
+      </div>
+
+      <form
+        onSubmit={(e) => { e.preventDefault(); send(input); }}
+        className="border-t border-border p-3 flex items-center gap-2 bg-background"
+      >
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask about your performance, services, or peers…"
+          className="flex-1 bg-secondary/40 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-gold/40 placeholder:text-muted-foreground"
+          disabled={busy}
+        />
+        <Button type="submit" size="sm" disabled={busy || !input.trim()} className="h-9 px-3 gap-1.5">
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+          Send
+        </Button>
+      </form>
     </div>
   );
 }
