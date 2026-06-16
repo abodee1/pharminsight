@@ -61,7 +61,7 @@ export const generateInsight = createServerFn({ method: "POST" })
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: EXPERT_SYSTEM },
           { role: "user", content: userPrompt },
@@ -477,7 +477,7 @@ export const generateAcquisitionReport = createServerFn({ method: "POST" })
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "google/gemini-2.5-flash",
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: ACQ_SYSTEM_PROMPT },
