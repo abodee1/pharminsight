@@ -658,5 +658,29 @@ export const askInsightsQuestion = createServerFn({ method: "POST" })
     if (!res.ok) throw new Error(`AI gateway error (${res.status})`);
     const json = await res.json();
     const answer: string = json.choices?.[0]?.message?.content ?? "";
-    return { answer };
+
+    // Best-effort follow-up suggestions (separate, cheap call, never blocks UX)
+    let followups: string[] = [];
+    try {
+      const fRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-lite",
+          messages: [
+            { role: "system", content: "You suggest 3 short, concrete follow-up questions a UK pharmacy owner would ask next. Return ONLY a JSON array of 3 strings, no prose. Each under 90 chars, specific to the prior answer." },
+            { role: "user", content: `Question: ${data.question}\n\nAnswer:\n${answer}\n\nReturn JSON array of 3 follow-up questions.` },
+          ],
+        }),
+      });
+      if (fRes.ok) {
+        const fj = await fRes.json();
+        const raw: string = fj.choices?.[0]?.message?.content ?? "[]";
+        const cleaned = raw.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "");
+        const arr = JSON.parse(cleaned);
+        if (Array.isArray(arr)) followups = arr.filter((x) => typeof x === "string").slice(0, 3);
+      }
+    } catch { /* ignore */ }
+
+    return { answer, followups };
   });
