@@ -899,6 +899,50 @@ export function AnnotatedSparkline({
   const yoy = hasChange ? Math.round(((last - first) / first) * 100) : 0;
   const tone = !hasChange ? "text-muted-foreground" : yoy > 0 ? "text-emerald-700" : yoy < 0 ? "text-rose-700" : "text-muted-foreground";
 
+  return <InteractiveSparkline
+    label={label}
+    usable={usable}
+    xs={xs} ys={ys} w={w} h={h}
+    path={path} area={area}
+    min={min} max={max}
+    peakIdx={peakIdx} troughIdx={troughIdx}
+    yoy={yoy} hasChange={hasChange} tone={tone}
+    unit={unit} caption={caption}
+  />;
+}
+
+function InteractiveSparkline({
+  label, usable, xs, ys, w, h, path, area, min, max,
+  peakIdx, troughIdx, yoy, hasChange, tone, unit, caption,
+}: {
+  label: string;
+  usable: { period: string; value: number }[];
+  xs: number[]; ys: number[]; w: number; h: number;
+  path: string; area: string;
+  min: number; max: number;
+  peakIdx: number; troughIdx: number;
+  yoy: number; hasChange: boolean; tone: string;
+  unit: string; caption?: string;
+}) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const svgRef = React.useRef<SVGSVGElement | null>(null);
+
+  const handleMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const xVb = ((e.clientX - rect.left) / rect.width) * w;
+    let nearest = 0;
+    let best = Infinity;
+    for (let i = 0; i < xs.length; i++) {
+      const d = Math.abs(xs[i] - xVb);
+      if (d < best) { best = d; nearest = i; }
+    }
+    setHoverIdx(nearest);
+  };
+
+  const active = hoverIdx ?? -1;
+
   return (
     <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
       <div className="flex items-baseline justify-between gap-4">
@@ -908,21 +952,45 @@ export function AnnotatedSparkline({
         </p>
       </div>
 
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full mt-3 h-20">
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${w} ${h}`}
+        className="w-full mt-3 h-20 cursor-crosshair touch-none"
+        onPointerMove={handleMove}
+        onPointerDown={handleMove}
+        onPointerLeave={() => setHoverIdx(null)}
+      >
         <path d={area} fill="var(--muted)" opacity={0.35} />
         <path d={path} fill="none" stroke="currentColor" strokeWidth={1.5} className="text-foreground" />
         <circle cx={xs[peakIdx]} cy={ys[peakIdx]} r={3} className="fill-foreground" />
         <circle cx={xs[troughIdx]} cy={ys[troughIdx]} r={3} className="fill-muted-foreground" />
+        {active >= 0 && (
+          <>
+            <line x1={xs[active]} x2={xs[active]} y1={0} y2={h} stroke="var(--primary)" strokeWidth={0.75} opacity={0.6} />
+            <circle cx={xs[active]} cy={ys[active]} r={3.5} className="fill-primary" />
+          </>
+        )}
       </svg>
 
-      <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
-        <span>
-          Peak: <span className="font-semibold text-foreground">{fmt(max)}{unit}</span> · {usable[peakIdx].period}
-        </span>
-        <span>
-          Low: <span className="font-semibold text-foreground">{fmt(min)}{unit}</span> · {usable[troughIdx].period}
-        </span>
-      </div>
+      {active >= 0 ? (
+        <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
+          <span>
+            <span className="font-semibold text-foreground">{usable[active].period}</span>
+          </span>
+          <span>
+            <span className="font-semibold text-foreground tabular-nums">{fmt(usable[active].value)}{unit}</span>
+          </span>
+        </div>
+      ) : (
+        <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
+          <span>
+            Peak: <span className="font-semibold text-foreground">{fmt(max)}{unit}</span> · {usable[peakIdx].period}
+          </span>
+          <span>
+            Low: <span className="font-semibold text-foreground">{fmt(min)}{unit}</span> · {usable[troughIdx].period}
+          </span>
+        </div>
+      )}
       {caption && <p className="mt-3 text-xs italic text-muted-foreground border-t border-border pt-2">{caption}</p>}
     </div>
   );
