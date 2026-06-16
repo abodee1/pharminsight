@@ -36,7 +36,10 @@ export const generateInsight = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
     z.object({
-      insight_type: z.enum(["swot", "benchmark", "trend", "acquisition"]),
+      insight_type: z.enum([
+        "swot", "benchmark", "trend", "acquisition",
+        "opportunities", "action_plan", "income_quality", "service_mix",
+      ]),
       pharmacy_id: z.string().uuid().nullable().optional(),
       context: z.record(z.string(), z.unknown()).optional(),
     }).parse(input)
@@ -46,7 +49,6 @@ export const generateInsight = createServerFn({ method: "POST" })
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI gateway not configured");
 
-    // Build the same rich context the Acquisition Report uses, when we have a pharmacy id.
     let aiContext: any = data.context ?? {};
     if (data.pharmacy_id) {
       aiContext = await buildPharmacyContext(supabase, data.pharmacy_id);
@@ -134,6 +136,98 @@ A paragraph on gross cost, final NHS payment and service income lines (£). Comm
 
 ## Next 90 days
 3–5 numbered actions, each with the expected metric to move and a rough £ or % impact.
+
+${dataBlock}`;
+  }
+
+  if (type === "opportunities") {
+    return `Produce an **Opportunity Radar** for this UK community pharmacy — a ranked list of the highest-£ growth opportunities, anchored to the actual peer gap and NHS tariff economics.
+
+Structure (use these exact H2 headings):
+
+## Top 5 opportunities (ranked by annual £ uplift)
+A numbered list. For each: a bold one-line headline naming the service/lever, then 2–3 sentences with: the current value vs the peer benchmark, the calculated gap, the indicative annual £ uplift range (low–high) tied to tariff logic, and the single most concrete action to close the gap in the next 60 days. Always quote a number.
+
+## Quick wins (under 30 days, under £1k cost)
+3–4 bullets, each a tactical move with the metric to watch.
+
+## Structural plays (90+ days)
+2–3 bullets, each a bigger move with an indicative £ range and the operating change required.
+
+## What to ignore
+2 bullets: things that look like opportunities but are not, given the data.
+
+${dataBlock}`;
+  }
+
+  if (type === "action_plan") {
+    return `Produce a **90-day Action Plan** for this UK community pharmacy. This is an executable plan an owner can hand to a manager on Monday morning.
+
+Structure (use these exact H2 headings):
+
+## North star metric
+1 sentence naming the single KPI to move in 90 days and the target (with current baseline).
+
+## Week 1 — set up
+4–6 bullets, each a specific action with owner role (Pharmacist / Counter / Manager), the system or template needed, and the success check by end of week 1.
+
+## Weeks 2–4 — execute
+4–6 bullets, each a specific behavioural change at the counter or in workflow, with the daily/weekly target and the £ or volume impact expected.
+
+## Weeks 5–12 — scale
+4–6 bullets, each a structural change (rota, nomination drive, GP liaison, range, signage, MUR list, supplier renegotiation) with the metric to monitor and rough £ impact.
+
+## Risks & dependencies
+3–4 bullets, each a thing that could derail the plan and the mitigation.
+
+## End-of-90-day scorecard
+A compact markdown table with columns: Metric | Baseline | Target | Stretch. 5–7 rows covering the key services and income lines from the data pack.
+
+${dataBlock}`;
+  }
+
+  if (type === "income_quality") {
+    return `Produce an **Income Quality Scorecard** for this UK community pharmacy — a hard look at the resilience and quality of the £ coming in.
+
+Structure (use these exact H2 headings):
+
+## Overall income quality grade
+A single letter (A / B / C / D) with a one-paragraph justification using the actual £ figures and mix from the data pack.
+
+## Income mix breakdown
+A markdown table with columns: Stream | Last 12m £ | % of total | YoY % | Quality note. Cover dispensing economics, Pharmacy First, NMS (where reported as £), MCR (Scotland), Flu, Smoking cessation, and any residual. Comment on which streams are recurring vs episodic.
+
+## Concentration risk
+2 paragraphs on dependency: how much of income depends on a single service line, a GP cluster, or one tariff mechanism. Quote the % share.
+
+## Resilience signals
+3–4 bullets on what is structurally healthy (e.g. growing service mix, EPS nomination share, repeat dispensing) — each with the supporting number.
+
+## Fragility signals
+3–4 bullets on what looks fragile (e.g. dispensing volume decline, single-service concentration, declining clawback headroom).
+
+## Three moves to upgrade quality
+A numbered list of 3 specific moves that would shift the grade up, each with the metric and rough £ impact.
+
+${dataBlock}`;
+  }
+
+  if (type === "service_mix") {
+    return `Produce a **Service Mix Deep Dive** for this UK community pharmacy. Owner wants to know exactly which clinical services are pulling weight and which are leaking value vs peers.
+
+Structure (use these exact H2 headings):
+
+## Mix snapshot
+2–3 sentences naming the dominant services by volume and by £, and the single biggest mismatch vs peers.
+
+## Service-by-service read
+For each of: **Pharmacy First**, **NMS**, **EPS / nominations**, **Flu**, **MCR** (if Scotland), **EHC**, **Smoking cessation**, **Methadone / supervised consumption** — give a 2–3 sentence read with current 12m volume, YoY %, peer gap where available, and the one operational lever to move it.
+
+## Mix shape verdict
+2 sentences on whether the mix is balanced, dispensing-heavy, or service-heavy, and what that implies for future NHS funding direction.
+
+## Mix moves
+3–5 bullets, each a specific rebalancing move with the service to grow, the service to defend, and the £ or % expected shift.
 
 ${dataBlock}`;
   }
@@ -418,14 +512,108 @@ export const getInsightsSnapshot = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const ctx = await buildPharmacyContext(supabase, data.pharmacy_id);
+    const extras = await buildSnapshotExtras(supabase, data.pharmacy_id, ctx);
     return {
       pharmacy: ctx.pharmacy,
       reporting_period: ctx.reporting_period,
       twelve_month: ctx.twelve_month,
       peer_benchmark: ctx.peer_benchmark,
       monthly_items_last_24: ctx.monthly_items_last_24,
+      latest_month_snapshot: ctx.latest_month_snapshot,
+      ...extras,
     };
   });
+
+// ---- snapshot extras: per-metric monthly series, mix, peer distributions ----
+async function buildSnapshotExtras(supabase: any, pharmacy_id: string, ctx: any) {
+  // Per-metric monthly series (24 months)
+  const { data: rows } = await supabase
+    .from("dispensing_data")
+    .select("year,month,items_dispensed,pharmacy_first_count,nms_count,flu_vaccinations,eps_items,mcr_items,ehc_items,methadone_items,smoking_cessation,gross_cost,pharmacy_first_payment,mcr_payment,smoking_cessation_payment,final_payment")
+    .eq("pharmacy_id", pharmacy_id)
+    .order("year", { ascending: true }).order("month", { ascending: true });
+  const r24 = ((rows || []) as any[]).slice(-24);
+
+  const series = (key: string) => r24.map((r: any) => ({ y: r.year, m: r.month, v: Number(r[key]) || 0 }));
+  const monthly = {
+    items: series("items_dispensed"),
+    pharmacy_first: series("pharmacy_first_count"),
+    nms: series("nms_count"),
+    flu: series("flu_vaccinations"),
+    eps: series("eps_items"),
+    final_payment: series("final_payment"),
+  };
+
+  // Service mix (last 12m volumes)
+  const l12 = r24.slice(-12);
+  const s = (key: string) => l12.reduce((a, r) => a + (Number(r[key]) || 0), 0);
+  const service_mix_12m = [
+    { label: "Pharmacy First", value: s("pharmacy_first_count") },
+    { label: "NMS", value: s("nms_count") },
+    { label: "Flu", value: s("flu_vaccinations") },
+    { label: "EPS items", value: s("eps_items") },
+    { label: "MCR items", value: s("mcr_items") },
+    { label: "EHC", value: s("ehc_items") },
+    { label: "Methadone", value: s("methadone_items") },
+    { label: "Smoking cessation", value: s("smoking_cessation") },
+  ].filter((x) => x.value > 0);
+
+  // Income mix (last 12m £)
+  const pfPay = s("pharmacy_first_payment");
+  const mcrPay = s("mcr_payment");
+  const smPay = s("smoking_cessation_payment");
+  const total = s("final_payment");
+  const namedClinical = pfPay + mcrPay + smPay;
+  const dispensingResidual = Math.max(0, total - namedClinical);
+  const income_mix_12m = [
+    { label: "Dispensing & other", value: Math.round(dispensingResidual) },
+    { label: "Pharmacy First", value: Math.round(pfPay) },
+    { label: "MCR (Scotland)", value: Math.round(mcrPay) },
+    { label: "Smoking cessation", value: Math.round(smPay) },
+  ].filter((x) => x.value > 0);
+
+  // Peer distributions (use country peers, 12m totals per pharmacy)
+  let peer_distribution: { items: number[]; pf: number[]; nms: number[]; final_payment: number[] } | null = null;
+  try {
+    const country = ctx.pharmacy?.country;
+    const latest = r24[r24.length - 1];
+    if (country && latest) {
+      const { data: peerPhs } = await supabase
+        .from("pharmacies").select("id").eq("country", country).neq("id", pharmacy_id).limit(400);
+      const ids = (peerPhs || []).map((p: any) => p.id);
+      if (ids.length) {
+        const earliest = r24[Math.max(0, r24.length - 12)];
+        const cy = earliest?.year ?? latest.year - 1;
+        const cm = earliest?.month ?? latest.month;
+        const { data: peerRows } = await supabase
+          .from("dispensing_data")
+          .select("pharmacy_id,items_dispensed,pharmacy_first_count,nms_count,final_payment,year,month")
+          .in("pharmacy_id", ids)
+          .or(`year.gt.${cy},and(year.eq.${cy},month.gte.${cm})`);
+        const g = new Map<string, { items: number; pf: number; nms: number; fp: number }>();
+        for (const r of (peerRows || []) as any[]) {
+          const cur = g.get(r.pharmacy_id) || { items: 0, pf: 0, nms: 0, fp: 0 };
+          cur.items += Number(r.items_dispensed) || 0;
+          cur.pf += Number(r.pharmacy_first_count) || 0;
+          cur.nms += Number(r.nms_count) || 0;
+          cur.fp += Number(r.final_payment) || 0;
+          g.set(r.pharmacy_id, cur);
+        }
+        const arr = Array.from(g.values());
+        if (arr.length) {
+          peer_distribution = {
+            items: arr.map((x) => x.items).sort((a, b) => a - b),
+            pf: arr.map((x) => x.pf).sort((a, b) => a - b),
+            nms: arr.map((x) => x.nms).sort((a, b) => a - b),
+            final_payment: arr.map((x) => Math.round(x.fp)).sort((a, b) => a - b),
+          };
+        }
+      }
+    }
+  } catch { /* non-critical */ }
+
+  return { monthly, service_mix_12m, income_mix_12m, peer_distribution };
+}
 
 // ============================================================
 // AI Q&A — chat grounded in the pharmacy's data pack
@@ -470,5 +658,29 @@ export const askInsightsQuestion = createServerFn({ method: "POST" })
     if (!res.ok) throw new Error(`AI gateway error (${res.status})`);
     const json = await res.json();
     const answer: string = json.choices?.[0]?.message?.content ?? "";
-    return { answer };
+
+    // Best-effort follow-up suggestions (separate, cheap call, never blocks UX)
+    let followups: string[] = [];
+    try {
+      const fRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-lite",
+          messages: [
+            { role: "system", content: "You suggest 3 short, concrete follow-up questions a UK pharmacy owner would ask next. Return ONLY a JSON array of 3 strings, no prose. Each under 90 chars, specific to the prior answer." },
+            { role: "user", content: `Question: ${data.question}\n\nAnswer:\n${answer}\n\nReturn JSON array of 3 follow-up questions.` },
+          ],
+        }),
+      });
+      if (fRes.ok) {
+        const fj = await fRes.json();
+        const raw: string = fj.choices?.[0]?.message?.content ?? "[]";
+        const cleaned = raw.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "");
+        const arr = JSON.parse(cleaned);
+        if (Array.isArray(arr)) followups = arr.filter((x) => typeof x === "string").slice(0, 3);
+      }
+    } catch { /* ignore */ }
+
+    return { answer, followups };
   });
