@@ -70,7 +70,10 @@ export const generateInsight = createServerFn({ method: "POST" })
     });
     if (res.status === 429) throw new Error("Rate limit exceeded. Please try again shortly.");
     if (res.status === 402) throw new Error("AI credits exhausted. Add credits in Workspace Settings.");
-    if (!res.ok) throw new Error(`AI gateway error (${res.status})`);
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`AI gateway error (${res.status})${body ? `: ${body}` : ""}`);
+    }
     const json = await res.json();
     const text: string = json.choices?.[0]?.message?.content ?? "";
 
@@ -581,14 +584,14 @@ async function buildSnapshotExtras(supabase: any, pharmacy_id: string, ctx: any)
     const country = ctx.pharmacy?.country;
     const latest = r24[r24.length - 1];
     if (country && latest) {
-      const { data: peerPhs } = await supabase
+      const { data: peerPhs } = await supabaseAdmin
         .from("pharmacies").select("id").eq("country", country).neq("id", pharmacy_id).limit(400);
       const ids = (peerPhs || []).map((p: any) => p.id);
       if (ids.length) {
         const earliest = r24[Math.max(0, r24.length - 12)];
         const cy = earliest?.year ?? latest.year - 1;
         const cm = earliest?.month ?? latest.month;
-        const { data: peerRows } = await supabase
+        const { data: peerRows } = await supabaseAdmin
           .from("dispensing_data")
           .select("pharmacy_id,items_dispensed,pharmacy_first_count,nms_count,final_payment,year,month")
           .in("pharmacy_id", ids)
@@ -658,7 +661,10 @@ export const askInsightsQuestion = createServerFn({ method: "POST" })
     });
     if (res.status === 429) throw new Error("Rate limit exceeded. Please try again shortly.");
     if (res.status === 402) throw new Error("AI credits exhausted. Add credits in Workspace Settings.");
-    if (!res.ok) throw new Error(`AI gateway error (${res.status})`);
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`AI gateway error (${res.status})${body ? `: ${body}` : ""}`);
+    }
     const json = await res.json();
     const answer: string = json.choices?.[0]?.message?.content ?? "";
 
