@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { z } from "zod";
 
 async function geocodePostcode(postcode: string | null | undefined): Promise<{ lat: number; lng: number } | null> {
@@ -294,7 +295,7 @@ async function buildPharmacyContext(supabase: any, pharmacy_id: string) {
 
   let peerStats: { avg_items_12m: number; avg_pf_12m: number; avg_nms_12m: number; n: number } | null = null;
   if (pharmacy.country && latest) {
-    const { data: peerPhs } = await supabase
+    const { data: peerPhs } = await supabaseAdmin
       .from("pharmacies").select("id").eq("country", pharmacy.country).neq("id", pharmacy.id).limit(400);
     const ids = (peerPhs || []).map((p: any) => p.id);
     if (ids.length) {
@@ -302,7 +303,9 @@ async function buildPharmacyContext(supabase: any, pharmacy_id: string) {
       const earliestYM = rows[minIdx];
       const cutoffYear = earliestYM?.year ?? latest.year - 1;
       const cutoffMonth = earliestYM?.month ?? latest.month;
-      const { data: peerRows } = await supabase
+      // Use supabaseAdmin to avoid the 1000-row PostgREST default limit —
+      // 400 peers × 12 months = up to 4800 rows.
+      const { data: peerRows } = await supabaseAdmin
         .from("dispensing_data")
         .select("pharmacy_id,items_dispensed,pharmacy_first_count,nms_count,year,month")
         .in("pharmacy_id", ids)
