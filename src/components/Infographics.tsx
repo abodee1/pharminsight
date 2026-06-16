@@ -1,7 +1,7 @@
 // Editorial / FT-style infographic primitives.
 // Built on top of semantic tokens (no hard-coded colors).
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from "recharts";
@@ -615,27 +615,48 @@ export function PercentileRail({
   nationalLabel?: string;
   formatValue?: (n: number) => string;
 }) {
+  const sortedAll = useMemo(
+    () => values.filter((v) => typeof v === "number" && !isNaN(v)).sort((a, b) => a - b),
+    [values],
+  );
+
   const { percentile, peerAvg, max } = useMemo(() => {
-    const arr = values.filter((v) => typeof v === "number" && !isNaN(v));
-    if (!arr.length) return { percentile: 0, peerAvg: 0, max: 0 };
-    const sorted = [...arr].sort((a, b) => a - b);
-    const below = sorted.filter((v) => v < value).length;
-    const pct = Math.round((below / sorted.length) * 100);
-    const avg = Math.round(arr.reduce((a, b) => a + b, 0) / arr.length);
-    return { percentile: pct, peerAvg: avg, max: sorted[sorted.length - 1] };
-  }, [values, value]);
+    if (!sortedAll.length) return { percentile: 0, peerAvg: 0, max: 0 };
+    const below = sortedAll.filter((v) => v < value).length;
+    const pct = Math.round((below / sortedAll.length) * 100);
+    const avg = Math.round(sortedAll.reduce((a, b) => a + b, 0) / sortedAll.length);
+    return { percentile: pct, peerAvg: avg, max: sortedAll[sortedAll.length - 1] };
+  }, [sortedAll, value]);
 
   const peerPct = useMemo(() => {
-    const arr = values.filter((v) => typeof v === "number" && !isNaN(v));
-    if (!arr.length) return 50;
-    const sorted = [...arr].sort((a, b) => a - b);
-    const below = sorted.filter((v) => v < peerAvg).length;
-    return Math.round((below / sorted.length) * 100);
-  }, [values, peerAvg]);
+    if (!sortedAll.length) return 50;
+    const below = sortedAll.filter((v) => v < peerAvg).length;
+    return Math.round((below / sortedAll.length) * 100);
+  }, [sortedAll, peerAvg]);
+
+  const [hoverPct, setHoverPct] = useState<number | null>(null);
+  const hoverValue = useMemo(() => {
+    if (hoverPct == null || !sortedAll.length) return null;
+    const idx = Math.min(
+      sortedAll.length - 1,
+      Math.max(0, Math.round((hoverPct / 100) * (sortedAll.length - 1))),
+    );
+    return sortedAll[idx];
+  }, [hoverPct, sortedAll]);
+
+  const handleMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.round(
+      Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100)),
+    );
+    setHoverPct(pct);
+  };
 
   const tone =
     percentile >= 75 ? "text-emerald-700" : percentile <= 25 ? "text-rose-700" : "text-foreground";
-  const rank = values.length ? values.length - Math.round((percentile / 100) * values.length) + 1 : 0;
+  const rank = sortedAll.length
+    ? sortedAll.length - Math.round((percentile / 100) * sortedAll.length) + 1
+    : 0;
 
   return (
     <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
@@ -643,42 +664,59 @@ export function PercentileRail({
         <h3 className="text-sm font-semibold tracking-tight">{label}</h3>
         <p className={`text-xs ${tone}`}>
           <span className="font-semibold">{ordinal(percentile)}</span> percentile
-          {values.length > 1 && (
-            <span className="text-muted-foreground"> · {ordinal(rank)} of {values.length}</span>
+          {sortedAll.length > 1 && (
+            <span className="text-muted-foreground"> · {ordinal(rank)} of {sortedAll.length}</span>
           )}
         </p>
       </div>
 
-      {/* Track */}
-      <div className="mt-4 relative h-8">
-        {/* Quartile band */}
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-2 rounded-full bg-secondary/60 overflow-hidden">
-          {/* Mid 50% (Q1–Q3) shading */}
+      {/* Track — interactive: drag/hover to inspect any percentile */}
+      <div
+        className="mt-4 relative h-8 cursor-crosshair touch-none select-none"
+        onPointerMove={handleMove}
+        onPointerDown={handleMove}
+        onPointerLeave={() => setHoverPct(null)}
+        role="slider"
+        aria-label={`${label} percentile explorer`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={hoverPct ?? percentile}
+      >
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-2 rounded-full bg-secondary/60 overflow-hidden pointer-events-none">
           <div className="absolute top-0 bottom-0 left-1/4 right-1/4 bg-secondary" />
-          {/* Filled portion to user */}
           <div
             className="absolute top-0 bottom-0 left-0 bg-foreground/80 rounded-full transition-all"
             style={{ width: `${Math.max(2, percentile)}%` }}
           />
         </div>
 
-        {/* Peer avg tick */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 h-4 w-px bg-muted-foreground/60"
+          className="absolute top-1/2 -translate-y-1/2 h-4 w-px bg-muted-foreground/60 pointer-events-none"
           style={{ left: `${peerPct}%` }}
           title={`${peerLabel}: ${formatValue(peerAvg)}`}
         />
 
-        {/* You marker */}
         <div
-          className="absolute -translate-x-1/2 top-0"
+          className="absolute -translate-x-1/2 top-0 pointer-events-none"
           style={{ left: `${Math.max(2, Math.min(98, percentile))}%` }}
         >
           <div className="h-8 w-px bg-foreground" />
           <div className="absolute -translate-x-1/2 -top-1.5 h-3 w-3 rounded-full bg-foreground border-2 border-card" />
         </div>
 
-        {/* Endpoint scale */}
+        {hoverPct != null && hoverValue != null && (
+          <div
+            className="absolute -translate-x-1/2 top-0 pointer-events-none"
+            style={{ left: `${Math.max(2, Math.min(98, hoverPct))}%` }}
+          >
+            <div className="h-8 w-px bg-primary/70" />
+            <div className="absolute -translate-x-1/2 -top-9 whitespace-nowrap rounded-md border border-border bg-card px-2 py-1 text-[10px] shadow-md">
+              <span className="font-semibold tabular-nums">{formatValue(hoverValue)}</span>
+              <span className="text-muted-foreground"> · {ordinal(hoverPct)}</span>
+            </div>
+          </div>
+        )}
+
         <div className="absolute -bottom-4 left-0 text-[10px] uppercase tracking-wider text-muted-foreground">
           0
         </div>
@@ -861,6 +899,50 @@ export function AnnotatedSparkline({
   const yoy = hasChange ? Math.round(((last - first) / first) * 100) : 0;
   const tone = !hasChange ? "text-muted-foreground" : yoy > 0 ? "text-emerald-700" : yoy < 0 ? "text-rose-700" : "text-muted-foreground";
 
+  return <InteractiveSparkline
+    label={label}
+    usable={usable}
+    xs={xs} ys={ys} w={w} h={h}
+    path={path} area={area}
+    min={min} max={max}
+    peakIdx={peakIdx} troughIdx={troughIdx}
+    yoy={yoy} hasChange={hasChange} tone={tone}
+    unit={unit} caption={caption}
+  />;
+}
+
+function InteractiveSparkline({
+  label, usable, xs, ys, w, h, path, area, min, max,
+  peakIdx, troughIdx, yoy, hasChange, tone, unit, caption,
+}: {
+  label: string;
+  usable: { period: string; value: number }[];
+  xs: number[]; ys: number[]; w: number; h: number;
+  path: string; area: string;
+  min: number; max: number;
+  peakIdx: number; troughIdx: number;
+  yoy: number; hasChange: boolean; tone: string;
+  unit: string; caption?: string;
+}) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const svgRef = React.useRef<SVGSVGElement | null>(null);
+
+  const handleMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const xVb = ((e.clientX - rect.left) / rect.width) * w;
+    let nearest = 0;
+    let best = Infinity;
+    for (let i = 0; i < xs.length; i++) {
+      const d = Math.abs(xs[i] - xVb);
+      if (d < best) { best = d; nearest = i; }
+    }
+    setHoverIdx(nearest);
+  };
+
+  const active = hoverIdx ?? -1;
+
   return (
     <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
       <div className="flex items-baseline justify-between gap-4">
@@ -870,21 +952,45 @@ export function AnnotatedSparkline({
         </p>
       </div>
 
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full mt-3 h-20">
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${w} ${h}`}
+        className="w-full mt-3 h-20 cursor-crosshair touch-none"
+        onPointerMove={handleMove}
+        onPointerDown={handleMove}
+        onPointerLeave={() => setHoverIdx(null)}
+      >
         <path d={area} fill="var(--muted)" opacity={0.35} />
         <path d={path} fill="none" stroke="currentColor" strokeWidth={1.5} className="text-foreground" />
         <circle cx={xs[peakIdx]} cy={ys[peakIdx]} r={3} className="fill-foreground" />
         <circle cx={xs[troughIdx]} cy={ys[troughIdx]} r={3} className="fill-muted-foreground" />
+        {active >= 0 && (
+          <>
+            <line x1={xs[active]} x2={xs[active]} y1={0} y2={h} stroke="var(--primary)" strokeWidth={0.75} opacity={0.6} />
+            <circle cx={xs[active]} cy={ys[active]} r={3.5} className="fill-primary" />
+          </>
+        )}
       </svg>
 
-      <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
-        <span>
-          Peak: <span className="font-semibold text-foreground">{fmt(max)}{unit}</span> · {usable[peakIdx].period}
-        </span>
-        <span>
-          Low: <span className="font-semibold text-foreground">{fmt(min)}{unit}</span> · {usable[troughIdx].period}
-        </span>
-      </div>
+      {active >= 0 ? (
+        <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
+          <span>
+            <span className="font-semibold text-foreground">{usable[active].period}</span>
+          </span>
+          <span>
+            <span className="font-semibold text-foreground tabular-nums">{fmt(usable[active].value)}{unit}</span>
+          </span>
+        </div>
+      ) : (
+        <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
+          <span>
+            Peak: <span className="font-semibold text-foreground">{fmt(max)}{unit}</span> · {usable[peakIdx].period}
+          </span>
+          <span>
+            Low: <span className="font-semibold text-foreground">{fmt(min)}{unit}</span> · {usable[troughIdx].period}
+          </span>
+        </div>
+      )}
       {caption && <p className="mt-3 text-xs italic text-muted-foreground border-t border-border pt-2">{caption}</p>}
     </div>
   );
