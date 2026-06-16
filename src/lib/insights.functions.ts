@@ -36,7 +36,10 @@ export const generateInsight = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
     z.object({
-      insight_type: z.enum(["swot", "benchmark", "trend", "acquisition"]),
+      insight_type: z.enum([
+        "swot", "benchmark", "trend", "acquisition",
+        "opportunities", "action_plan", "income_quality", "service_mix",
+      ]),
       pharmacy_id: z.string().uuid().nullable().optional(),
       context: z.record(z.string(), z.unknown()).optional(),
     }).parse(input)
@@ -46,7 +49,6 @@ export const generateInsight = createServerFn({ method: "POST" })
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI gateway not configured");
 
-    // Build the same rich context the Acquisition Report uses, when we have a pharmacy id.
     let aiContext: any = data.context ?? {};
     if (data.pharmacy_id) {
       aiContext = await buildPharmacyContext(supabase, data.pharmacy_id);
