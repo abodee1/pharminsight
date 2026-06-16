@@ -512,14 +512,108 @@ export const getInsightsSnapshot = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const ctx = await buildPharmacyContext(supabase, data.pharmacy_id);
+    const extras = await buildSnapshotExtras(supabase, data.pharmacy_id, ctx);
     return {
       pharmacy: ctx.pharmacy,
       reporting_period: ctx.reporting_period,
       twelve_month: ctx.twelve_month,
       peer_benchmark: ctx.peer_benchmark,
       monthly_items_last_24: ctx.monthly_items_last_24,
+      latest_month_snapshot: ctx.latest_month_snapshot,
+      ...extras,
     };
   });
+
+// ---- snapshot extras: per-metric monthly series, mix, peer distributions ----
+async function buildSnapshotExtras(supabase: any, pharmacy_id: string, ctx: any) {
+  // Per-metric monthly series (24 months)
+  const { data: rows } = await supabase
+    .from("dispensing_data")
+    .select("year,month,items_dispensed,pharmacy_first_count,nms_count,flu_vaccinations,eps_items,mcr_items,ehc_items,methadone_items,smoking_cessation,gross_cost,pharmacy_first_payment,mcr_payment,smoking_cessation_payment,final_payment")
+    .eq("pharmacy_id", pharmacy_id)
+    .order("year", { ascending: true }).order("month", { ascending: true });
+  const r24 = ((rows || []) as any[]).slice(-24);
+
+  const series = (key: string) => r24.map((r: any) => ({ y: r.year, m: r.month, v: Number(r[key]) || 0 }));
+  const monthly = {
+    items: series("items_dispensed"),
+    pharmacy_first: series("pharmacy_first_count"),
+    nms: series("nms_count"),
+    flu: series("flu_vaccinations"),
+    eps: series("eps_items"),
+    final_payment: series("final_payment"),
+  };
+
+  // Service mix (last 12m volumes)
+  const l12 = r24.slice(-12);
+  const s = (key: string) => l12.reduce((a, r) => a + (Number(r[key]) || 0), 0);
+  const service_mix_12m = [
+    { label: "Pharmacy First", value: s("pharmacy_first_count") },
+    { label: "NMS", value: s("nms_count") },
+    { label: "Flu", value: s("flu_vaccinations") },
+    { label: "EPS items", value: s("eps_items") },
+    { label: "MCR items", value: s("mcr_items") },
+    { label: "EHC", value: s("ehc_items") },
+    { label: "Methadone", value: s("methadone_items") },
+    { label: "Smoking cessation", value: s("smoking_cessation") },
+  ].filter((x) => x.value > 0);
+
+  // Income mix (last 12m £)
+  const pfPay = s("pharmacy_first_payment");
+  const mcrPay = s("mcr_payment");
+  const smPay = s("smoking_cessation_payment");
+  const total = s("final_payment");
+  const namedClinical = pfPay + mcrPay + smPay;
+  const dispensingResidual = Math.max(0, total - namedClinical);
+  const income_mix_12m = [
+    { label: "Dispensing & other", value: Math.round(dispensingResidual) },
+    { label: "Pharmacy First", value: Math.round(pfPay) },
+    { label: "MCR (Scotland)", value: Math.round(mcrPay) },
+    { label: "Smoking cessation", value: Math.round(smPay) },
+  ].filter((x) => x.value > 0);
+
+  // Peer distributions (use country peers, 12m totals per pharmacy)
+  let peer_distribution: { items: number[]; pf: number[]; nms: number[]; final_payment: number[] } | null = null;
+  try {
+    const country = ctx.pharmacy?.country;
+    const latest = r24[r24.length - 1];
+    if (country && latest) {
+      const { data: peerPhs } = await supabase
+        .from("pharmacies").select("id").eq("country", country).neq("id", pharmacy_id).limit(400);
+      const ids = (peerPhs || []).map((p: any) => p.id);
+      if (ids.length) {
+        const earliest = r24[Math.max(0, r24.length - 12)];
+        const cy = earliest?.year ?? latest.year - 1;
+        const cm = earliest?.month ?? latest.month;
+        const { data: peerRows } = await supabase
+          .from("dispensing_data")
+          .select("pharmacy_id,items_dispensed,pharmacy_first_count,nms_count,final_payment,year,month")
+          .in("pharmacy_id", ids)
+          .or(`year.gt.${cy},and(year.eq.${cy},month.gte.${cm})`);
+        const g = new Map<string, { items: number; pf: number; nms: number; fp: number }>();
+        for (const r of (peerRows || []) as any[]) {
+          const cur = g.get(r.pharmacy_id) || { items: 0, pf: 0, nms: 0, fp: 0 };
+          cur.items += Number(r.items_dispensed) || 0;
+          cur.pf += Number(r.pharmacy_first_count) || 0;
+          cur.nms += Number(r.nms_count) || 0;
+          cur.fp += Number(r.final_payment) || 0;
+          g.set(r.pharmacy_id, cur);
+        }
+        const arr = Array.from(g.values());
+        if (arr.length) {
+          peer_distribution = {
+            items: arr.map((x) => x.items).sort((a, b) => a - b),
+            pf: arr.map((x) => x.pf).sort((a, b) => a - b),
+            nms: arr.map((x) => x.nms).sort((a, b) => a - b),
+            final_payment: arr.map((x) => Math.round(x.fp)).sort((a, b) => a - b),
+          };
+        }
+      }
+    }
+  } catch { /* non-critical */ }
+
+  return { monthly, service_mix_12m, income_mix_12m, peer_distribution };
+}
 
 // ============================================================
 // AI Q&A — chat grounded in the pharmacy's data pack
