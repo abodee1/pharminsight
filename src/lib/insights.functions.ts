@@ -140,6 +140,98 @@ A paragraph on gross cost, final NHS payment and service income lines (£). Comm
 ${dataBlock}`;
   }
 
+  if (type === "opportunities") {
+    return `Produce an **Opportunity Radar** for this UK community pharmacy — a ranked list of the highest-£ growth opportunities, anchored to the actual peer gap and NHS tariff economics.
+
+Structure (use these exact H2 headings):
+
+## Top 5 opportunities (ranked by annual £ uplift)
+A numbered list. For each: a bold one-line headline naming the service/lever, then 2–3 sentences with: the current value vs the peer benchmark, the calculated gap, the indicative annual £ uplift range (low–high) tied to tariff logic, and the single most concrete action to close the gap in the next 60 days. Always quote a number.
+
+## Quick wins (under 30 days, under £1k cost)
+3–4 bullets, each a tactical move with the metric to watch.
+
+## Structural plays (90+ days)
+2–3 bullets, each a bigger move with an indicative £ range and the operating change required.
+
+## What to ignore
+2 bullets: things that look like opportunities but are not, given the data.
+
+${dataBlock}`;
+  }
+
+  if (type === "action_plan") {
+    return `Produce a **90-day Action Plan** for this UK community pharmacy. This is an executable plan an owner can hand to a manager on Monday morning.
+
+Structure (use these exact H2 headings):
+
+## North star metric
+1 sentence naming the single KPI to move in 90 days and the target (with current baseline).
+
+## Week 1 — set up
+4–6 bullets, each a specific action with owner role (Pharmacist / Counter / Manager), the system or template needed, and the success check by end of week 1.
+
+## Weeks 2–4 — execute
+4–6 bullets, each a specific behavioural change at the counter or in workflow, with the daily/weekly target and the £ or volume impact expected.
+
+## Weeks 5–12 — scale
+4–6 bullets, each a structural change (rota, nomination drive, GP liaison, range, signage, MUR list, supplier renegotiation) with the metric to monitor and rough £ impact.
+
+## Risks & dependencies
+3–4 bullets, each a thing that could derail the plan and the mitigation.
+
+## End-of-90-day scorecard
+A compact markdown table with columns: Metric | Baseline | Target | Stretch. 5–7 rows covering the key services and income lines from the data pack.
+
+${dataBlock}`;
+  }
+
+  if (type === "income_quality") {
+    return `Produce an **Income Quality Scorecard** for this UK community pharmacy — a hard look at the resilience and quality of the £ coming in.
+
+Structure (use these exact H2 headings):
+
+## Overall income quality grade
+A single letter (A / B / C / D) with a one-paragraph justification using the actual £ figures and mix from the data pack.
+
+## Income mix breakdown
+A markdown table with columns: Stream | Last 12m £ | % of total | YoY % | Quality note. Cover dispensing economics, Pharmacy First, NMS (where reported as £), MCR (Scotland), Flu, Smoking cessation, and any residual. Comment on which streams are recurring vs episodic.
+
+## Concentration risk
+2 paragraphs on dependency: how much of income depends on a single service line, a GP cluster, or one tariff mechanism. Quote the % share.
+
+## Resilience signals
+3–4 bullets on what is structurally healthy (e.g. growing service mix, EPS nomination share, repeat dispensing) — each with the supporting number.
+
+## Fragility signals
+3–4 bullets on what looks fragile (e.g. dispensing volume decline, single-service concentration, declining clawback headroom).
+
+## Three moves to upgrade quality
+A numbered list of 3 specific moves that would shift the grade up, each with the metric and rough £ impact.
+
+${dataBlock}`;
+  }
+
+  if (type === "service_mix") {
+    return `Produce a **Service Mix Deep Dive** for this UK community pharmacy. Owner wants to know exactly which clinical services are pulling weight and which are leaking value vs peers.
+
+Structure (use these exact H2 headings):
+
+## Mix snapshot
+2–3 sentences naming the dominant services by volume and by £, and the single biggest mismatch vs peers.
+
+## Service-by-service read
+For each of: **Pharmacy First**, **NMS**, **EPS / nominations**, **Flu**, **MCR** (if Scotland), **EHC**, **Smoking cessation**, **Methadone / supervised consumption** — give a 2–3 sentence read with current 12m volume, YoY %, peer gap where available, and the one operational lever to move it.
+
+## Mix shape verdict
+2 sentences on whether the mix is balanced, dispensing-heavy, or service-heavy, and what that implies for future NHS funding direction.
+
+## Mix moves
+3–5 bullets, each a specific rebalancing move with the service to grow, the service to defend, and the £ or % expected shift.
+
+${dataBlock}`;
+  }
+
   // Fallback for "trend" / "acquisition" via this endpoint
   return `Produce an expert analysis (type: ${type}) using clear H2 markdown sections. Be specific to the numbers.\n\n${dataBlock}`;
 }
