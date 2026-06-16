@@ -1,7 +1,7 @@
 // Editorial / FT-style infographic primitives.
 // Built on top of semantic tokens (no hard-coded colors).
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from "recharts";
