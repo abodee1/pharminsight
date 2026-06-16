@@ -615,27 +615,48 @@ export function PercentileRail({
   nationalLabel?: string;
   formatValue?: (n: number) => string;
 }) {
+  const sortedAll = useMemo(
+    () => values.filter((v) => typeof v === "number" && !isNaN(v)).sort((a, b) => a - b),
+    [values],
+  );
+
   const { percentile, peerAvg, max } = useMemo(() => {
-    const arr = values.filter((v) => typeof v === "number" && !isNaN(v));
-    if (!arr.length) return { percentile: 0, peerAvg: 0, max: 0 };
-    const sorted = [...arr].sort((a, b) => a - b);
-    const below = sorted.filter((v) => v < value).length;
-    const pct = Math.round((below / sorted.length) * 100);
-    const avg = Math.round(arr.reduce((a, b) => a + b, 0) / arr.length);
-    return { percentile: pct, peerAvg: avg, max: sorted[sorted.length - 1] };
-  }, [values, value]);
+    if (!sortedAll.length) return { percentile: 0, peerAvg: 0, max: 0 };
+    const below = sortedAll.filter((v) => v < value).length;
+    const pct = Math.round((below / sortedAll.length) * 100);
+    const avg = Math.round(sortedAll.reduce((a, b) => a + b, 0) / sortedAll.length);
+    return { percentile: pct, peerAvg: avg, max: sortedAll[sortedAll.length - 1] };
+  }, [sortedAll, value]);
 
   const peerPct = useMemo(() => {
-    const arr = values.filter((v) => typeof v === "number" && !isNaN(v));
-    if (!arr.length) return 50;
-    const sorted = [...arr].sort((a, b) => a - b);
-    const below = sorted.filter((v) => v < peerAvg).length;
-    return Math.round((below / sorted.length) * 100);
-  }, [values, peerAvg]);
+    if (!sortedAll.length) return 50;
+    const below = sortedAll.filter((v) => v < peerAvg).length;
+    return Math.round((below / sortedAll.length) * 100);
+  }, [sortedAll, peerAvg]);
+
+  const [hoverPct, setHoverPct] = useState<number | null>(null);
+  const hoverValue = useMemo(() => {
+    if (hoverPct == null || !sortedAll.length) return null;
+    const idx = Math.min(
+      sortedAll.length - 1,
+      Math.max(0, Math.round((hoverPct / 100) * (sortedAll.length - 1))),
+    );
+    return sortedAll[idx];
+  }, [hoverPct, sortedAll]);
+
+  const handleMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.round(
+      Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100)),
+    );
+    setHoverPct(pct);
+  };
 
   const tone =
     percentile >= 75 ? "text-emerald-700" : percentile <= 25 ? "text-rose-700" : "text-foreground";
-  const rank = values.length ? values.length - Math.round((percentile / 100) * values.length) + 1 : 0;
+  const rank = sortedAll.length
+    ? sortedAll.length - Math.round((percentile / 100) * sortedAll.length) + 1
+    : 0;
 
   return (
     <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
@@ -643,42 +664,59 @@ export function PercentileRail({
         <h3 className="text-sm font-semibold tracking-tight">{label}</h3>
         <p className={`text-xs ${tone}`}>
           <span className="font-semibold">{ordinal(percentile)}</span> percentile
-          {values.length > 1 && (
-            <span className="text-muted-foreground"> · {ordinal(rank)} of {values.length}</span>
+          {sortedAll.length > 1 && (
+            <span className="text-muted-foreground"> · {ordinal(rank)} of {sortedAll.length}</span>
           )}
         </p>
       </div>
 
-      {/* Track */}
-      <div className="mt-4 relative h-8">
-        {/* Quartile band */}
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-2 rounded-full bg-secondary/60 overflow-hidden">
-          {/* Mid 50% (Q1–Q3) shading */}
+      {/* Track — interactive: drag/hover to inspect any percentile */}
+      <div
+        className="mt-4 relative h-8 cursor-crosshair touch-none select-none"
+        onPointerMove={handleMove}
+        onPointerDown={handleMove}
+        onPointerLeave={() => setHoverPct(null)}
+        role="slider"
+        aria-label={`${label} percentile explorer`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={hoverPct ?? percentile}
+      >
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-2 rounded-full bg-secondary/60 overflow-hidden pointer-events-none">
           <div className="absolute top-0 bottom-0 left-1/4 right-1/4 bg-secondary" />
-          {/* Filled portion to user */}
           <div
             className="absolute top-0 bottom-0 left-0 bg-foreground/80 rounded-full transition-all"
             style={{ width: `${Math.max(2, percentile)}%` }}
           />
         </div>
 
-        {/* Peer avg tick */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 h-4 w-px bg-muted-foreground/60"
+          className="absolute top-1/2 -translate-y-1/2 h-4 w-px bg-muted-foreground/60 pointer-events-none"
           style={{ left: `${peerPct}%` }}
           title={`${peerLabel}: ${formatValue(peerAvg)}`}
         />
 
-        {/* You marker */}
         <div
-          className="absolute -translate-x-1/2 top-0"
+          className="absolute -translate-x-1/2 top-0 pointer-events-none"
           style={{ left: `${Math.max(2, Math.min(98, percentile))}%` }}
         >
           <div className="h-8 w-px bg-foreground" />
           <div className="absolute -translate-x-1/2 -top-1.5 h-3 w-3 rounded-full bg-foreground border-2 border-card" />
         </div>
 
-        {/* Endpoint scale */}
+        {hoverPct != null && hoverValue != null && (
+          <div
+            className="absolute -translate-x-1/2 top-0 pointer-events-none"
+            style={{ left: `${Math.max(2, Math.min(98, hoverPct))}%` }}
+          >
+            <div className="h-8 w-px bg-primary/70" />
+            <div className="absolute -translate-x-1/2 -top-9 whitespace-nowrap rounded-md border border-border bg-card px-2 py-1 text-[10px] shadow-md">
+              <span className="font-semibold tabular-nums">{formatValue(hoverValue)}</span>
+              <span className="text-muted-foreground"> · {ordinal(hoverPct)}</span>
+            </div>
+          </div>
+        )}
+
         <div className="absolute -bottom-4 left-0 text-[10px] uppercase tracking-wider text-muted-foreground">
           0
         </div>
