@@ -26,7 +26,43 @@ ABSOLUTE RULES
 - Never invent numbers. If something is missing, say so and lower your confidence rather than guess.
 - Where you estimate £ uplift, anchor it to observed NHS tariff economics and the gap vs the peer benchmark in the pack.
 - Use British English. No emojis. No fluff. No throat-clearing ("In conclusion…", "It is important to note…").
-- Output ONLY markdown (no JSON, no code fences around the whole reply).`;
+- Output ONLY markdown (no JSON, no code fences around the whole reply).
+- RESPECT JURISDICTION: only reference NHS services, contracts, tariffs and bodies that apply in the pharmacy's nation (see JURISDICTION SCOPE block). Never mention out-of-jurisdiction services (e.g. NMS or English Pharmacy First in Scotland; MCR or PFS in England/Wales/NI) even if the data pack has a zero/null for them.`;
+
+// Country-specific service & contract scope. Injected into every prompt so the
+// model only references services that actually exist in the pharmacy's nation.
+function countryScope(country: string | null | undefined): string {
+  const c = (country || "").trim().toLowerCase();
+  if (c === "scotland") {
+    return `JURISDICTION SCOPE — SCOTLAND
+- Contractor: NHS Scotland community pharmacy contract; payments via PSD (Practitioner Services Division).
+- Core clinical services to analyse: **Pharmacy First Scotland (PFS / NHS PFS Plus)**, **MCR (Medicines: Care & Review — formerly CMS)**, **Public Health Service (smoking cessation, EHC, sexual health)**, **OST: methadone / buprenorphine + supervised consumption**, **Stoma / AMS** where present.
+- Dispensing economics: items dispensed, gross ingredient cost, ESPS, professional fees, MCR capitation; no Drug Tariff Cat M concept — use Scottish reimbursement logic.
+- DO NOT mention or analyse: NMS (does not exist in Scotland), English Pharmacy First clinical pathways, Flu under the English Advanced Service spec, EPS / EPS nominations (Scotland uses CMS / ePharmacy, not EPS), DMS, Hypertension Case-Finding, Contraception Service (English spec), CPCS.
+- Peer framing: compare to other Scottish community pharmacies only.`;
+  }
+  if (c === "wales") {
+    return `JURISDICTION SCOPE — WALES
+- Contractor: NHS Wales Community Pharmacy Contractual Framework; payments via NWSSP.
+- Core clinical services to analyse: **Common Ailments Service (CAS)**, **Independent Prescribing Service (IPS)**, **Emergency Contraception**, **Smoking cessation (Help Me Quit)**, **Flu vaccination (Welsh spec)**, **Discharge Medicines Review (DMR)**, **Sore Throat Test & Treat** where in scope.
+- DO NOT mention or analyse: English NMS, English Pharmacy First clinical pathways, EPS / EPS nominations (Wales uses its own electronic transfer), MCR (Scotland-only), CPCS.
+- Peer framing: compare to other Welsh community pharmacies only.`;
+  }
+  if (c === "northern ireland" || c === "ni") {
+    return `JURISDICTION SCOPE — NORTHERN IRELAND
+- Contractor: HSC Northern Ireland community pharmacy contract; payments via BSO.
+- Core clinical services to analyse: **Pharmacy First NI (minor ailments / acute medication / living well)**, **Managing Your Medicines (MYM)**, **Substance misuse / supervised consumption**, **Smoking cessation**, **Flu vaccination (NI spec)**, **Emergency hormonal contraception**.
+- DO NOT mention or analyse: English NMS, English Pharmacy First clinical pathways, EPS / EPS nominations (NI does not use EPS), MCR (Scotland-only), CPCS, DMS (English).
+- Peer framing: compare to other Northern Ireland community pharmacies only.`;
+  }
+  // Default: England (also covers null / unknown — England is the largest cohort)
+  return `JURISDICTION SCOPE — ENGLAND
+- Contractor: NHS England Community Pharmacy Contractual Framework (CPCF); payments via NHSBSA.
+- Core clinical services to analyse: **Pharmacy First (England — 7 clinical pathways)**, **New Medicine Service (NMS)**, **Flu vaccination (Advanced Service)**, **Hypertension Case-Finding**, **Contraception Service (Tier 1 & 2)**, **Discharge Medicines Service (DMS)**, **Smoking Cessation Service (SCS)**, **EPS items & nominations**, **Lateral Flow / Pandemic services** where in scope.
+- Dispensing economics: Drug Tariff (Cat M, A, C), single activity fee, transitional payment, establishment payment where applicable.
+- DO NOT mention or analyse: MCR / CMS (Scotland-only), Pharmacy First Scotland, Welsh CAS / IPS, NI Pharmacy First. Supervised consumption / methadone is locally commissioned — only reference if the pack shows activity.
+- Peer framing: compare to other English community pharmacies only.`;
+}
 
 // ============================================================
 // generateInsight — SWOT and Performance Commentary
