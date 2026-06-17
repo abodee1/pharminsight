@@ -688,6 +688,7 @@ export const askInsightsQuestion = createServerFn({ method: "POST" })
 
     const messages: { role: string; content: string }[] = [
       { role: "system", content: QA_SYSTEM },
+      { role: "system", content: countryScope(aiContext?.pharmacy?.country) },
       { role: "system", content: dataBlock },
       ...(data.history ?? []),
       { role: "user", content: data.question },
