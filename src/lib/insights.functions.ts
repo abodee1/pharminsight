@@ -519,6 +519,7 @@ export const generateAcquisitionReport = createServerFn({ method: "POST" })
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: ACQ_SYSTEM_PROMPT },
+          { role: "system", content: countryScope(aiContext?.pharmacy?.country) },
           { role: "user", content: `${RESPONSE_SCHEMA_HINT}\n\nTARGET DATA:\n${JSON.stringify(aiContext, null, 2)}` },
         ],
       }),
