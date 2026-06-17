@@ -92,6 +92,7 @@ export const generateInsight = createServerFn({ method: "POST" })
     }
 
     const userPrompt = buildPromptForType(data.insight_type, aiContext);
+    const scope = countryScope(aiContext?.pharmacy?.country);
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -100,6 +101,7 @@ export const generateInsight = createServerFn({ method: "POST" })
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: EXPERT_SYSTEM },
+          { role: "system", content: scope },
           { role: "user", content: userPrompt },
         ],
       }),
