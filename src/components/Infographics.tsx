@@ -475,6 +475,7 @@ export function GpPrescribingCard({
                       <div className="flex items-baseline justify-between gap-3">
                         <div className="min-w-0">
                           <p className="font-semibold truncate">{g.name}</p>
+                          {g.address && <p className="text-[10px] text-muted-foreground truncate">{g.address}</p>}
                           <p className="text-[10px] text-muted-foreground font-mono truncate">
                             {g.code}{g.postcode ? ` · ${g.postcode}` : ""}
                           </p>

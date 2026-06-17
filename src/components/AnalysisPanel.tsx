@@ -223,11 +223,11 @@ export function AnalysisPanel({ pharmacy, open, onClose }: { pharmacy: Pharmacy;
 // ------------------------- OVERVIEW TAB -------------------------
 function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
   const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
+  const [trailingWin, setTrailingWin] = useState<6 | 12 | 18 | 24>(12);
 
   const latestIdx = useMemo(() => {
     if (!rows.length) return -1;
     if (isScot) for (let i = rows.length - 1; i >= 0; i--) if (rows[i].is_actual_payment) return i;
-    // skip trailing all-zero rows
     for (let i = rows.length - 1; i >= 0; i--) {
       const r = rows[i];
       if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) return i;
@@ -236,7 +236,10 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
   }, [rows, isScot]);
 
   const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
-  const prior = latestIdx > 0 ? rows[latestIdx - 1] : undefined;
+
+  const trailingRows = useMemo(() => rows.slice(Math.max(0, latestIdx - (trailingWin - 1)), latestIdx + 1), [rows, latestIdx, trailingWin]);
+  const priorRows = useMemo(() => rows.slice(Math.max(0, latestIdx - (trailingWin * 2 - 1)), Math.max(0, latestIdx - trailingWin + 1)), [rows, latestIdx, trailingWin]);
+  const sumR = (arr: DRow[], key: keyof DRow) => arr.reduce((s, r) => s + (Number(r[key]) || 0), 0);
 
   const last12 = useMemo(() => rows.slice(Math.max(0, latestIdx - 11), latestIdx + 1), [rows, latestIdx]);
   const chartData = useMemo(() => last12.map((r, i, arr) => {
@@ -245,25 +248,27 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
     return { label: `${MONTHS[r.month - 1]} ${String(r.year).slice(2)}`, items: r.items_dispensed, flag: change > 0.15 };
   }), [last12]);
 
-  const epsRate = latest && latest.items_dispensed ? (latest.eps_items / latest.items_dispensed) * 100 : 0;
+  const epsItemsTotal = sumR(trailingRows, "eps_items");
+  const epsDispensedTotal = sumR(trailingRows, "items_dispensed");
+  const epsRate = epsDispensedTotal > 0 ? (epsItemsTotal / epsDispensedTotal) * 100 : 0;
   const epsColor = epsRate > 95 ? "text-emerald-600" : epsRate >= 80 ? "text-amber-600" : "text-rose-600";
 
   const last6Nominations = rows.slice(Math.max(0, latestIdx - 5), latestIdx + 1).map((r) => ({ x: `${r.month}/${String(r.year).slice(2)}`, v: r.eps_nominations }));
 
   const cards = latest ? (isScot ? [
-    { label: "Items", v: latest.items_dispensed, p: prior?.items_dispensed ?? 0 },
-    { label: "Pharmacy First", v: latest.pharmacy_first_count, p: prior?.pharmacy_first_count ?? 0 },
-    { label: "MCR registrations", v: latest.mcr_registrations, p: prior?.mcr_registrations ?? 0 },
-    { label: "MCR items", v: latest.mcr_items, p: prior?.mcr_items ?? 0 },
-    { label: "Methadone items", v: latest.methadone_items, p: prior?.methadone_items ?? 0 },
-    { label: "Supervised doses", v: latest.supervised_methadone_doses, p: prior?.supervised_methadone_doses ?? 0 },
-    { label: "EHC items", v: latest.ehc_items, p: prior?.ehc_items ?? 0 },
-    { label: "Smoking cessation", v: latest.smoking_cessation, p: prior?.smoking_cessation ?? 0 },
+    { label: "Items", v: sumR(trailingRows, "items_dispensed"), p: sumR(priorRows, "items_dispensed") },
+    { label: "Pharmacy First", v: sumR(trailingRows, "pharmacy_first_count"), p: sumR(priorRows, "pharmacy_first_count") },
+    { label: "MCR registrations", v: sumR(trailingRows, "mcr_registrations"), p: sumR(priorRows, "mcr_registrations") },
+    { label: "MCR items", v: sumR(trailingRows, "mcr_items"), p: sumR(priorRows, "mcr_items") },
+    { label: "Methadone items", v: sumR(trailingRows, "methadone_items"), p: sumR(priorRows, "methadone_items") },
+    { label: "Supervised doses", v: sumR(trailingRows, "supervised_methadone_doses"), p: sumR(priorRows, "supervised_methadone_doses") },
+    { label: "EHC items", v: sumR(trailingRows, "ehc_items"), p: sumR(priorRows, "ehc_items") },
+    { label: "Smoking cessation", v: sumR(trailingRows, "smoking_cessation"), p: sumR(priorRows, "smoking_cessation") },
   ] : [
-    { label: "Items", v: latest.items_dispensed, p: prior?.items_dispensed ?? 0 },
-    { label: "NMS", v: latest.nms_count, p: prior?.nms_count ?? 0 },
-    { label: "Pharmacy First", v: latest.pharmacy_first_count, p: prior?.pharmacy_first_count ?? 0 },
-    { label: "Flu vaccinations", v: latest.flu_vaccinations, p: prior?.flu_vaccinations ?? 0 },
+    { label: "Items", v: sumR(trailingRows, "items_dispensed"), p: sumR(priorRows, "items_dispensed") },
+    { label: "NMS", v: sumR(trailingRows, "nms_count"), p: sumR(priorRows, "nms_count") },
+    { label: "Pharmacy First", v: sumR(trailingRows, "pharmacy_first_count"), p: sumR(priorRows, "pharmacy_first_count") },
+    { label: "Flu vaccinations", v: sumR(trailingRows, "flu_vaccinations"), p: sumR(priorRows, "flu_vaccinations") },
   ]) : [];
 
 
@@ -271,7 +276,7 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
 
   return (
     <div className="p-3 md:p-6 space-y-5 md:space-y-6">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="inline-flex items-center text-[11px] md:text-xs rounded-full bg-secondary px-2.5 py-1">Data current to {MONTHS[latest.month - 1]} {latest.year}</span>
       </div>
 
@@ -285,6 +290,19 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
         title="Performance over time"
       />
 
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <p className="text-xs font-medium text-muted-foreground">Trailing period totals — vs prior period of same length</p>
+        <div className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/40 p-0.5">
+          {([6, 12, 18, 24] as const).map((w) => (
+            <button key={w} type="button" onClick={() => setTrailingWin(w)}
+              className={["px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+                trailingWin === w ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"].join(" ")}>
+              {w}M
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {cards.map((c) => {
           const diff = c.v - c.p;
@@ -294,7 +312,12 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
               key={c.label}
               title={c.label}
               value={c.v.toLocaleString()}
-              sub={<p className="flex items-center gap-1 text-xs">{trendArrow(diff)} <span className={diff > 0 ? "text-emerald-700" : diff < 0 ? "text-rose-700" : "text-muted-foreground"}>{diff === 0 ? "—" : `${diff > 0 ? "+" : ""}${pctv}% vs prior`}</span></p>}
+              sub={
+                <div className="space-y-0.5 mt-1">
+                  <p className="text-[10px] text-muted-foreground">{trailingWin}M total</p>
+                  <p className="flex items-center gap-1 text-xs">{trendArrow(diff)} <span className={diff > 0 ? "text-emerald-700" : diff < 0 ? "text-rose-700" : "text-muted-foreground"}>{diff === 0 ? "—" : `${diff > 0 ? "+" : ""}${pctv}% vs prior ${trailingWin}M`}</span></p>
+                </div>
+              }
               description={METRIC_INFO[c.label] || ""}
             />
           );
@@ -304,24 +327,24 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
       {isScot ? (
         <div className="grid md:grid-cols-2 gap-4">
           <FlipCard
-            title="Pharmacy First £ (latest)"
-            value={gbp(Number(latest.pharmacy_first_payment) || 0)}
-            sub={<p className="text-xs text-muted-foreground">Verified NHS payment</p>}
+            title={`Pharmacy First £ (${trailingWin}M total)`}
+            value={gbp(sumR(trailingRows, "pharmacy_first_payment"))}
+            sub={<p className="text-xs text-muted-foreground">Trailing {trailingWin}M verified NHS payments</p>}
             description="Total NHS payment received for Pharmacy First consultations and the associated fixed monthly fee."
           />
           <FlipCard
-            title="MCR payment (latest)"
-            value={gbp(Number(latest.mcr_payment) || 0)}
-            sub={<p className="text-xs text-muted-foreground">Verified NHS payment</p>}
+            title={`MCR payment (${trailingWin}M total)`}
+            value={gbp(sumR(trailingRows, "mcr_payment"))}
+            sub={<p className="text-xs text-muted-foreground">Trailing {trailingWin}M verified NHS payments</p>}
             description="Total NHS payment received for the Medicines: Care & Review service this month."
           />
         </div>
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
           <FlipCard
-            title="EPS rate"
+            title={`EPS rate (${trailingWin}M avg)`}
             value={<span className={epsColor}>{pct(epsRate)}</span>}
-            sub={<p className="text-xs text-muted-foreground">{">"}95% green · 80-95% amber · {"<"}80% red</p>}
+            sub={<p className="text-xs text-muted-foreground">{">"}95% green · 80-95% amber · {"<"}80% red · trailing {trailingWin}M average</p>}
             description={METRIC_INFO["EPS rate"]}
           />
           <div className="rounded-xl border border-border bg-card p-5">
@@ -497,7 +520,7 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
   const [localAvg, setLocalAvg] = useState<Record<string, number>>({});
   const [nationalAvg, setNationalAvg] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
-
+  const [benchWin, setBenchWin] = useState<12 | 18 | 24>(12);
 
   const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
   const latestIdx = useMemo(() => {
@@ -510,6 +533,14 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
     return rows.length - 1;
   }, [rows, isScot]);
   const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
+
+  const trailingBench = useMemo(() => rows.slice(Math.max(0, latestIdx - (benchWin - 1)), latestIdx + 1), [rows, latestIdx, benchWin]);
+  const priorBench = useMemo(() => rows.slice(Math.max(0, latestIdx - (benchWin * 2 - 1)), Math.max(0, latestIdx - benchWin + 1)), [rows, latestIdx, benchWin]);
+  const avgBench = (arr: DRow[], key: keyof DRow) => {
+    const nonZero = arr.filter(r => (Number(r[key]) || 0) > 0);
+    return nonZero.length ? nonZero.reduce((s, r) => s + (Number(r[key]) || 0), 0) / nonZero.length : 0;
+  };
+  const trendBench = (self: number, prior: number) => prior > 0 ? ((self - prior) / prior) * 100 : 0;
 
   const SCOT_COLS = ["items_dispensed","pharmacy_first_count","mcr_registrations","mcr_items","methadone_items","supervised_methadone_doses","ehc_items","smoking_cessation"] as const;
   const ENG_COLS = ["items_dispensed","nms_count","pharmacy_first_count","eps_items"] as const;
@@ -558,19 +589,19 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
   if (loading) return <div className="p-10 text-sm text-muted-foreground text-center"><Loader2 className="inline h-4 w-4 animate-spin mr-2" />Computing benchmarks…</div>;
 
   const rowsTable = isScot ? [
-    { label: "Items dispensed", self: latest.items_dispensed, local: localAvg.items_dispensed || 0, nat: nationalAvg.items_dispensed || 0 },
-    { label: "Pharmacy First", self: latest.pharmacy_first_count, local: localAvg.pharmacy_first_count || 0, nat: nationalAvg.pharmacy_first_count || 0 },
-    { label: "MCR registrations", self: latest.mcr_registrations, local: localAvg.mcr_registrations || 0, nat: nationalAvg.mcr_registrations || 0 },
-    { label: "MCR items", self: latest.mcr_items, local: localAvg.mcr_items || 0, nat: nationalAvg.mcr_items || 0 },
-    { label: "Methadone items", self: latest.methadone_items, local: localAvg.methadone_items || 0, nat: nationalAvg.methadone_items || 0 },
-    { label: "Supervised doses", self: latest.supervised_methadone_doses, local: localAvg.supervised_methadone_doses || 0, nat: nationalAvg.supervised_methadone_doses || 0 },
-    { label: "EHC items", self: latest.ehc_items, local: localAvg.ehc_items || 0, nat: nationalAvg.ehc_items || 0 },
-    { label: "Smoking cessation", self: latest.smoking_cessation, local: localAvg.smoking_cessation || 0, nat: nationalAvg.smoking_cessation || 0 },
+    { label: "Items dispensed", self: avgBench(trailingBench, "items_dispensed"), prior: avgBench(priorBench, "items_dispensed"), local: localAvg.items_dispensed || 0, nat: nationalAvg.items_dispensed || 0 },
+    { label: "Pharmacy First", self: avgBench(trailingBench, "pharmacy_first_count"), prior: avgBench(priorBench, "pharmacy_first_count"), local: localAvg.pharmacy_first_count || 0, nat: nationalAvg.pharmacy_first_count || 0 },
+    { label: "MCR registrations", self: avgBench(trailingBench, "mcr_registrations"), prior: avgBench(priorBench, "mcr_registrations"), local: localAvg.mcr_registrations || 0, nat: nationalAvg.mcr_registrations || 0 },
+    { label: "MCR items", self: avgBench(trailingBench, "mcr_items"), prior: avgBench(priorBench, "mcr_items"), local: localAvg.mcr_items || 0, nat: nationalAvg.mcr_items || 0 },
+    { label: "Methadone items", self: avgBench(trailingBench, "methadone_items"), prior: avgBench(priorBench, "methadone_items"), local: localAvg.methadone_items || 0, nat: nationalAvg.methadone_items || 0 },
+    { label: "Supervised doses", self: avgBench(trailingBench, "supervised_methadone_doses"), prior: avgBench(priorBench, "supervised_methadone_doses"), local: localAvg.supervised_methadone_doses || 0, nat: nationalAvg.supervised_methadone_doses || 0 },
+    { label: "EHC items", self: avgBench(trailingBench, "ehc_items"), prior: avgBench(priorBench, "ehc_items"), local: localAvg.ehc_items || 0, nat: nationalAvg.ehc_items || 0 },
+    { label: "Smoking cessation", self: avgBench(trailingBench, "smoking_cessation"), prior: avgBench(priorBench, "smoking_cessation"), local: localAvg.smoking_cessation || 0, nat: nationalAvg.smoking_cessation || 0 },
   ] : [
-    { label: "Items dispensed", self: latest.items_dispensed, local: localAvg.items_dispensed || 0, nat: nationalAvg.items_dispensed || 0 },
-    { label: "NMS", self: latest.nms_count, local: localAvg.nms_count || 0, nat: nationalAvg.nms_count || 0 },
-    { label: "Pharmacy First", self: latest.pharmacy_first_count, local: localAvg.pharmacy_first_count || 0, nat: nationalAvg.pharmacy_first_count || 0 },
-    { label: "EPS items", self: latest.eps_items, local: localAvg.eps_items || 0, nat: nationalAvg.eps_items || 0 },
+    { label: "Items dispensed", self: avgBench(trailingBench, "items_dispensed"), prior: avgBench(priorBench, "items_dispensed"), local: localAvg.items_dispensed || 0, nat: nationalAvg.items_dispensed || 0 },
+    { label: "NMS", self: avgBench(trailingBench, "nms_count"), prior: avgBench(priorBench, "nms_count"), local: localAvg.nms_count || 0, nat: nationalAvg.nms_count || 0 },
+    { label: "Pharmacy First", self: avgBench(trailingBench, "pharmacy_first_count"), prior: avgBench(priorBench, "pharmacy_first_count"), local: localAvg.pharmacy_first_count || 0, nat: nationalAvg.pharmacy_first_count || 0 },
+    { label: "EPS items", self: avgBench(trailingBench, "eps_items"), prior: avgBench(priorBench, "eps_items"), local: localAvg.eps_items || 0, nat: nationalAvg.eps_items || 0 },
   ];
 
   const colorFor = (self: number, ref: number) => {
@@ -594,23 +625,47 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
 
   return (
     <div className="p-4 md:p-6 space-y-6">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <p className="text-sm font-semibold">Benchmarking · {pharmacy.region || pharmacy.country || "UK"}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">This pharmacy avg/month vs latest peer snapshot</p>
+        </div>
+        <div className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/40 p-0.5">
+          {([12, 18, 24] as const).map((w) => (
+            <button key={w} type="button" onClick={() => setBenchWin(w)}
+              className={["px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+                benchWin === w ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"].join(" ")}>
+              {w}M
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-muted-foreground"><tr>
             <th className="text-left px-4 py-2 font-medium">Metric</th>
-            <th className="text-right px-4 py-2 font-medium">This pharmacy</th>
-            <th className="text-right px-4 py-2 font-medium">{pharmacy.region || "Region"}</th>
-            <th className="text-right px-4 py-2 font-medium">National</th>
+            <th className="text-right px-4 py-2 font-medium">This pharmacy <span className="font-normal text-[10px]">{benchWin}M avg</span></th>
+            <th className="text-right px-4 py-2 font-medium">Trend</th>
+            <th className="text-right px-4 py-2 font-medium">{pharmacy.region || "Region"} <span className="font-normal text-[10px]">latest</span></th>
+            <th className="text-right px-4 py-2 font-medium">National <span className="font-normal text-[10px]">latest</span></th>
           </tr></thead>
           <tbody>
-            {rowsTable.map((r) => (
-              <tr key={r.label} className="border-t border-border">
-                <td className="px-4 py-2 font-medium">{r.label}</td>
-                <td className={"px-4 py-2 text-right tabular-nums " + colorFor(r.self, r.nat)}>{Math.round(r.self).toLocaleString()}</td>
-                <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{Math.round(r.local).toLocaleString()}</td>
-                <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{Math.round(r.nat).toLocaleString()}</td>
-              </tr>
-            ))}
+            {rowsTable.map((r) => {
+              const trend = trendBench(r.self, r.prior);
+              return (
+                <tr key={r.label} className="border-t border-border">
+                  <td className="px-4 py-2 font-medium">{r.label}</td>
+                  <td className={"px-4 py-2 text-right tabular-nums " + colorFor(r.self, r.nat)}>{Math.round(r.self).toLocaleString()}</td>
+                  <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
+                    <span className={["text-xs font-semibold", trend > 0 ? "text-emerald-700" : trend < 0 ? "text-rose-700" : "text-muted-foreground"].join(" ")}>
+                      {r.prior > 0 ? `${trend > 0 ? "+" : ""}${trend.toFixed(1)}%` : "—"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{Math.round(r.local).toLocaleString()}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{Math.round(r.nat).toLocaleString()}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -629,7 +684,7 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-semibold mb-3">Benchmarking assessment</h3>
         <p className="text-sm leading-relaxed">
-          Overall index: <span className="font-semibold">{overallIdx}</span> vs national 100.
+          Overall index: <span className="font-semibold">{overallIdx}</span> vs national 100 ({benchWin}M trailing average vs latest national snapshot).
           {overallIdx >= 110 && " This pharmacy trades materially above the national pace across most measured services."}
           {overallIdx < 110 && overallIdx >= 90 && " This pharmacy tracks broadly in line with the national pace."}
           {overallIdx < 90 && " This pharmacy is trading meaningfully below the national pace — material upside if service uptake is closed."}
@@ -697,6 +752,7 @@ function IncomeDonut({ segments }: { segments: { label: string; value: number; c
 function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
   const [company, setCompany] = useState<Company | null>(null);
   const [manualPrivateIncome, setManualPrivateIncome] = useState<number | "">("");
+  const [acqWin, setAcqWin] = useState<12 | 18 | 24>(12);
   const [catchment, setCatchment] = useState<{
     competitors: number;
     gpFeeders: number;
@@ -758,17 +814,17 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
 
   const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
   const isEngland = (pharmacy.country || "").toLowerCase() === "england";
-  const last12 = rows.slice(-12);
+  const lastN = rows.slice(-acqWin);
   const NMS_RATE = 21; // changed April 2025 (£11 intervention + £10 follow-up)
 
   let itemsTotal = 0, pfTotal = 0, nmsTotal = 0, fluTotal = 0;
-  last12.forEach((r) => { itemsTotal += r.items_dispensed; pfTotal += r.pharmacy_first_count; nmsTotal += r.nms_count; fluTotal += r.flu_vaccinations; });
-  const estimated = itemsTotal * 1.27 + pfTotal * 15 + nmsTotal * NMS_RATE + fluTotal * 12.58;
+  lastN.forEach((r) => { itemsTotal += r.items_dispensed; pfTotal += r.pharmacy_first_count; nmsTotal += r.nms_count; fluTotal += r.flu_vaccinations; });
+  const estimated = (itemsTotal * 1.27 + pfTotal * 15 + nmsTotal * NMS_RATE + fluTotal * 12.58) * (12 / acqWin);
   const estimatedNet = estimated * 0.95;
 
   let actualNHS: number | null = null;
   if (isScot) {
-    const actuals = last12.filter((r) => r.is_actual_payment);
+    const actuals = lastN.filter((r) => r.is_actual_payment);
     if (actuals.length >= 6) actualNHS = actuals.reduce((s, r) => s + (Number(r.final_payment) || 0), 0) * (12 / actuals.length);
   }
   const nhsIncome = actualNHS ?? estimatedNet;
@@ -795,7 +851,7 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
   const adjValLow = nhsValLow + effectivePrivate * 0.5;
   const adjValHigh = nhsValHigh + effectivePrivate * 0.8;
 
-  const monthlyBars = last12.map((r) => ({
+  const monthlyBars = lastN.map((r) => ({
     label: `${MONTHS[r.month - 1]} ${String(r.year).slice(2)}`,
     v: Math.round(r.items_dispensed * 1.27 + r.pharmacy_first_count * 15 + r.nms_count * NMS_RATE + r.flu_vaccinations * 12.58),
   }));
@@ -804,19 +860,19 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
   const servicesRevenue = pfTotal * 15 + nmsTotal * NMS_RATE + fluTotal * 12.58;
   const servicesShare = (dispensingRevenue + servicesRevenue) > 0
     ? (servicesRevenue / (dispensingRevenue + servicesRevenue)) * 100 : 0;
-  const monthlyItems = last12.map((r) => r.items_dispensed).filter((v) => v > 0);
+  const monthlyItems = lastN.map((r) => r.items_dispensed).filter((v) => v > 0);
   const mean = monthlyItems.reduce((a, b) => a + b, 0) / (monthlyItems.length || 1);
   const variance = monthlyItems.reduce((a, b) => a + (b - mean) ** 2, 0) / (monthlyItems.length || 1);
   const cv = mean > 0 ? Math.sqrt(variance) / mean : 0;
   const peakIdx = monthlyItems.length ? monthlyItems.indexOf(Math.max(...monthlyItems)) : -1;
   const troughIdx = monthlyItems.length ? monthlyItems.indexOf(Math.min(...monthlyItems)) : -1;
-  const peakMonth = peakIdx >= 0 ? MONTHS[last12[peakIdx].month - 1] : "—";
-  const troughMonth = troughIdx >= 0 ? MONTHS[last12[troughIdx].month - 1] : "—";
+  const peakMonth = peakIdx >= 0 ? MONTHS[lastN[peakIdx].month - 1] : "—";
+  const troughMonth = troughIdx >= 0 ? MONTHS[lastN[troughIdx].month - 1] : "—";
   const incomePerListMember = catchment && catchment.listSizeTotal > 0 ? nhsIncome / catchment.listSizeTotal : null;
 
   // Enhanced red flags
   const flags: { msg: string; detail?: string }[] = [];
-  const nonZeroRows = last12.filter(r => r.items_dispensed > 0);
+  const nonZeroRows = lastN.filter(r => r.items_dispensed > 0);
   if (nonZeroRows.length >= 3) {
     let consDecline = 0;
     for (let i = nonZeroRows.length - 1; i > 0; i--) {
@@ -828,12 +884,13 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
       detail: `${nonZeroRows[nonZeroRows.length - 1].items_dispensed.toLocaleString()} vs ${nonZeroRows[nonZeroRows.length - 1 - consDecline].items_dispensed.toLocaleString()} items`,
     });
   }
-  if (last12.length >= 12) {
-    const r6 = last12.slice(-6).reduce((s, r) => s + r.items_dispensed, 0);
-    const p6 = last12.slice(0, 6).reduce((s, r) => s + r.items_dispensed, 0);
+  if (lastN.length >= 12) {
+    const halfWin = Math.floor(acqWin / 2);
+    const r6 = lastN.slice(-halfWin).reduce((s, r) => s + r.items_dispensed, 0);
+    const p6 = lastN.slice(0, halfWin).reduce((s, r) => s + r.items_dispensed, 0);
     if (p6 > 0 && (r6 - p6) / p6 < -0.10) {
       const pctDecline = Math.abs(Math.round(((r6 - p6) / p6) * 100));
-      flags.push({ msg: `Items dispensed down ${pctDecline}% year-on-year`, detail: `Recent 6M: ${r6.toLocaleString()} vs prior 6M: ${p6.toLocaleString()}` });
+      flags.push({ msg: `Items dispensed down ${pctDecline}% (recent ${halfWin}M vs prior ${halfWin}M)`, detail: `Recent ${halfWin}M: ${r6.toLocaleString()} vs prior ${halfWin}M: ${p6.toLocaleString()}` });
     }
   }
   let consNomDecline = 0;
@@ -843,7 +900,7 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
     if (consNomDecline >= 3) break;
   }
   if (consNomDecline >= 3) flags.push({ msg: "EPS nominations declining 3+ consecutive months", detail: `${consNomDecline} months` });
-  const last3 = rows.slice(-3);
+  const last3 = lastN.slice(-3);
   if (isEngland && last3.length === 3 && last3.every((r) => r.nms_count === 0))
     flags.push({ msg: "NMS count is zero for last 3 months — potential revenue leakage", detail: "£0 NMS income reported" });
   if (company?.last_accounts_date) {
@@ -870,6 +927,21 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
 
   return (
     <div className="p-3 md:p-6 space-y-5 md:space-y-6">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <p className="text-sm font-semibold">Analysis window</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Controls income, trends, volatility, and red flag detection</p>
+        </div>
+        <div className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/40 p-0.5">
+          {([12, 18, 24] as const).map((w) => (
+            <button key={w} type="button" onClick={() => setAcqWin(w)}
+              className={["px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+                acqWin === w ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"].join(" ")}>
+              {w}M
+            </button>
+          ))}
+        </div>
+      </div>
       <Section title="Acquisition intelligence — at a glance">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Cell label="Local competitors (1mi)" v={catchment ? String(catchment.competitors) : "…"} />
@@ -901,6 +973,7 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
               <div className="rounded-lg bg-secondary/40 p-3">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{incomeLabel}</p>
                 <p className="text-xl font-bold tabular-nums">{gbp(nhsIncome)}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Annualised from {acqWin}M data</p>
               </div>
               <div className="rounded-lg bg-secondary/40 p-3">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Avg monthly (NHS)</p>
@@ -913,7 +986,7 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
             ]} />
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Monthly estimated NHS income (last 12 months)</p>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Monthly estimated NHS income (last {acqWin} months)</p>
             <div className="h-48">
               <ResponsiveContainer>
                 <BarChart data={monthlyBars} margin={{ top: 4, right: 8, bottom: 0, left: 4 }}>
@@ -1158,17 +1231,21 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
     }
   };
 
-  // NMS cap
+  // NMS cap — use latest month for absolute cap check
   const nmsCap = latest ? Math.floor((latest.items_dispensed || 0) * 0.01) : 0;
   const nmsCount = latest?.nms_count || 0;
   const nmsUtil = nmsCap > 0 ? Math.min(100, (nmsCount / nmsCap) * 100) : 0;
   const nmsCapped = nmsCap > 0 && nmsCount >= nmsCap;
   const nmsHeadroom = Math.max(0, nmsCap - nmsCount);
 
-  // Underclaimed services
-  const nmsGap = natAvg.nms_count ? Math.max(0, natAvg.nms_count - nmsCount) : 0;
-  const pfGap = natAvg.pharmacy_first_count ? Math.max(0, natAvg.pharmacy_first_count - (latest?.pharmacy_first_count || 0)) : 0;
-  const fluGap = natAvg.flu_vaccinations ? Math.max(0, natAvg.flu_vaccinations - (latest?.flu_vaccinations || 0)) : 0;
+  // Underclaimed services — use trailing 12M average for "you" vs national snapshot
+  const avgNmsCount12 = last12.length ? last12.reduce((s, r) => s + (r.nms_count || 0), 0) / last12.length : nmsCount;
+  const avgPfCount12 = last12.length ? last12.reduce((s, r) => s + (r.pharmacy_first_count || 0), 0) / last12.length : (latest?.pharmacy_first_count || 0);
+  const avgFluCount12 = last12.length ? last12.reduce((s, r) => s + (r.flu_vaccinations || 0), 0) / last12.length : (latest?.flu_vaccinations || 0);
+
+  const nmsGap = natAvg.nms_count ? Math.max(0, natAvg.nms_count - avgNmsCount12) : 0;
+  const pfGap = natAvg.pharmacy_first_count ? Math.max(0, natAvg.pharmacy_first_count - avgPfCount12) : 0;
+  const fluGap = natAvg.flu_vaccinations ? Math.max(0, natAvg.flu_vaccinations - avgFluCount12) : 0;
   const nmsUplift = Math.round(nmsGap * 21);
   const pfUplift = Math.round(pfGap * 15);
   const fluUplift = Math.round(fluGap * 12.58);
@@ -1316,7 +1393,7 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
           {Object.keys(natAvg).length > 0 && (
             <Section title="Underclaimed services">
               <p className="text-xs text-muted-foreground mb-4">
-                Services below England average for {MONTHS[latest.month - 1]} {latest.year}.
+                Your trailing 12M average vs England average for {MONTHS[latest.month - 1]} {latest.year}.
                 Closing each gap to national average would generate the monthly revenue uplift shown.
               </p>
               {totalUplift === 0 ? (
@@ -1327,13 +1404,13 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
               ) : (
                 <div className="space-y-3">
                   {nmsGap > 0.5 && (
-                    <ServiceGapRow label="New Medicine Service" current={nmsCount} avg={natAvg.nms_count} gap={nmsGap} rateLabel="£21/completed NMS" uplift={nmsUplift} />
+                    <ServiceGapRow label="New Medicine Service" current={avgNmsCount12} avg={natAvg.nms_count} gap={nmsGap} rateLabel="£21/completed NMS" uplift={nmsUplift} />
                   )}
                   {pfGap > 0.5 && (
-                    <ServiceGapRow label="Pharmacy First" current={latest.pharmacy_first_count || 0} avg={natAvg.pharmacy_first_count} gap={pfGap} rateLabel="~£15/consultation" uplift={pfUplift} />
+                    <ServiceGapRow label="Pharmacy First" current={avgPfCount12} avg={natAvg.pharmacy_first_count} gap={pfGap} rateLabel="~£15/consultation" uplift={pfUplift} />
                   )}
                   {fluGap > 0.5 && (
-                    <ServiceGapRow label="Flu vaccinations" current={latest.flu_vaccinations || 0} avg={natAvg.flu_vaccinations} gap={fluGap} rateLabel="£12.58/jab" uplift={fluUplift} />
+                    <ServiceGapRow label="Flu vaccinations" current={avgFluCount12} avg={natAvg.flu_vaccinations} gap={fluGap} rateLabel="£12.58/jab" uplift={fluUplift} />
                   )}
                   <div className="mt-1 rounded-lg border border-gold/40 bg-gold/5 p-3.5 flex items-center justify-between gap-3">
                     <div>
@@ -1344,7 +1421,7 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
                   </div>
                 </div>
               )}
-              <p className="text-[10px] text-muted-foreground mt-3">Drug Tariff rates · {MONTHS[latest.month - 1]} {latest.year} · Sample of up to 5,000 England pharmacies</p>
+              <p className="text-[10px] text-muted-foreground mt-3">Your 12M avg vs national avg · Drug Tariff rates · {MONTHS[latest.month - 1]} {latest.year} · Sample of up to 5,000 England pharmacies</p>
             </Section>
           )}
 

@@ -27,7 +27,7 @@ type Row = {
   pharmacy_id: string; month: number; year: number;
   items_dispensed: number; nms_count: number; pharmacy_first_count: number; flu_vaccinations: number; eps_items: number;
 };
-type Pharm = { id: string; ods_code: string; name: string; trading_name: string | null; region: string | null; country: string | null; postcode: string | null };
+type Pharm = { id: string; ods_code: string; name: string; trading_name: string | null; region: string | null; country: string | null; postcode: string | null; address: string | null };
 
 function prevPeriod(y: number, m: number): { year: number; month: number } {
   return m === 1 ? { year: y - 1, month: 12 } : { year: y, month: m - 1 };
@@ -84,12 +84,12 @@ function Leaderboards() {
       const fetchPharms = async (): Promise<Pharm[]> => {
         try {
           return await fetchAll<Pharm>((from, to) =>
-            supabase.from("pharmacies").select("id,ods_code,name,trading_name,region,country,postcode").eq("country", country).range(from, to)
+            supabase.from("pharmacies").select("id,ods_code,name,trading_name,region,country,postcode,address").eq("country", country).range(from, to)
           );
         } catch {
           // trading_name column may not exist yet — fall back without it
           const rows = await fetchAll<Omit<Pharm, "trading_name">>((from, to) =>
-            supabase.from("pharmacies").select("id,ods_code,name,region,country,postcode").eq("country", country).range(from, to)
+            supabase.from("pharmacies").select("id,ods_code,name,region,country,postcode,address").eq("country", country).range(from, to)
           );
           return rows.map((r) => ({ ...r, trading_name: null as string | null }));
         }
@@ -364,8 +364,11 @@ function Leaderboards() {
                     )}
                   </td>
                   <td className="px-4 py-2">
-                    {pharmacyDisplayName(r.ph.name, r.ph.trading_name, r.ph.ods_code)}
-                    {isMine && <span className="ml-2 text-xs text-gold font-semibold">YOU</span>}
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span>{pharmacyDisplayName(r.ph.name, r.ph.trading_name, r.ph.ods_code)}</span>
+                      {isMine && <span className="text-xs text-gold font-semibold">YOU</span>}
+                    </div>
+                    {r.ph.address && <p className="text-[11px] text-muted-foreground truncate max-w-xs">{r.ph.address}</p>}
                   </td>
                   <td className="px-4 py-2 text-muted-foreground">{r.ph.region}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{r.value.toLocaleString()}</td>
