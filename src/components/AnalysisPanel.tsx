@@ -275,7 +275,7 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
   if (!latest) return <div className="p-10 text-center text-sm text-muted-foreground">No dispensing data yet.</div>;
 
   return (
-    <div className="p-3 md:p-6 space-y-5 md:space-y-6">
+    <div className="p-4 md:p-6 space-y-5 md:space-y-6">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="inline-flex items-center text-[11px] md:text-xs rounded-full bg-secondary px-2.5 py-1">Data current to {MONTHS[latest.month - 1]} {latest.year}</span>
       </div>
@@ -295,7 +295,7 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
         <div className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/40 p-0.5">
           {([6, 12, 18, 24] as const).map((w) => (
             <button key={w} type="button" onClick={() => setTrailingWin(w)}
-              className={["px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+              className={["px-2.5 py-1.5 sm:py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
                 trailingWin === w ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"].join(" ")}>
               {w}M
             </button>
@@ -303,7 +303,7 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {cards.map((c) => {
           const diff = c.v - c.p;
           const pctv = c.p ? Math.round((diff / c.p) * 100) : 0;
@@ -349,7 +349,7 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
           />
           <div className="rounded-xl border border-border bg-card p-5">
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Nominations (6m)</p>
-            <div className="h-16"><ResponsiveContainer><LineChart data={last6Nominations}><Line type="monotone" dataKey="v" stroke="var(--gold)" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></div>
+            <div className="h-20"><ResponsiveContainer><LineChart data={last6Nominations}><Line type="monotone" dataKey="v" stroke="var(--gold)" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></div>
           </div>
         </div>
       )}
@@ -476,7 +476,7 @@ function CompanyDisplay({ company, onRefresh }: { company: Company; onRefresh: (
   const grossMargin = company.turnover && company.gross_profit ? (company.gross_profit / company.turnover) * 100 : null;
   const netMargin = company.turnover && company.net_profit ? (company.net_profit / company.turnover) * 100 : null;
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {company.is_chain && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 text-amber-900 p-3 text-sm">
           This is a {company.chain_name} branch. Figures below represent the entire {company.chain_name} group.
@@ -494,7 +494,7 @@ function CompanyDisplay({ company, onRefresh }: { company: Company; onRefresh: (
 
       {hasFigures ? (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Cell label="Turnover" v={gbp(company.turnover)} />
             <Cell label="Gross margin" v={grossMargin != null ? pct(grossMargin) : "—"} />
             <Cell label="Net margin" v={netMargin != null ? pct(netMargin) : "—"} />
@@ -633,7 +633,7 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
         <div className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/40 p-0.5">
           {([12, 18, 24] as const).map((w) => (
             <button key={w} type="button" onClick={() => setBenchWin(w)}
-              className={["px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+              className={["px-2.5 py-1.5 sm:py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
                 benchWin === w ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"].join(" ")}>
               {w}M
             </button>
@@ -926,7 +926,7 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
     opps.push({ msg: `Top-quartile performer — ${catchment.peerRankPct}th percentile (5-mile catchment)`, detail: "Market leader position" });
 
   return (
-    <div className="p-3 md:p-6 space-y-5 md:space-y-6">
+    <div className="p-4 md:p-6 space-y-5 md:space-y-6">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <p className="text-sm font-semibold">Analysis window</p>
@@ -935,7 +935,7 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
         <div className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/40 p-0.5">
           {([12, 18, 24] as const).map((w) => (
             <button key={w} type="button" onClick={() => setAcqWin(w)}
-              className={["px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+              className={["px-2.5 py-1.5 sm:py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
                 acqWin === w ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"].join(" ")}>
               {w}M
             </button>
@@ -943,13 +943,13 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
         </div>
       </div>
       <Section title="Acquisition intelligence — at a glance">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Cell label="Local competitors (1mi)" v={catchment ? String(catchment.competitors) : "…"} />
           <Cell label="GP feeders (1mi)" v={catchment ? String(catchment.gpFeeders) : "…"} />
           <Cell label="Catchment list size" v={catchment && catchment.listSizeTotal ? catchment.listSizeTotal.toLocaleString() : "—"} />
           <Cell label="Peer rank (5mi)" v={catchment?.peerRankPct != null ? `${catchment.peerRankPct}th pct` : "—"} />
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
           <Cell label="Services share of revenue" v={`${servicesShare.toFixed(1)}%`} />
           <Cell label="Item volatility (CV)" v={`${(cv * 100).toFixed(1)}%`} />
           <Cell label="Peak month" v={peakMonth} />
@@ -969,7 +969,7 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
       <Section title="Income composition">
         <div className="grid md:grid-cols-2 gap-5 items-start">
           <div>
-            <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="grid grid-cols-2 gap-4 mb-5">
               <div className="rounded-lg bg-secondary/40 p-3">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{incomeLabel}</p>
                 <p className="text-xl font-bold tabular-nums">{gbp(nhsIncome)}</p>
@@ -1014,7 +1014,7 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
               </span>
             </div>
           ) : (
-            <div className="grid md:grid-cols-3 gap-3">
+            <div className="grid md:grid-cols-3 gap-4">
               <div className="rounded-lg bg-secondary/40 p-3">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">CH total turnover</p>
                 <p className="text-xl font-bold tabular-nums">{gbp(chTurnover)}</p>
@@ -1077,7 +1077,7 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
 
       <Section title="Financial performance (Companies House)">
         {company?.turnover ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Cell label="Turnover" v={gbp(company.turnover)} />
             <Cell label="Operating profit" v={gbp(company.operating_profit)} />
             <Cell label="Net profit" v={gbp(company.net_profit)} />
@@ -1347,7 +1347,7 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
           {/* NMS 1% Cap */}
           <Section title="NMS utilisation vs 1% cap">
             <p className="text-xs text-muted-foreground mb-4">NHSBSA caps NMS at 1% of monthly items dispensed. Tracking utilisation prevents revenue leakage and avoids delivering NMS above the cap which will not be reimbursed.</p>
-            <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="grid grid-cols-3 gap-4 mb-5">
               <div className="rounded-lg border border-border bg-secondary/40 p-3">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Items dispensed</p>
                 <p className="text-lg font-bold tabular-nums">{latest.items_dispensed.toLocaleString()}</p>
@@ -1466,7 +1466,7 @@ function ServiceGapRow({ label, current, avg, gap, rateLabel, uplift }: {
 }) {
   const pctBehind = avg > 0 ? ((gap / avg) * 100).toFixed(0) : "0";
   return (
-    <div className="rounded-lg border border-border bg-card p-3 flex items-center gap-3">
+    <div className="rounded-lg border border-border bg-card p-4 flex items-center gap-4">
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium">{label}</p>
         <p className="text-xs text-muted-foreground mt-0.5">
@@ -1489,7 +1489,7 @@ function PqsCriterionRow({ label, met, detail, warn }: { label: string; met: boo
       : <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />;
   const badge = met ? "bg-emerald-50 text-emerald-700" : warn ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-700";
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-3">
+    <div className="flex items-start gap-4 rounded-lg border border-border bg-card p-4">
       {icon}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium">{label}</p>
@@ -1503,5 +1503,5 @@ function PqsCriterionRow({ label, met, detail, warn }: { label: string; met: boo
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return <div className="rounded-xl border border-border bg-card p-5"><h3 className="text-sm font-semibold mb-3">{title}</h3>{children}</div>;
+  return <div className="rounded-xl border border-border bg-card p-5 md:p-6"><h3 className="text-sm font-semibold mb-4">{title}</h3>{children}</div>;
 }

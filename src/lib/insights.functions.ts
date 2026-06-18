@@ -623,20 +623,39 @@ async function buildSnapshotExtras(supabase: any, pharmacy_id: string, ctx: any)
     const country = ctx.pharmacy?.country;
     const latest = r24[r24.length - 1];
     if (country && latest) {
-      const { data: peerPhs } = await supabaseAdmin
-        .from("pharmacies").select("id").eq("country", country).neq("id", pharmacy_id).limit(400);
-      const ids = (peerPhs || []).map((p: any) => p.id);
+      // Paginate all country peers (England ~11k+, Scotland ~1.8k) without a cap
+      const ids: string[] = [];
+      const PAGE = 1000;
+      for (let from = 0; from < 50_000; from += PAGE) {
+        const { data, error } = await supabaseAdmin
+          .from("pharmacies")
+          .select("id")
+          .eq("country", country)
+          .neq("id", pharmacy_id)
+          .order("id", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (error || !data || data.length === 0) break;
+        ids.push(...(data as any[]).map((p: any) => p.id));
+        if (data.length < PAGE) break;
+      }
       if (ids.length) {
         const earliest = r24[Math.max(0, r24.length - 12)];
         const cy = earliest?.year ?? latest.year - 1;
         const cm = earliest?.month ?? latest.month;
-        const { data: peerRows } = await supabaseAdmin
-          .from("dispensing_data")
-          .select("pharmacy_id,items_dispensed,pharmacy_first_count,nms_count,final_payment,year,month")
-          .in("pharmacy_id", ids)
-          .or(`year.gt.${cy},and(year.eq.${cy},month.gte.${cm})`);
+        // Chunk IDs into batches of 500 to stay within Supabase .in() limits
+        const CHUNK = 500;
+        const allPeerRows: any[] = [];
+        for (let i = 0; i < ids.length; i += CHUNK) {
+          const chunk = ids.slice(i, i + CHUNK);
+          const { data: chunkRows } = await supabaseAdmin
+            .from("dispensing_data")
+            .select("pharmacy_id,items_dispensed,pharmacy_first_count,nms_count,final_payment,year,month")
+            .in("pharmacy_id", chunk)
+            .or(`year.gt.${cy},and(year.eq.${cy},month.gte.${cm})`);
+          if (chunkRows) allPeerRows.push(...chunkRows);
+        }
         const g = new Map<string, { items: number; pf: number; nms: number; fp: number }>();
-        for (const r of (peerRows || []) as any[]) {
+        for (const r of allPeerRows) {
           const cur = g.get(r.pharmacy_id) || { items: 0, pf: 0, nms: 0, fp: 0 };
           cur.items += Number(r.items_dispensed) || 0;
           cur.pf += Number(r.pharmacy_first_count) || 0;

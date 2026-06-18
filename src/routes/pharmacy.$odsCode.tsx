@@ -77,12 +77,11 @@ function PharmacyProfile() {
   const [myPharmacyId, setMyPharmacyId] = useState<string | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [hasUserPharmacy, setHasUserPharmacy] = useState<boolean | null>(null);
-  const [ranks, setRanks] = useState<Partial<Record<RankKey, { rank: number; total: number }>>>({});
   const [hasFp34c, setHasFp34c] = useState(false);
   const [pfPeerAvg, setPfPeerAvg] = useState<Record<string, number> | null>(null);
   const [pfPeerCount, setPfPeerCount] = useState(0);
   const [peerDistribution, setPeerDistribution] = useState<{
-    items_dispensed: number[]; nms_count: number[]; pharmacy_first_count: number[]; eps_items: number[];
+    items_dispensed: number[]; nms_count: number[]; pharmacy_first_count: number[]; eps_items: number[]; flu_vaccinations: number[];
   } | null>(null);
   const [peerPeriods, setPeerPeriods] = useState<{
     items_dispensed: string; nms_count: string; pharmacy_first_count: string; eps_items: string;
@@ -158,37 +157,6 @@ function PharmacyProfile() {
     }
   }, [pharmacy, myPharmacyId]);
 
-  // National rank for latest month across the key metrics
-  useEffect(() => {
-    (async () => {
-      if (rows.length === 0) return;
-      // Use latest row with reported activity for all pharmacies (same logic
-      // everywhere — don't prefer is_actual_payment, which lags 2+ months).
-      let latest = rows[rows.length - 1];
-      for (let i = rows.length - 1; i >= 0; i--) {
-        const r = rows[i];
-        if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) { latest = r; break; }
-      }
-      const keys: RankKey[] = ["items_dispensed", "nms_count", "pharmacy_first_count", "flu_vaccinations", "eps_items"];
-      const out: Partial<Record<RankKey, { rank: number; total: number }>> = {};
-      await Promise.all(keys.map(async (k) => {
-        const value = (latest as any)[k] as number;
-        const totalQ = await supabase
-          .from("dispensing_data")
-          .select("pharmacy_id", { count: "exact", head: true })
-          .eq("year", latest.year).eq("month", latest.month);
-        const aheadQ = await supabase
-          .from("dispensing_data")
-          .select("pharmacy_id", { count: "exact", head: true })
-          .eq("year", latest.year).eq("month", latest.month)
-          .gt(k, value);
-        const total = totalQ.count ?? 0;
-        const rank = (aheadQ.count ?? 0) + 1;
-        out[k] = { rank, total };
-      }));
-      setRanks(out);
-    })();
-  }, [rows, pharmacy]);
 
   // Peer PF service mix — average per pharmacy for the same region+month.
   useEffect(() => {
@@ -237,12 +205,13 @@ function PharmacyProfile() {
   useEffect(() => {
     (async () => {
       if (!pharmacy || rows.length === 0) return;
-      // Paginate to fetch ALL country pharmacies (Scotland 1800+, England 16k+)
+      // Paginate to fetch ALL country pharmacies, excluding this pharmacy itself
       const peerRows = await fetchAll<{ id: string }>((from, to) =>
         supabase
           .from("pharmacies")
           .select("id")
           .eq("country", pharmacy.country ?? "")
+          .neq("id", pharmacy.id)
           .order("id", { ascending: true })
           .range(from, to),
       );
@@ -251,24 +220,25 @@ function PharmacyProfile() {
       const peerIdSet = new Set(peerIds);
 
       // Determine latest reported period per-metric for THIS pharmacy
-      const latestFor = (key: keyof Row): { y: number; m: number } | null => {
+      const latestForPeriod = (key: keyof Row): { y: number; m: number } | null => {
         for (let i = rows.length - 1; i >= 0; i--) {
           if ((Number(rows[i][key]) || 0) > 0) return { y: rows[i].year, m: rows[i].month };
         }
         return null;
       };
-      const periods: Record<"items_dispensed" | "nms_count" | "pharmacy_first_count" | "eps_items", { y: number; m: number } | null> = {
-        items_dispensed: latestFor("items_dispensed"),
-        nms_count: latestFor("nms_count"),
-        pharmacy_first_count: latestFor("pharmacy_first_count"),
-        eps_items: latestFor("eps_items"),
+      const periods = {
+        items_dispensed: latestForPeriod("items_dispensed"),
+        nms_count: latestForPeriod("nms_count"),
+        pharmacy_first_count: latestForPeriod("pharmacy_first_count"),
+        eps_items: latestForPeriod("eps_items"),
+        flu_vaccinations: latestForPeriod("flu_vaccinations"),
       };
 
       const fetchPeriod = async (y: number, m: number) => {
-        const all = await fetchAll<{ pharmacy_id: string; items_dispensed: number; nms_count: number; pharmacy_first_count: number; eps_items: number }>((from, to) =>
+        const all = await fetchAll<{ pharmacy_id: string; items_dispensed: number; nms_count: number; pharmacy_first_count: number; eps_items: number; flu_vaccinations: number }>((from, to) =>
           supabase
             .from("dispensing_data")
-            .select("pharmacy_id,items_dispensed,nms_count,pharmacy_first_count,eps_items")
+            .select("pharmacy_id,items_dispensed,nms_count,pharmacy_first_count,eps_items,flu_vaccinations")
             .eq("year", y).eq("month", m)
             .order("id", { ascending: true })
             .range(from, to),
@@ -285,11 +255,12 @@ function PharmacyProfile() {
         return cache.get(k) || [];
       };
 
-      const [itemsRows, nmsRows, pfRows, epsRows] = await Promise.all([
+      const [itemsRows, nmsRows, pfRows, epsRows, fluRows] = await Promise.all([
         getRows(periods.items_dispensed),
         getRows(periods.nms_count),
         getRows(periods.pharmacy_first_count),
         getRows(periods.eps_items),
+        getRows(periods.flu_vaccinations),
       ]);
 
       setPeerDistribution({
@@ -297,6 +268,7 @@ function PharmacyProfile() {
         nms_count: nmsRows.map((r) => r.nms_count || 0),
         pharmacy_first_count: pfRows.map((r) => r.pharmacy_first_count || 0),
         eps_items: epsRows.map((r) => r.eps_items || 0),
+        flu_vaccinations: fluRows.map((r) => r.flu_vaccinations || 0),
       });
       setPeerPeriods({
         items_dispensed: periods.items_dispensed ? `${MONTHS[periods.items_dispensed.m - 1]} ${periods.items_dispensed.y}` : "",
@@ -359,6 +331,22 @@ function PharmacyProfile() {
       return null;
     };
   }, [rows]);
+
+  const ranks = useMemo<Partial<Record<RankKey, { rank: number; total: number }>>>(() => {
+    if (!peerDistribution) return {};
+    const keys: RankKey[] = ["items_dispensed", "nms_count", "pharmacy_first_count", "flu_vaccinations", "eps_items"];
+    const out: Partial<Record<RankKey, { rank: number; total: number }>> = {};
+    for (const k of keys) {
+      const arr = peerDistribution[k as keyof typeof peerDistribution];
+      if (!arr?.length) continue;
+      const lf = latestFor(k as keyof Row);
+      if (!lf) continue;
+      const value = Number(lf.row[k as keyof Row]) || 0;
+      const above = arr.filter((v) => v > value).length;
+      out[k] = { rank: above + 1, total: arr.length };
+    }
+    return out;
+  }, [peerDistribution, latestFor]);
 
   const trimmedRows = useMemo(
     () => (latestIdx >= 0 ? rows.slice(0, latestIdx + 1) : rows),
@@ -614,7 +602,7 @@ function PharmacyProfile() {
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {metrics.map((m) => (
               <MetricCard
                 key={m.label}
@@ -632,7 +620,7 @@ function PharmacyProfile() {
           </div>
 
           {!showVerified && !hasFp34c && !isWales && (
-            <div className="mt-4 rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+            <div className="mt-5 rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
               Payment data isn't publicly available for this pharmacy.
             </div>
           )}

@@ -62,11 +62,10 @@ function MyPharmacy() {
   const [loading, setLoading] = useState(true);
   const [noPharmacy, setNoPharmacy] = useState(false);
   const [hasFp34c, setHasFp34c] = useState(false);
-  const [ranks, setRanks] = useState<Partial<Record<RankKey, { rank: number; total: number }>>>({});
   const [pfPeerAvg, setPfPeerAvg] = useState<Record<string, number> | null>(null);
   const [pfPeerCount, setPfPeerCount] = useState(0);
   const [peerDistribution, setPeerDistribution] = useState<{
-    items_dispensed: number[]; nms_count: number[]; pharmacy_first_count: number[]; eps_items: number[];
+    items_dispensed: number[]; nms_count: number[]; pharmacy_first_count: number[]; eps_items: number[]; flu_vaccinations: number[];
   } | null>(null);
   const [peerPeriods, setPeerPeriods] = useState<{
     items_dispensed: string; nms_count: string; pharmacy_first_count: string; eps_items: string;
@@ -128,33 +127,6 @@ function MyPharmacy() {
     })();
   }, [user, pharmacy]);
 
-  // National rank per metric
-  useEffect(() => {
-    (async () => {
-      if (rows.length === 0) return;
-      let latest = rows[rows.length - 1];
-      for (let i = rows.length - 1; i >= 0; i--) {
-        const r = rows[i];
-        if (r.items_dispensed > 0 || r.pharmacy_first_count > 0 || r.nms_count > 0) { latest = r; break; }
-      }
-      const keys: RankKey[] = ["items_dispensed", "nms_count", "pharmacy_first_count", "flu_vaccinations", "eps_items"];
-      const out: Partial<Record<RankKey, { rank: number; total: number }>> = {};
-      await Promise.all(keys.map(async (k) => {
-        const value = (latest as any)[k] as number;
-        const totalQ = await supabase
-          .from("dispensing_data")
-          .select("pharmacy_id", { count: "exact", head: true })
-          .eq("year", latest.year).eq("month", latest.month);
-        const aheadQ = await supabase
-          .from("dispensing_data")
-          .select("pharmacy_id", { count: "exact", head: true })
-          .eq("year", latest.year).eq("month", latest.month)
-          .gt(k, value);
-        out[k] = { rank: (aheadQ.count ?? 0) + 1, total: totalQ.count ?? 0 };
-      }));
-      setRanks(out);
-    })();
-  }, [rows]);
 
   // Peer PF service mix (Scotland only)
   useEffect(() => {
@@ -197,29 +169,30 @@ function MyPharmacy() {
     (async () => {
       if (!pharmacy || rows.length === 0) return;
       const peerRows = await fetchAll<{ id: string }>((from, to) =>
-        supabase.from("pharmacies").select("id").eq("country", pharmacy.country ?? "").order("id", { ascending: true }).range(from, to),
+        supabase.from("pharmacies").select("id").eq("country", pharmacy.country ?? "").neq("id", pharmacy.id).order("id", { ascending: true }).range(from, to),
       );
       const peerIds = peerRows.map((p) => p.id);
       if (!peerIds.length) return;
       const peerIdSet = new Set(peerIds);
 
-      const latestFor = (key: keyof Row): { y: number; m: number } | null => {
+      const latestForPeriod = (key: keyof Row): { y: number; m: number } | null => {
         for (let i = rows.length - 1; i >= 0; i--) {
           if ((Number(rows[i][key]) || 0) > 0) return { y: rows[i].year, m: rows[i].month };
         }
         return null;
       };
       const periods = {
-        items_dispensed: latestFor("items_dispensed"),
-        nms_count: latestFor("nms_count"),
-        pharmacy_first_count: latestFor("pharmacy_first_count"),
-        eps_items: latestFor("eps_items"),
+        items_dispensed: latestForPeriod("items_dispensed"),
+        nms_count: latestForPeriod("nms_count"),
+        pharmacy_first_count: latestForPeriod("pharmacy_first_count"),
+        eps_items: latestForPeriod("eps_items"),
+        flu_vaccinations: latestForPeriod("flu_vaccinations"),
       };
 
       const fetchPeriod = async (y: number, m: number) => {
-        const all = await fetchAll<{ pharmacy_id: string; items_dispensed: number; nms_count: number; pharmacy_first_count: number; eps_items: number }>((from, to) =>
+        const all = await fetchAll<{ pharmacy_id: string; items_dispensed: number; nms_count: number; pharmacy_first_count: number; eps_items: number; flu_vaccinations: number }>((from, to) =>
           supabase.from("dispensing_data")
-            .select("pharmacy_id,items_dispensed,nms_count,pharmacy_first_count,eps_items")
+            .select("pharmacy_id,items_dispensed,nms_count,pharmacy_first_count,eps_items,flu_vaccinations")
             .eq("year", y).eq("month", m).order("id", { ascending: true }).range(from, to),
         );
         return all.filter((r) => peerIdSet.has(r.pharmacy_id));
@@ -233,11 +206,12 @@ function MyPharmacy() {
         return cache.get(k) || [];
       };
 
-      const [itemsRows, nmsRows, pfRows, epsRows] = await Promise.all([
+      const [itemsRows, nmsRows, pfRows, epsRows, fluRows] = await Promise.all([
         getRows(periods.items_dispensed),
         getRows(periods.nms_count),
         getRows(periods.pharmacy_first_count),
         getRows(periods.eps_items),
+        getRows(periods.flu_vaccinations),
       ]);
 
       setPeerDistribution({
@@ -245,6 +219,7 @@ function MyPharmacy() {
         nms_count: nmsRows.map((r) => r.nms_count || 0),
         pharmacy_first_count: pfRows.map((r) => r.pharmacy_first_count || 0),
         eps_items: epsRows.map((r) => r.eps_items || 0),
+        flu_vaccinations: fluRows.map((r) => r.flu_vaccinations || 0),
       });
       setPeerPeriods({
         items_dispensed: periods.items_dispensed ? `${MONTHS[periods.items_dispensed.m - 1]} ${periods.items_dispensed.y}` : "",
@@ -285,6 +260,24 @@ function MyPharmacy() {
       return null;
     };
   }, [rows]);
+
+  // Derive per-metric country ranks from the already country-filtered peerDistribution.
+  // This replaces the old ranks useEffect that queried all nations without a country filter.
+  const ranks = useMemo<Partial<Record<RankKey, { rank: number; total: number }>>>(() => {
+    if (!peerDistribution) return {};
+    const keys: RankKey[] = ["items_dispensed", "nms_count", "pharmacy_first_count", "flu_vaccinations", "eps_items"];
+    const out: Partial<Record<RankKey, { rank: number; total: number }>> = {};
+    for (const k of keys) {
+      const arr = peerDistribution[k as keyof typeof peerDistribution];
+      if (!arr?.length) continue;
+      const lf = latestFor(k as keyof Row);
+      if (!lf) continue;
+      const value = Number(lf.row[k as keyof Row]) || 0;
+      const above = arr.filter((v) => v > value).length;
+      out[k] = { rank: above + 1, total: arr.length };
+    }
+    return out;
+  }, [peerDistribution, latestFor]);
 
   const trimmedRows = useMemo(
     () => (latestIdx >= 0 ? rows.slice(0, latestIdx + 1) : rows),

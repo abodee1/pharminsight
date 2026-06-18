@@ -36,7 +36,7 @@ export function PeriodPills({
           type="button"
           onClick={() => onChange(opt)}
           className={[
-            "px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+            "px-2.5 py-1.5 sm:py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
             value === opt
               ? "bg-foreground text-background"
               : "text-muted-foreground hover:text-foreground",
@@ -158,7 +158,7 @@ export function TrendCard({
                 type="button"
                 onClick={() => setUnit("primary")}
                 className={[
-                  "px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+                  "px-2.5 py-1.5 sm:py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
                   unit === "primary" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
                 ].join(" ")}
                 aria-pressed={unit === "primary"}
@@ -169,7 +169,7 @@ export function TrendCard({
                 type="button"
                 onClick={() => setUnit("alt")}
                 className={[
-                  "px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+                  "px-2.5 py-1.5 sm:py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
                   unit === "alt" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
                 ].join(" ")}
                 aria-pressed={unit === "alt"}
@@ -456,7 +456,7 @@ export function GpPrescribingCard({
       />
       {topGps.length > 0 && (
         <Flippable
-          minHeight={Math.max(240, 72 + topGps.length * 78)}
+          minHeight={Math.max(280, 80 + topGps.length * 100)}
           front={
             <div className="rounded-lg border border-border bg-card p-4 shadow-sm h-full">
               <div className="flex items-center justify-between mb-3 pr-28">
@@ -487,20 +487,20 @@ export function GpPrescribingCard({
                           </p>
                         </div>
                       </div>
-                      <div className="mt-1 grid grid-cols-3 gap-2 text-[10px]">
-                        <div className="rounded bg-secondary/40 px-2 py-1">
-                          <span className="text-muted-foreground">List size · </span>
-                          <span className="font-semibold tabular-nums">{g.listSize ? g.listSize.toLocaleString() : "—"}</span>
+                      <div className="mt-1 grid grid-cols-3 gap-2">
+                        <div className="rounded bg-secondary/40 px-2 py-1.5">
+                          <p className="text-[9px] uppercase tracking-wide text-muted-foreground leading-none mb-1">List size</p>
+                          <p className="text-[10px] font-semibold tabular-nums leading-none">{g.listSize ? g.listSize.toLocaleString() : "—"}</p>
                         </div>
-                        <div className="rounded bg-secondary/40 px-2 py-1">
-                          <span className="text-muted-foreground">Items / patient · </span>
-                          <span className="font-semibold tabular-nums">{perPatient != null ? perPatient.toFixed(1) : "—"}</span>
+                        <div className="rounded bg-secondary/40 px-2 py-1.5">
+                          <p className="text-[9px] uppercase tracking-wide text-muted-foreground leading-none mb-1">Items / pt</p>
+                          <p className="text-[10px] font-semibold tabular-nums leading-none">{perPatient != null ? perPatient.toFixed(1) : "—"}</p>
                         </div>
-                        <div className={`rounded bg-secondary/40 px-2 py-1 ${tone}`}>
-                          <span className="text-muted-foreground">Δ · </span>
-                          <span className="font-semibold tabular-nums">
+                        <div className={`rounded bg-secondary/40 px-2 py-1.5 ${tone}`}>
+                          <p className="text-[9px] uppercase tracking-wide text-muted-foreground leading-none mb-1">Δ prior</p>
+                          <p className="text-[10px] font-semibold tabular-nums leading-none">
                             {delta == null ? "—" : `${delta >= 0 ? "+" : ""}${delta}%`}
-                          </span>
+                          </p>
                         </div>
                       </div>
                     </li>
@@ -554,7 +554,7 @@ function Flippable({
         type="button"
         onClick={() => setFlipped((f) => !f)}
         aria-label={flipped ? "Hide explanation" : "What does this mean?"}
-        className="absolute right-2 top-2 z-10 inline-flex h-7 items-center gap-1 rounded-full border border-border bg-background/90 px-2 text-[10px] font-medium text-muted-foreground shadow-sm hover:bg-secondary hover:text-foreground transition"
+        className="absolute right-2 top-2 z-10 inline-flex h-8 sm:h-7 items-center gap-1 rounded-full border border-border bg-background/90 px-2.5 sm:px-2 text-[10px] font-medium text-muted-foreground shadow-sm hover:bg-secondary hover:text-foreground transition"
       >
         {flipped ? "← Back to chart" : "ⓘ What does this mean?"}
       </button>
@@ -656,7 +656,7 @@ export function PercentileRail({
   const tone =
     percentile >= 75 ? "text-emerald-700" : percentile <= 25 ? "text-rose-700" : "text-foreground";
   const rank = sortedAll.length
-    ? sortedAll.length - Math.round((percentile / 100) * sortedAll.length) + 1
+    ? sortedAll.filter((v) => v > value).length + 1
     : 0;
 
   return (
@@ -673,7 +673,7 @@ export function PercentileRail({
 
       {/* Track — interactive: drag/hover to inspect any percentile */}
       <div
-        className="mt-4 relative h-8 cursor-crosshair touch-none select-none"
+        className="mt-4 relative h-10 sm:h-8 cursor-crosshair touch-none select-none"
         onPointerMove={handleMove}
         onPointerDown={handleMove}
         onPointerLeave={() => setHoverPct(null)}
@@ -701,7 +701,7 @@ export function PercentileRail({
           className="absolute -translate-x-1/2 top-0 pointer-events-none"
           style={{ left: `${Math.max(2, Math.min(98, percentile))}%` }}
         >
-          <div className="h-8 w-px bg-foreground" />
+          <div className="h-10 sm:h-8 w-px bg-foreground" />
           <div className="absolute -translate-x-1/2 -top-1.5 h-3 w-3 rounded-full bg-foreground border-2 border-card" />
         </div>
 
@@ -726,7 +726,7 @@ export function PercentileRail({
         </div>
       </div>
 
-      <div className="mt-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-1 text-xs">
+      <div className="mt-8 sm:mt-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-1 text-xs">
         <div>
           <p className="text-muted-foreground uppercase tracking-wider text-[10px]">You</p>
           <p className="font-semibold tabular-nums text-sm">{formatValue(value)}</p>
@@ -1063,7 +1063,7 @@ export function ShareDonut({
           })}
         </svg>
 
-        <ul className="flex-1 min-w-[200px] space-y-1.5 text-sm">
+        <ul className="flex-1 min-w-[160px] sm:min-w-[200px] space-y-1.5 text-sm">
           {filtered
             .slice()
             .sort((a, b) => b.value - a.value)
@@ -1154,7 +1154,7 @@ export function MetricSpotlight({
     const percentile = Math.round((below / sorted.length) * 100);
     const belowAvg = sorted.filter((v) => v < avg).length;
     const avgPercentile = Math.round((belowAvg / sorted.length) * 100);
-    const rank = sorted.length - Math.round((percentile / 100) * sorted.length) + 1;
+    const rank = sorted.filter((v) => v > active.yourValue).length + 1;
     return { sorted, avg, max, min, percentile, avgPercentile, rank, n: sorted.length };
   }, [active]);
 
@@ -1242,7 +1242,7 @@ export function MetricSpotlight({
               type="button"
               onClick={() => setActiveKey(m.key)}
               className={[
-                "px-3 py-1 text-[11px] font-semibold rounded-md transition-all",
+                "px-3 py-1.5 sm:py-1 text-[11px] font-semibold rounded-md transition-all",
                 active.key === m.key
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
@@ -1452,7 +1452,7 @@ export function ServiceIntensityCard({
               type="button"
               onClick={() => setActiveKey(r.key)}
               className={[
-                "px-2.5 py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+                "px-2.5 py-1.5 sm:py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
                 active.key === r.key
                   ? "bg-foreground text-background"
                   : "text-muted-foreground hover:text-foreground",
