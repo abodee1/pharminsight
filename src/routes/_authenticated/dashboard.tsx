@@ -357,14 +357,18 @@ function MyPharmacy() {
           ])
     : [];
 
+  // Scottish-only service metrics. There is no national per-service rank
+  // table for these, so we mark their `key` as "money" — that sentinel is
+  // excluded from the rank lookup further below, preventing the
+  // misleading items_dispensed rank from appearing on every card.
   const scottishDefs: MetricDef[] = isScotland && latest
     ? [
-        { label: "MCR registrations", key: "items_dispensed", field: "mcr_registrations" },
-        { label: "MCR items", key: "items_dispensed", field: "mcr_items" },
-        { label: "EHC items", key: "items_dispensed", field: "ehc_items" },
-        { label: "Methadone items", key: "items_dispensed", field: "methadone_items" },
-        { label: "Supervised doses", key: "items_dispensed", field: "supervised_methadone_doses" },
-        { label: "Smoking cessation", key: "items_dispensed", field: "smoking_cessation" },
+        { label: "MCR registrations", key: "money", field: "mcr_registrations" },
+        { label: "MCR items", key: "money", field: "mcr_items" },
+        { label: "EHC items", key: "money", field: "ehc_items" },
+        { label: "Methadone items", key: "money", field: "methadone_items" },
+        { label: "Supervised doses", key: "money", field: "supervised_methadone_doses" },
+        { label: "Smoking cessation", key: "money", field: "smoking_cessation" },
         { label: "Smoking cessation £", key: "money", field: "smoking_cessation_payment", format: gbp },
         { label: "Pharmacy First £", key: "money", field: "pharmacy_first_payment", format: gbp },
         { label: "MCR payment", key: "money", field: "mcr_payment", format: gbp },
