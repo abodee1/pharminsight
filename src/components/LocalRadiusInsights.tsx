@@ -20,6 +20,7 @@ type Nearby = {
   ods_code: string;
   name: string;
   distance_m: number;
+  address?: string | null;
 };
 
 type MetricKey = "items" | "pf" | "nms" | "eps";
@@ -62,6 +63,7 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
   const [metric, setMetric] = useState<MetricKey>("items");
   const [win, setWin] = useState<PeriodWindow>(3);
   const [nearby, setNearby] = useState<Nearby[]>([]);
+  const [addrMap, setAddrMap] = useState<Map<string, string | null>>(new Map());
   const [perPharm, setPerPharm] = useState<Map<string, number>>(new Map());
   const [perPharmPay, setPerPharmPay] = useState<Map<string, number>>(new Map()); // PF £ only
   const [period, setPeriod] = useState<string>("");
@@ -90,6 +92,21 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
       if (!alive) return;
       const arr = (data as Nearby[] | null) || [];
       setNearby(arr);
+      // Fetch addresses for nearby pharmacies
+      const ids = arr.map(n => n.id);
+      if (ids.length) {
+        const { data: addrData } = await supabase
+          .from("pharmacies")
+          .select("id,address")
+          .in("id", ids);
+        if (alive && addrData) {
+          const m = new Map<string, string | null>();
+          for (const p of addrData as Array<{ id: string; address: string | null }>) {
+            m.set(p.id, p.address);
+          }
+          setAddrMap(m);
+        }
+      }
     })().finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [origin, radius]);
@@ -173,15 +190,15 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
 
   const rows = useMemo(() => {
     const list = [
-      { id: pharmacyId, name: pharmacyName, isYou: true, distance_m: 0 },
-      ...nearby.filter((n) => n.id !== pharmacyId).map((n) => ({ id: n.id, name: n.name, isYou: false, distance_m: n.distance_m })),
+      { id: pharmacyId, name: pharmacyName, isYou: true, distance_m: 0, address: null as string | null },
+      ...nearby.filter((n) => n.id !== pharmacyId).map((n) => ({ id: n.id, name: n.name, isYou: false, distance_m: n.distance_m, address: addrMap.get(n.id) ?? null })),
     ];
     const annotated = list.map((p) => ({
       ...p,
       value: perPharm.get(p.id) || 0,
     }));
     return annotated.sort((a, b) => b.value - a.value);
-  }, [nearby, perPharm, pharmacyId, pharmacyName]);
+  }, [nearby, addrMap, perPharm, pharmacyId, pharmacyName]);
 
   const yourValue = perPharm.get(pharmacyId) || 0;
   const others = rows.filter((r) => !r.isYou && r.value > 0);
@@ -318,6 +335,22 @@ export function LocalRadiusInsights({ pharmacyId, pharmacyName, postcode, lat, l
           <p className="mt-3 text-[11px] text-muted-foreground italic border-t border-border pt-2">
             Dashed line = cohort median. Highlighted bar = this pharmacy. Top 20 by {METRIC_LABEL[metric]} over the {Number(win)}-month window.
           </p>
+
+          <div className="mt-3 max-h-64 overflow-y-auto rounded-md border border-border divide-y divide-border text-xs">
+            {rows.filter(r => r.value > 0).map((r, i) => (
+              <div key={r.id} className={["flex items-center justify-between gap-3 px-3 py-2",
+                r.isYou ? "bg-foreground/5" : ""].join(" ")}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="shrink-0 w-5 text-[10px] text-muted-foreground tabular-nums">{i + 1}</span>
+                  <div className="min-w-0">
+                    <p className={["font-medium truncate", r.isYou ? "text-foreground" : ""].join(" ")}>{r.name}</p>
+                    {r.address && <p className="text-[10px] text-muted-foreground truncate">{r.address}</p>}
+                  </div>
+                </div>
+                <span className="shrink-0 tabular-nums font-semibold">{fmt(r.value)}</span>
+              </div>
+            ))}
+          </div>
         </>
       )}
     </div>

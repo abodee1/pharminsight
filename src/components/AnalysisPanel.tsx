@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { X, Star, Loader2, RefreshCw, AlertTriangle, CheckCircle2, TrendingUp, TrendingDown, Minus, FileText, Sparkles } from "lucide-react";
+import { X, Star, Loader2, RefreshCw, AlertTriangle, CheckCircle2, TrendingUp, TrendingDown, Minus, FileText, Sparkles, Target, ListChecks, Coins, PieChart } from "lucide-react";
 import { toast } from "sonner";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar,
@@ -70,6 +70,14 @@ const METRIC_INFO: Record<string, string> = {
   "Premium · 6x": "Premium valuation = EBITDA × 6. Reserved for high-growth, high-margin pharmacies in desirable locations with services income.",
   "Estimated annual NHS income": "Our estimate of the NHS payment this pharmacy receives per year, based on items, NMS, Pharmacy First and flu volumes multiplied by published Drug Tariff rates, less a 5% clawback. For Scotland, actual payment data is used where available.",
   "Actual annual NHS income": "Annualised NHS payment based on verified monthly payment data (Scotland open data or your uploaded FP34C schedules). This is not an estimate.",
+  "Local competitors (1mi)": "Number of other NHS community pharmacies within a 1-mile radius. Higher competition compresses catchment share; a low count (0–1) is a meaningful moat in valuation.",
+  "GP feeders (1mi)": "Number of NHS GP practices within 1 mile whose patients are likely to use this pharmacy. More feeders means a more diversified script base and lower concentration risk.",
+  "Catchment list size": "Combined number of registered NHS patients across all GP practices within 1 mile. A larger list size provides a larger addressable pool of prescriptions and service referrals.",
+  "Peer rank (5mi)": "This pharmacy's dispensing volume percentile rank vs other pharmacies within a 5-mile catchment — e.g. 75th means it dispenses more items than 75% of local peers. A proxy for market position.",
+  "Services share of revenue": "Percentage of estimated NHS income derived from clinical services (NMS, Pharmacy First, flu) vs. core dispensing fees. Higher services share signals better income diversification and is valued positively by acquirers.",
+  "Item volatility (CV)": "Coefficient of variation of monthly item volumes — standard deviation divided by the mean. Below 5% is highly stable; above 15% signals meaningful seasonal or operational swings.",
+  "Peak month": "The month with the highest items dispensed in the selected window. Useful for spotting seasonal demand peaks (e.g. winter flu season) and planning staffing.",
+  "Trough month": "The month with the lowest items dispensed in the selected window. Recurring troughs may indicate seasonal patterns, public holidays, or script delivery issues worth investigating.",
 };
 
 function FlipCard({ title, value, sub, description, className = "" }: {
@@ -1142,13 +1150,23 @@ function insightTimeAgo(ts: string) {
 }
 
 type SavedInsight = { id: string; insight_type: string; insight_text: string; generated_at: string };
+type PanelInsightKey = "swot" | "benchmark" | "opportunities" | "action_plan" | "income_quality" | "service_mix";
+
+const PANEL_INSIGHT_TYPES: { key: PanelInsightKey; title: string; blurb: string; Icon: any; accent: string }[] = [
+  { key: "swot", title: "SWOT Analysis", blurb: "Strengths, weaknesses, opportunities and threats anchored to your numbers.", Icon: Sparkles, accent: "bg-gold/10 text-gold border-gold/25" },
+  { key: "benchmark", title: "Performance Commentary", blurb: "Expert narrative on dispensing trend, service mix and income quality vs peers.", Icon: TrendingUp, accent: "bg-sky-500/10 text-sky-600 border-sky-500/25" },
+  { key: "opportunities", title: "Opportunity Radar", blurb: "Top 5 highest-£ opportunities ranked by indicative annual uplift.", Icon: Target, accent: "bg-emerald-500/10 text-emerald-600 border-emerald-500/25" },
+  { key: "action_plan", title: "90-day Action Plan", blurb: "Executable week-by-week plan an owner can hand to a manager Monday morning.", Icon: ListChecks, accent: "bg-violet-500/10 text-violet-600 border-violet-500/25" },
+  { key: "income_quality", title: "Income Quality", blurb: "A–D grade with concentration risk, resilience and three upgrade moves.", Icon: Coins, accent: "bg-amber-500/10 text-amber-600 border-amber-500/25" },
+  { key: "service_mix", title: "Service Mix", blurb: "Service-by-service read with peer gaps and the lever to move each.", Icon: PieChart, accent: "bg-rose-500/10 text-rose-600 border-rose-500/25" },
+];
 
 // -------- AI Insights tab --------
 function InsightsTab({ pharmacy, rows, win }: { pharmacy: Pharmacy; rows: DRow[]; win: number }) {
   const { user } = useAuth();
   const isEng = (pharmacy.country || "").toLowerCase() === "england";
   const [natAvg, setNatAvg] = useState<Record<string, number>>({});
-  const [generating, setGenerating] = useState<"swot" | "benchmark" | null>(null);
+  const [generating, setGenerating] = useState<PanelInsightKey | null>(null);
   const [savedInsights, setSavedInsights] = useState<SavedInsight[]>([]);
   const [activeInsight, setActiveInsight] = useState<SavedInsight | null>(null);
 
@@ -1171,9 +1189,9 @@ function InsightsTab({ pharmacy, rows, win }: { pharmacy: Pharmacy; rows: DRow[]
         .from("ai_insights")
         .select("id,insight_type,insight_text,generated_at")
         .eq("pharmacy_id", pharmacy.id)
-        .in("insight_type", ["swot", "benchmark"])
+        .in("insight_type", ["swot", "benchmark", "opportunities", "action_plan", "income_quality", "service_mix"])
         .order("generated_at", { ascending: false })
-        .limit(4);
+        .limit(12);
       const arr = (data as SavedInsight[]) ?? [];
       setSavedInsights(arr);
       if (arr.length) setActiveInsight(arr[0]);
@@ -1201,7 +1219,7 @@ function InsightsTab({ pharmacy, rows, win }: { pharmacy: Pharmacy; rows: DRow[]
     })();
   }, [isEng, latest]);
 
-  const handleGenerate = async (type: "swot" | "benchmark") => {
+  const handleGenerate = async (type: PanelInsightKey) => {
     setGenerating(type);
     try {
       const r = await gen({ data: { pharmacy_id: pharmacy.id, insight_type: type } });
@@ -1251,48 +1269,51 @@ function InsightsTab({ pharmacy, rows, win }: { pharmacy: Pharmacy; rows: DRow[]
   const epsOk = epsRateLatest >= 89;
   const epsKnown = epsRateLatest > 0;
 
-  const swotCached = savedInsights.find(i => i.insight_type === "swot");
-  const benchCached = savedInsights.find(i => i.insight_type === "benchmark");
-
   return (
     <div className="p-4 md:p-6 space-y-5">
       {/* AI Analysis */}
       <Section title="AI analysis">
-        <div className="flex flex-wrap gap-3 mb-4">
-          <Button onClick={() => handleGenerate("swot")} disabled={!!generating} className="gap-2">
-            {generating === "swot" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {swotCached ? "Refresh SWOT" : "SWOT Analysis"}
-          </Button>
-          <Button variant="outline" onClick={() => handleGenerate("benchmark")} disabled={!!generating} className="gap-2">
-            {generating === "benchmark" ? <Loader2 className="h-4 w-4 animate-spin" /> : <TrendingUp className="h-4 w-4" />}
-            {benchCached ? "Refresh Commentary" : "Performance Commentary"}
-          </Button>
-          {(swotCached || benchCached) && (
-            <div className="flex gap-2 flex-wrap">
-              {swotCached && (
-                <button
-                  onClick={() => setActiveInsight(swotCached)}
-                  className={["text-xs px-3 py-1.5 rounded-full border transition-colors",
-                    activeInsight?.id === swotCached.id
-                      ? "border-gold bg-gold/10 text-amber-800"
-                      : "border-border text-muted-foreground hover:text-foreground"].join(" ")}
-                >
-                  SWOT · {insightTimeAgo(swotCached.generated_at)}
-                </button>
-              )}
-              {benchCached && (
-                <button
-                  onClick={() => setActiveInsight(benchCached)}
-                  className={["text-xs px-3 py-1.5 rounded-full border transition-colors",
-                    activeInsight?.id === benchCached.id
-                      ? "border-sky-400 bg-sky-50 text-sky-800"
-                      : "border-border text-muted-foreground hover:text-foreground"].join(" ")}
-                >
-                  Commentary · {insightTimeAgo(benchCached.generated_at)}
-                </button>
-              )}
-            </div>
-          )}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {PANEL_INSIGHT_TYPES.map(({ key, title, blurb, Icon, accent }) => {
+            const cached = savedInsights.find(i => i.insight_type === key);
+            const isGenerating = generating === key;
+            const isActive = activeInsight?.insight_type === key;
+            return (
+              <div key={key} className={["rounded-lg border bg-card p-3 flex flex-col gap-2",
+                isActive ? "border-foreground/30" : "border-border"].join(" ")}>
+                <div className="flex items-start gap-2">
+                  <div className={`h-7 w-7 rounded-md border flex items-center justify-center shrink-0 ${accent}`}>
+                    <Icon className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold leading-tight">{title}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">{blurb}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {cached ? (
+                    <>
+                      <button type="button" onClick={() => setActiveInsight(cached)}
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded border transition-colors ${isActive ? "bg-foreground text-background border-foreground" : "border-border hover:border-foreground/40"}`}>
+                        {isActive ? "Viewing" : "View"}
+                      </button>
+                      <button type="button" disabled={!!generating} onClick={() => handleGenerate(key)}
+                        className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 disabled:opacity-50">
+                        <RefreshCw className="h-2.5 w-2.5" /> Refresh
+                      </button>
+                      <span className="text-[9px] text-muted-foreground ml-auto">{insightTimeAgo(cached.generated_at)}</span>
+                    </>
+                  ) : (
+                    <button type="button" disabled={!!generating} onClick={() => handleGenerate(key)}
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded border border-border hover:border-foreground/40 flex items-center gap-1 transition-colors disabled:opacity-50">
+                      {isGenerating ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Sparkles className="h-2.5 w-2.5" />}
+                      {isGenerating ? "Generating…" : "Generate"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {generating && (
@@ -1309,12 +1330,12 @@ function InsightsTab({ pharmacy, rows, win }: { pharmacy: Pharmacy; rows: DRow[]
               <div className="flex items-center gap-2">
                 <span className="text-[10px] bg-gold/10 text-amber-700 border border-gold/25 rounded-full px-2.5 py-0.5 font-semibold uppercase tracking-wider">AI</span>
                 <span className="text-xs font-semibold">
-                  {activeInsight.insight_type === "swot" ? "SWOT Analysis" : "Performance Commentary"}
+                  {PANEL_INSIGHT_TYPES.find(t => t.key === activeInsight.insight_type)?.title ?? activeInsight.insight_type}
                 </span>
                 <span className="text-xs text-muted-foreground">· {insightTimeAgo(activeInsight.generated_at)}</span>
               </div>
               <button
-                onClick={() => handleGenerate(activeInsight.insight_type as "swot" | "benchmark")}
+                onClick={() => handleGenerate(activeInsight.insight_type as PanelInsightKey)}
                 disabled={!!generating}
                 className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
               >
