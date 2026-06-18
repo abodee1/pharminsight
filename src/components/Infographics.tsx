@@ -445,11 +445,11 @@ export function GpPrescribingCard({
             </p>
             <ul className="list-disc pl-4 space-y-1">
               <li><strong>{avgGps} GP practices</strong> — on average, this many distinct surgeries sent scripts to this pharmacy each month in the selected window.</li>
-              <li><strong>{totalItems.toLocaleString()} items</strong> — total prescription items dispensed over the last {win} months from linked GPs.</li>
+              <li><strong>{totalItems.toLocaleString()} items</strong> — total prescription items dispensed {win >= ALL_PERIOD ? "across all reported months" : `over the last ${win} months`} from linked GPs.</li>
               <li>A <strong>rising line</strong> means the pharmacy is capturing more GP-originated scripts; a falling line means script volume from feeders is declining.</li>
             </ul>
             <p className="text-muted-foreground">
-              Source: official NHS BSA (England), PHS (Scotland) and BSO (Northern Ireland) GP-to-pharmacy linkage extracts.
+              Source: official NHS BSA (England), PHS (Scotland) and BSO (Northern Ireland) GP-to-pharmacy linkage extracts. Wales is not included — no public GP-to-pharmacy linkage feed is published there.
             </p>
           </ExplainPanel>
         }
@@ -512,15 +512,15 @@ export function GpPrescribingCard({
           back={
             <ExplainPanel title="What 'Top GP feeders' tells you">
               <p>
-                These are the GP surgeries sending the <strong>most prescription items</strong> to this pharmacy over the last {win} months,
+                These are the GP surgeries sending the <strong>most prescription items</strong> to this pharmacy {win >= ALL_PERIOD ? "across all reported months" : `over the last ${win} months`},
                 ranked by volume. Together they show where the pharmacy's NHS dispensing income originates.
               </p>
               <ul className="list-disc pl-4 space-y-1">
                 <li><strong>Items</strong> — total prescription items dispensed from that surgery's scripts in the window.</li>
-                <li><strong>Share</strong> — that surgery's % of all linked-GP items dispensed by this pharmacy. A high share (e.g. &gt;30%) means heavy reliance on one practice.</li>
-                <li><strong>List size</strong> — number of patients registered at the GP practice (latest NHS list-size return).</li>
-                <li><strong>Items / patient</strong> — items dispensed per registered patient. Higher numbers suggest the pharmacy is the dominant dispenser for that practice's patients.</li>
-                <li><strong>Δ vs prior {win}M</strong> — % change vs the previous equivalent window. Green = growing feeder, red = shrinking feeder (a possible churn signal).</li>
+                <li><strong>Share</strong> — that surgery's % of all linked-GP items dispensed by this pharmacy in the same window. A high share (e.g. &gt;30%) means heavy reliance on one practice.</li>
+                <li><strong>List size</strong> — number of patients registered at the GP practice (latest published NHS list-size return; may pre-date the latest dispensing month).</li>
+                <li><strong>Items / patient</strong> — window items divided by current list size. A rough capture indicator, not an annualised rate — compare practices within the same window, not across windows.</li>
+                <li><strong>Δ vs prior {win >= ALL_PERIOD ? "window" : `${win}M`}</strong> — % change vs the previous equivalent window. Green = growing feeder, red = shrinking feeder (a possible churn signal). Shown as "—" when there is no prior-window baseline.</li>
               </ul>
               <p className="text-muted-foreground">
                 Use this to spot concentration risk (one surgery dominating revenue), under-served nearby practices, and feeders trending up or down.
