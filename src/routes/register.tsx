@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/register")({ component: Register });
@@ -11,6 +12,18 @@ function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<"google" | "apple" | null>(null);
+
+  const signUpWith = async (provider: "google" | "apple") => {
+    setOauthLoading(provider);
+    const result = await lovable.auth.signInWithOAuth(provider, {
+      redirect_uri: window.location.origin + "/dashboard",
+    });
+    if (result.redirected) return;
+    setOauthLoading(null);
+    if (result.error) return toast.error(result.error.message || `${provider} sign-up failed`);
+    nav({ to: "/dashboard" });
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
