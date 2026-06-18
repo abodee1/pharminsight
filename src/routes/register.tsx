@@ -1,8 +1,22 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { toast } from "sonner";
+
+function passwordStrength(pw: string): { score: number; label: string; color: string } {
+  if (!pw) return { score: 0, label: "", color: "" };
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  if (score <= 1) return { score, label: "Weak", color: "bg-red-500" };
+  if (score === 2) return { score, label: "Fair", color: "bg-orange-400" };
+  if (score === 3) return { score, label: "Good", color: "bg-yellow-400" };
+  return { score, label: "Strong", color: "bg-green-500" };
+}
 
 export const Route = createFileRoute("/register")({ component: Register });
 
@@ -13,6 +27,7 @@ function Register() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<"google" | "apple" | null>(null);
+  const strength = useMemo(() => passwordStrength(password), [password]);
 
   const signUpWith = async (provider: "google" | "apple") => {
     setOauthLoading(provider);
@@ -107,11 +122,29 @@ function Register() {
             <input
               type="password"
               required
-              minLength={6}
+              minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             />
+            {password && (
+              <div className="mt-2 space-y-1">
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      className={`h-1 flex-1 rounded-full transition-colors ${
+                        strength.score >= i ? strength.color : "bg-muted"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {strength.label && <span className="font-medium">{strength.label} — </span>}
+                  Use 8+ characters with a mix of letters, numbers, and symbols.
+                </p>
+              </div>
+            )}
           </div>
           <button
             disabled={loading}
