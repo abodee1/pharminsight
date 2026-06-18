@@ -113,6 +113,7 @@ export function AnalysisPanel({ pharmacy, open, onClose }: { pharmacy: Pharmacy;
   const [rows, setRows] = useState<DRow[]>([]);
   const [loadingRows, setLoadingRows] = useState(false);
   const [saved, setSaved] = useState<{ id: string; is_shortlisted: boolean } | null>(null);
+  const [win, setWin] = useState(12);
 
   useEffect(() => {
     if (!open) return;
@@ -195,15 +196,28 @@ export function AnalysisPanel({ pharmacy, open, onClose }: { pharmacy: Pharmacy;
           ))}
         </div>
         <div className="flex-1 overflow-y-auto">
+          <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-3 md:px-6 py-2 flex items-center gap-3 flex-wrap">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground shrink-0">Window</span>
+            <div className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/40 p-0.5">
+              {([3, 6, 12, 18, 24] as const).map((w) => (
+                <button key={w} type="button" onClick={() => setWin(w)}
+                  className={["px-2.5 py-1.5 sm:py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
+                    win === w ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"].join(" ")}>
+                  {w}M
+                </button>
+              ))}
+            </div>
+            <span className="text-[10px] text-muted-foreground">Applies to all metrics, charts and comparisons</span>
+          </div>
           {loadingRows ? (
             <div className="p-10 text-center text-sm text-muted-foreground"><Loader2 className="inline h-4 w-4 animate-spin mr-2" />Loading data…</div>
           ) : (
             <>
-              {tab === "overview" && <OverviewTab pharmacy={pharmacy} rows={rows} />}
+              {tab === "overview" && <OverviewTab pharmacy={pharmacy} rows={rows} win={win} />}
               {tab === "financials" && <FinancialsTab pharmacy={pharmacy} />}
-              {tab === "benchmarking" && <BenchmarkingTab pharmacy={pharmacy} rows={rows} />}
-              {tab === "insights" && <InsightsTab pharmacy={pharmacy} rows={rows} />}
-              {tab === "acquisition" && (canAcquire ? <AcquisitionTab pharmacy={pharmacy} rows={rows} /> :
+              {tab === "benchmarking" && <BenchmarkingTab pharmacy={pharmacy} rows={rows} win={win} />}
+              {tab === "insights" && <InsightsTab pharmacy={pharmacy} rows={rows} win={win} />}
+              {tab === "acquisition" && (canAcquire ? <AcquisitionTab pharmacy={pharmacy} rows={rows} win={win} /> :
                 <div className="p-10 text-center">
                   <div className="mx-auto max-w-md rounded-xl border border-border bg-card p-8">
                     <FileText className="h-8 w-8 mx-auto text-gold mb-3" />
@@ -221,9 +235,8 @@ export function AnalysisPanel({ pharmacy, open, onClose }: { pharmacy: Pharmacy;
 }
 
 // ------------------------- OVERVIEW TAB -------------------------
-function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
+function OverviewTab({ pharmacy, rows, win }: { pharmacy: Pharmacy; rows: DRow[]; win: number }) {
   const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
-  const [trailingWin, setTrailingWin] = useState<6 | 12 | 18 | 24>(12);
 
   const latestIdx = useMemo(() => {
     if (!rows.length) return -1;
@@ -237,8 +250,8 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
 
   const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
 
-  const trailingRows = useMemo(() => rows.slice(Math.max(0, latestIdx - (trailingWin - 1)), latestIdx + 1), [rows, latestIdx, trailingWin]);
-  const priorRows = useMemo(() => rows.slice(Math.max(0, latestIdx - (trailingWin * 2 - 1)), Math.max(0, latestIdx - trailingWin + 1)), [rows, latestIdx, trailingWin]);
+  const trailingRows = useMemo(() => rows.slice(Math.max(0, latestIdx - (win - 1)), latestIdx + 1), [rows, latestIdx, win]);
+  const priorRows = useMemo(() => rows.slice(Math.max(0, latestIdx - (win * 2 - 1)), Math.max(0, latestIdx - win + 1)), [rows, latestIdx, win]);
   const sumR = (arr: DRow[], key: keyof DRow) => arr.reduce((s, r) => s + (Number(r[key]) || 0), 0);
 
   const last12 = useMemo(() => rows.slice(Math.max(0, latestIdx - 11), latestIdx + 1), [rows, latestIdx]);
@@ -253,7 +266,7 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
   const epsRate = epsDispensedTotal > 0 ? (epsItemsTotal / epsDispensedTotal) * 100 : 0;
   const epsColor = epsRate > 95 ? "text-emerald-600" : epsRate >= 80 ? "text-amber-600" : "text-rose-600";
 
-  const last6Nominations = rows.slice(Math.max(0, latestIdx - 5), latestIdx + 1).map((r) => ({ x: `${r.month}/${String(r.year).slice(2)}`, v: r.eps_nominations }));
+  const lastWinNominations = rows.slice(Math.max(0, latestIdx - (win - 1)), latestIdx + 1).map((r) => ({ x: `${r.month}/${String(r.year).slice(2)}`, v: r.eps_nominations }));
 
   const cards = latest ? (isScot ? [
     { label: "Items", v: sumR(trailingRows, "items_dispensed"), p: sumR(priorRows, "items_dispensed") },
@@ -290,18 +303,7 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
         title="Performance over time"
       />
 
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <p className="text-xs font-medium text-muted-foreground">Trailing period totals — vs prior period of same length</p>
-        <div className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/40 p-0.5">
-          {([6, 12, 18, 24] as const).map((w) => (
-            <button key={w} type="button" onClick={() => setTrailingWin(w)}
-              className={["px-2.5 py-1.5 sm:py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
-                trailingWin === w ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"].join(" ")}>
-              {w}M
-            </button>
-          ))}
-        </div>
-      </div>
+      <p className="text-xs font-medium text-muted-foreground">Trailing {win}M totals — vs prior period of same length</p>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {cards.map((c) => {
@@ -314,8 +316,8 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
               value={c.v.toLocaleString()}
               sub={
                 <div className="space-y-0.5 mt-1">
-                  <p className="text-[10px] text-muted-foreground">{trailingWin}M total</p>
-                  <p className="flex items-center gap-1 text-xs">{trendArrow(diff)} <span className={diff > 0 ? "text-emerald-700" : diff < 0 ? "text-rose-700" : "text-muted-foreground"}>{diff === 0 ? "—" : `${diff > 0 ? "+" : ""}${pctv}% vs prior ${trailingWin}M`}</span></p>
+                  <p className="text-[10px] text-muted-foreground">{win}M total</p>
+                  <p className="flex items-center gap-1 text-xs">{trendArrow(diff)} <span className={diff > 0 ? "text-emerald-700" : diff < 0 ? "text-rose-700" : "text-muted-foreground"}>{diff === 0 ? "—" : `${diff > 0 ? "+" : ""}${pctv}% vs prior ${win}M`}</span></p>
                 </div>
               }
               description={METRIC_INFO[c.label] || ""}
@@ -327,29 +329,29 @@ function OverviewTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
       {isScot ? (
         <div className="grid md:grid-cols-2 gap-4">
           <FlipCard
-            title={`Pharmacy First £ (${trailingWin}M total)`}
+            title={`Pharmacy First £ (${win}M total)`}
             value={gbp(sumR(trailingRows, "pharmacy_first_payment"))}
-            sub={<p className="text-xs text-muted-foreground">Trailing {trailingWin}M verified NHS payments</p>}
+            sub={<p className="text-xs text-muted-foreground">Trailing {win}M verified NHS payments</p>}
             description="Total NHS payment received for Pharmacy First consultations and the associated fixed monthly fee."
           />
           <FlipCard
-            title={`MCR payment (${trailingWin}M total)`}
+            title={`MCR payment (${win}M total)`}
             value={gbp(sumR(trailingRows, "mcr_payment"))}
-            sub={<p className="text-xs text-muted-foreground">Trailing {trailingWin}M verified NHS payments</p>}
+            sub={<p className="text-xs text-muted-foreground">Trailing {win}M verified NHS payments</p>}
             description="Total NHS payment received for the Medicines: Care & Review service this month."
           />
         </div>
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
           <FlipCard
-            title={`EPS rate (${trailingWin}M avg)`}
+            title={`EPS rate (${win}M avg)`}
             value={<span className={epsColor}>{pct(epsRate)}</span>}
-            sub={<p className="text-xs text-muted-foreground">{">"}95% green · 80-95% amber · {"<"}80% red · trailing {trailingWin}M average</p>}
+            sub={<p className="text-xs text-muted-foreground">{">"}95% green · 80-95% amber · {"<"}80% red · trailing {win}M average</p>}
             description={METRIC_INFO["EPS rate"]}
           />
           <div className="rounded-xl border border-border bg-card p-5">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Nominations (6m)</p>
-            <div className="h-20"><ResponsiveContainer><LineChart data={last6Nominations}><Line type="monotone" dataKey="v" stroke="var(--gold)" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></div>
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Nominations ({win}M)</p>
+            <div className="h-20"><ResponsiveContainer><LineChart data={lastWinNominations}><Line type="monotone" dataKey="v" stroke="var(--gold)" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></div>
           </div>
         </div>
       )}
@@ -516,11 +518,10 @@ function Cell({ label, v }: { label: string; v: string }) {
 }
 
 // ------------------------- BENCHMARKING TAB -------------------------
-function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
+function BenchmarkingTab({ pharmacy, rows, win }: { pharmacy: Pharmacy; rows: DRow[]; win: number }) {
   const [localAvg, setLocalAvg] = useState<Record<string, number>>({});
   const [nationalAvg, setNationalAvg] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
-  const [benchWin, setBenchWin] = useState<12 | 18 | 24>(12);
 
   const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
   const latestIdx = useMemo(() => {
@@ -534,8 +535,8 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
   }, [rows, isScot]);
   const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
 
-  const trailingBench = useMemo(() => rows.slice(Math.max(0, latestIdx - (benchWin - 1)), latestIdx + 1), [rows, latestIdx, benchWin]);
-  const priorBench = useMemo(() => rows.slice(Math.max(0, latestIdx - (benchWin * 2 - 1)), Math.max(0, latestIdx - benchWin + 1)), [rows, latestIdx, benchWin]);
+  const trailingBench = useMemo(() => rows.slice(Math.max(0, latestIdx - (win - 1)), latestIdx + 1), [rows, latestIdx, win]);
+  const priorBench = useMemo(() => rows.slice(Math.max(0, latestIdx - (win * 2 - 1)), Math.max(0, latestIdx - win + 1)), [rows, latestIdx, win]);
   const avgBench = (arr: DRow[], key: keyof DRow) => {
     const nonZero = arr.filter(r => (Number(r[key]) || 0) > 0);
     return nonZero.length ? nonZero.reduce((s, r) => s + (Number(r[key]) || 0), 0) / nonZero.length : 0;
@@ -625,26 +626,15 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div>
-          <p className="text-sm font-semibold">Benchmarking · {pharmacy.region || pharmacy.country || "UK"}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">This pharmacy avg/month vs latest peer snapshot</p>
-        </div>
-        <div className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/40 p-0.5">
-          {([12, 18, 24] as const).map((w) => (
-            <button key={w} type="button" onClick={() => setBenchWin(w)}
-              className={["px-2.5 py-1.5 sm:py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
-                benchWin === w ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"].join(" ")}>
-              {w}M
-            </button>
-          ))}
-        </div>
+      <div>
+        <p className="text-sm font-semibold">Benchmarking · {pharmacy.region || pharmacy.country || "UK"}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">This pharmacy {win}M avg/month vs latest peer snapshot</p>
       </div>
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-muted-foreground"><tr>
             <th className="text-left px-4 py-2 font-medium">Metric</th>
-            <th className="text-right px-4 py-2 font-medium">This pharmacy <span className="font-normal text-[10px]">{benchWin}M avg</span></th>
+            <th className="text-right px-4 py-2 font-medium">This pharmacy <span className="font-normal text-[10px]">{win}M avg</span></th>
             <th className="text-right px-4 py-2 font-medium">Trend</th>
             <th className="text-right px-4 py-2 font-medium">{pharmacy.region || "Region"} <span className="font-normal text-[10px]">latest</span></th>
             <th className="text-right px-4 py-2 font-medium">National <span className="font-normal text-[10px]">latest</span></th>
@@ -684,7 +674,7 @@ function BenchmarkingTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] 
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-semibold mb-3">Benchmarking assessment</h3>
         <p className="text-sm leading-relaxed">
-          Overall index: <span className="font-semibold">{overallIdx}</span> vs national 100 ({benchWin}M trailing average vs latest national snapshot).
+          Overall index: <span className="font-semibold">{overallIdx}</span> vs national 100 ({win}M trailing average vs latest national snapshot).
           {overallIdx >= 110 && " This pharmacy trades materially above the national pace across most measured services."}
           {overallIdx < 110 && overallIdx >= 90 && " This pharmacy tracks broadly in line with the national pace."}
           {overallIdx < 90 && " This pharmacy is trading meaningfully below the national pace — material upside if service uptake is closed."}
@@ -749,10 +739,9 @@ function IncomeDonut({ segments }: { segments: { label: string; value: number; c
 }
 
 // ------------------------- ACQUISITION TAB -------------------------
-function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
+function AcquisitionTab({ pharmacy, rows, win }: { pharmacy: Pharmacy; rows: DRow[]; win: number }) {
   const [company, setCompany] = useState<Company | null>(null);
   const [manualPrivateIncome, setManualPrivateIncome] = useState<number | "">("");
-  const [acqWin, setAcqWin] = useState<12 | 18 | 24>(12);
   const [catchment, setCatchment] = useState<{
     competitors: number;
     gpFeeders: number;
@@ -814,18 +803,29 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
 
   const isScot = (pharmacy.country || "").toLowerCase() === "scotland";
   const isEngland = (pharmacy.country || "").toLowerCase() === "england";
-  const lastN = rows.slice(-acqWin);
+
+  const latestIdx = useMemo(() => {
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if ((rows[i].items_dispensed || 0) > 0 || (rows[i].pharmacy_first_count || 0) > 0) return i;
+    }
+    return Math.max(0, rows.length - 1);
+  }, [rows]);
+
+  const lastN = useMemo(
+    () => rows.slice(Math.max(0, latestIdx - win + 1), latestIdx + 1),
+    [rows, latestIdx, win]
+  );
   const NMS_RATE = 21; // changed April 2025 (£11 intervention + £10 follow-up)
 
   let itemsTotal = 0, pfTotal = 0, nmsTotal = 0, fluTotal = 0;
   lastN.forEach((r) => { itemsTotal += r.items_dispensed; pfTotal += r.pharmacy_first_count; nmsTotal += r.nms_count; fluTotal += r.flu_vaccinations; });
-  const estimated = (itemsTotal * 1.27 + pfTotal * 15 + nmsTotal * NMS_RATE + fluTotal * 12.58) * (12 / acqWin);
+  const estimated = (itemsTotal * 1.27 + pfTotal * 15 + nmsTotal * NMS_RATE + fluTotal * 12.58) * (12 / Math.max(1, lastN.length));
   const estimatedNet = estimated * 0.95;
 
   let actualNHS: number | null = null;
   if (isScot) {
     const actuals = lastN.filter((r) => r.is_actual_payment);
-    if (actuals.length >= 6) actualNHS = actuals.reduce((s, r) => s + (Number(r.final_payment) || 0), 0) * (12 / actuals.length);
+    if (actuals.length >= 3) actualNHS = actuals.reduce((s, r) => s + (Number(r.final_payment) || 0), 0) * (12 / actuals.length);
   }
   const nhsIncome = actualNHS ?? estimatedNet;
   const avgMonthlyIncome = nhsIncome / 12;
@@ -884,8 +884,8 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
       detail: `${nonZeroRows[nonZeroRows.length - 1].items_dispensed.toLocaleString()} vs ${nonZeroRows[nonZeroRows.length - 1 - consDecline].items_dispensed.toLocaleString()} items`,
     });
   }
-  if (lastN.length >= 12) {
-    const halfWin = Math.floor(acqWin / 2);
+  if (lastN.length >= win) {
+    const halfWin = Math.floor(win / 2);
     const r6 = lastN.slice(-halfWin).reduce((s, r) => s + r.items_dispensed, 0);
     const p6 = lastN.slice(0, halfWin).reduce((s, r) => s + r.items_dispensed, 0);
     if (p6 > 0 && (r6 - p6) / p6 < -0.10) {
@@ -927,21 +927,6 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
 
   return (
     <div className="p-4 md:p-6 space-y-5 md:space-y-6">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div>
-          <p className="text-sm font-semibold">Analysis window</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Controls income, trends, volatility, and red flag detection</p>
-        </div>
-        <div className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/40 p-0.5">
-          {([12, 18, 24] as const).map((w) => (
-            <button key={w} type="button" onClick={() => setAcqWin(w)}
-              className={["px-2.5 py-1.5 sm:py-0.5 text-[11px] font-semibold rounded-sm transition-colors",
-                acqWin === w ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"].join(" ")}>
-              {w}M
-            </button>
-          ))}
-        </div>
-      </div>
       <Section title="Acquisition intelligence — at a glance">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Cell label="Local competitors (1mi)" v={catchment ? String(catchment.competitors) : "…"} />
@@ -973,7 +958,7 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
               <div className="rounded-lg bg-secondary/40 p-3">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{incomeLabel}</p>
                 <p className="text-xl font-bold tabular-nums">{gbp(nhsIncome)}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Annualised from {acqWin}M data</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Annualised from {win}M data</p>
               </div>
               <div className="rounded-lg bg-secondary/40 p-3">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Avg monthly (NHS)</p>
@@ -986,7 +971,7 @@ function AcquisitionTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }
             ]} />
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Monthly estimated NHS income (last {acqWin} months)</p>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">Monthly estimated NHS income (last {win} months)</p>
             <div className="h-48">
               <ResponsiveContainer>
                 <BarChart data={monthlyBars} margin={{ top: 4, right: 8, bottom: 0, left: 4 }}>
@@ -1159,7 +1144,7 @@ function insightTimeAgo(ts: string) {
 type SavedInsight = { id: string; insight_type: string; insight_text: string; generated_at: string };
 
 // -------- AI Insights tab --------
-function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
+function InsightsTab({ pharmacy, rows, win }: { pharmacy: Pharmacy; rows: DRow[]; win: number }) {
   const { user } = useAuth();
   const isEng = (pharmacy.country || "").toLowerCase() === "england";
   const [natAvg, setNatAvg] = useState<Record<string, number>>({});
@@ -1177,7 +1162,7 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
     return rows.length - 1;
   }, [rows]);
   const latest = latestIdx >= 0 ? rows[latestIdx] : undefined;
-  const last12 = useMemo(() => rows.slice(Math.max(0, latestIdx - 11), latestIdx + 1), [rows, latestIdx]);
+  const lastWin = useMemo(() => rows.slice(Math.max(0, latestIdx - win + 1), latestIdx + 1), [rows, latestIdx, win]);
 
   useEffect(() => {
     if (!user) return;
@@ -1238,23 +1223,30 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
   const nmsCapped = nmsCap > 0 && nmsCount >= nmsCap;
   const nmsHeadroom = Math.max(0, nmsCap - nmsCount);
 
-  // Underclaimed services — use trailing 12M average for "you" vs national snapshot
-  const avgNmsCount12 = last12.length ? last12.reduce((s, r) => s + (r.nms_count || 0), 0) / last12.length : nmsCount;
-  const avgPfCount12 = last12.length ? last12.reduce((s, r) => s + (r.pharmacy_first_count || 0), 0) / last12.length : (latest?.pharmacy_first_count || 0);
-  const avgFluCount12 = last12.length ? last12.reduce((s, r) => s + (r.flu_vaccinations || 0), 0) / last12.length : (latest?.flu_vaccinations || 0);
+  // Underclaimed services — use trailing window average for "you" vs national snapshot
+  const avgNmsCount = lastWin.length ? lastWin.reduce((s, r) => s + (r.nms_count || 0), 0) / lastWin.length : nmsCount;
+  const avgPfCount = lastWin.length ? lastWin.reduce((s, r) => s + (r.pharmacy_first_count || 0), 0) / lastWin.length : (latest?.pharmacy_first_count || 0);
+  const avgFluCount = lastWin.length ? lastWin.reduce((s, r) => s + (r.flu_vaccinations || 0), 0) / lastWin.length : (latest?.flu_vaccinations || 0);
 
-  const nmsGap = natAvg.nms_count ? Math.max(0, natAvg.nms_count - avgNmsCount12) : 0;
-  const pfGap = natAvg.pharmacy_first_count ? Math.max(0, natAvg.pharmacy_first_count - avgPfCount12) : 0;
-  const fluGap = natAvg.flu_vaccinations ? Math.max(0, natAvg.flu_vaccinations - avgFluCount12) : 0;
+  const nmsGap = natAvg.nms_count ? Math.max(0, natAvg.nms_count - avgNmsCount) : 0;
+  const pfGap = natAvg.pharmacy_first_count ? Math.max(0, natAvg.pharmacy_first_count - avgPfCount) : 0;
+  const fluGap = natAvg.flu_vaccinations ? Math.max(0, natAvg.flu_vaccinations - avgFluCount) : 0;
   const nmsUplift = Math.round(nmsGap * 21);
   const pfUplift = Math.round(pfGap * 15);
   const fluUplift = Math.round(fluGap * 12.58);
   const totalUplift = nmsUplift + pfUplift + fluUplift;
 
   // PQS indicators
-  const avgNms12 = last12.length ? last12.reduce((s, r) => s + (r.nms_count || 0), 0) / last12.length : 0;
-  const hasPf = last12.some(r => (r.pharmacy_first_count || 0) > 0);
-  const hasFlu = last12.some(r => [9,10,11,12,1,2,3].includes(r.month) && (r.flu_vaccinations || 0) > 0);
+  const avgNms = lastWin.length ? lastWin.reduce((s, r) => s + (r.nms_count || 0), 0) / lastWin.length : 0;
+  const hasPf = lastWin.some(r => (r.pharmacy_first_count || 0) > 0);
+  const hasFlu = lastWin.some(r => [9,10,11,12,1,2,3].includes(r.month) && (r.flu_vaccinations || 0) > 0);
+
+  // NMS utilisation trend over selected window
+  const nmsMonthly = lastWin.map(r => ({
+    label: `${MONTHS[r.month - 1]} ${String(r.year).slice(2)}`,
+    cap: Math.floor((r.items_dispensed || 0) * 0.01),
+    delivered: r.nms_count || 0,
+  }));
   const epsRateLatest = latest && latest.items_dispensed ? (latest.eps_items / latest.items_dispensed) * 100 : 0;
   const epsOk = epsRateLatest >= 89;
   const epsKnown = epsRateLatest > 0;
@@ -1375,6 +1367,27 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
                 />
               </div>
             </div>
+            {nmsMonthly.length > 1 && (
+              <div className="mt-4 mb-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Cap utilisation trend · last {win} months</p>
+                <div className="flex items-end gap-[3px] h-10">
+                  {nmsMonthly.map((m, i) => {
+                    const pct = m.cap > 0 ? Math.min(100, (m.delivered / m.cap) * 100) : 0;
+                    const tone = pct >= 90 ? "bg-rose-400" : pct >= 60 ? "bg-amber-400" : "bg-emerald-400";
+                    return (
+                      <div key={i} className="flex-1 relative bg-secondary rounded-sm h-full overflow-hidden"
+                           title={`${m.label}: ${m.delivered}/${m.cap} NMS (${Math.round(pct)}%)`}>
+                        <div className={`absolute bottom-0 left-0 right-0 ${tone} transition-all`} style={{ height: `${Math.max(4, pct)}%` }} />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                  <span>{nmsMonthly[0]?.label}</span>
+                  <span>{nmsMonthly[nmsMonthly.length - 1]?.label}</span>
+                </div>
+              </div>
+            )}
             {nmsCapped ? (
               <div className="rounded-lg border border-rose-200 bg-rose-50 text-rose-900 p-3 text-xs flex gap-2">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
@@ -1393,7 +1406,7 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
           {Object.keys(natAvg).length > 0 && (
             <Section title="Underclaimed services">
               <p className="text-xs text-muted-foreground mb-4">
-                Your trailing 12M average vs England average for {MONTHS[latest.month - 1]} {latest.year}.
+                Your trailing {win}M average vs England average for {MONTHS[latest.month - 1]} {latest.year}.
                 Closing each gap to national average would generate the monthly revenue uplift shown.
               </p>
               {totalUplift === 0 ? (
@@ -1404,13 +1417,13 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
               ) : (
                 <div className="space-y-3">
                   {nmsGap > 0.5 && (
-                    <ServiceGapRow label="New Medicine Service" current={avgNmsCount12} avg={natAvg.nms_count} gap={nmsGap} rateLabel="£21/completed NMS" uplift={nmsUplift} />
+                    <ServiceGapRow label="New Medicine Service" current={avgNmsCount} avg={natAvg.nms_count} gap={nmsGap} rateLabel="£21/completed NMS" uplift={nmsUplift} />
                   )}
                   {pfGap > 0.5 && (
-                    <ServiceGapRow label="Pharmacy First" current={avgPfCount12} avg={natAvg.pharmacy_first_count} gap={pfGap} rateLabel="~£15/consultation" uplift={pfUplift} />
+                    <ServiceGapRow label="Pharmacy First" current={avgPfCount} avg={natAvg.pharmacy_first_count} gap={pfGap} rateLabel="~£15/consultation" uplift={pfUplift} />
                   )}
                   {fluGap > 0.5 && (
-                    <ServiceGapRow label="Flu vaccinations" current={avgFluCount12} avg={natAvg.flu_vaccinations} gap={fluGap} rateLabel="£12.58/jab" uplift={fluUplift} />
+                    <ServiceGapRow label="Flu vaccinations" current={avgFluCount} avg={natAvg.flu_vaccinations} gap={fluGap} rateLabel="£12.58/jab" uplift={fluUplift} />
                   )}
                   <div className="mt-1 rounded-lg border border-gold/40 bg-gold/5 p-3.5 flex items-center justify-between gap-3">
                     <div>
@@ -1421,7 +1434,7 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
                   </div>
                 </div>
               )}
-              <p className="text-[10px] text-muted-foreground mt-3">Your 12M avg vs national avg · Drug Tariff rates · {MONTHS[latest.month - 1]} {latest.year} · Sample of up to 5,000 England pharmacies</p>
+              <p className="text-[10px] text-muted-foreground mt-3">Your {win}M avg vs national avg · Drug Tariff rates · {MONTHS[latest.month - 1]} {latest.year} · Sample of up to 5,000 England pharmacies</p>
             </Section>
           )}
 
@@ -1431,13 +1444,13 @@ function InsightsTab({ pharmacy, rows }: { pharmacy: Pharmacy; rows: DRow[] }) {
             <div className="space-y-2.5">
               <PqsCriterionRow
                 label="NMS minimum — aspirational"
-                met={avgNms12 >= 11}
-                detail={`Average ${avgNms12.toFixed(1)} NMS/month over last 12 months (aspirational target ≥ 11/month)`}
+                met={avgNms >= 11}
+                detail={`Average ${avgNms.toFixed(1)} NMS/month over last ${win} months (aspirational target ≥ 11/month)`}
               />
               <PqsCriterionRow
                 label="Pharmacy First active"
                 met={hasPf}
-                detail={hasPf ? "Pharmacy First consultations recorded in the last 12 months" : "No Pharmacy First consultations found in last 12 months — confirm PF is activated"}
+                detail={hasPf ? `Pharmacy First consultations recorded in the last ${win} months` : `No Pharmacy First consultations found in last ${win} months — confirm PF is activated`}
               />
               <PqsCriterionRow
                 label="Seasonal flu vaccinations"
