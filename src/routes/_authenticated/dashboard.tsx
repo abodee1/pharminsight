@@ -327,8 +327,13 @@ function MyPharmacy() {
     };
     const value = sumRange(anchor - N + 1, anchor);
     const priorVal = sumRange(anchor - 2 * N + 1, anchor - N);
+    // YoY compares the same N-month window starting 12 months earlier.
+    // When N === 12 this is identical to the "prior" window above, so we
+    // suppress it (avoids showing two labels for the same percentage).
     const yoyAnchor = anchor - 12;
-    const yoyVal = yoyAnchor >= 0 ? sumRange(yoyAnchor - N + 1, yoyAnchor) : 0;
+    const yoyVal = N === 12 || yoyAnchor < 0
+      ? 0
+      : sumRange(yoyAnchor - N + 1, yoyAnchor);
     const from = rows[Math.max(0, anchor - N + 1)];
     const to = rows[anchor];
     const period = N === 1
