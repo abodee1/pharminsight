@@ -340,11 +340,11 @@ export const Route = createFileRoute("/api/public/hooks/ingest-england-gp")({
             await logFailure(item, msg);
             return Response.json({ ok: false, queued, error: msg, item: item.resource_url }, { status: 500 });
           }
-          // More chunks remaining for this file → trigger next invocation.
-          if (result && !result.isLast) triggerSelf(request.url);
           const { count: pending } = await supabaseAdmin.from("ingestion_queue")
             .select("id", { count: "exact", head: true })
             .eq("source", SOURCE).in("status", ["pending", "processing"]);
+          // More chunks remaining for this file, OR more files queued → keep the chain alive.
+          if (result && (!result.isLast || (pending ?? 0) > 0)) triggerSelf(request.url);
           return Response.json({ ok: true, queued, processed: 1, result, pending });
         } catch (e) {
           return Response.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 });
