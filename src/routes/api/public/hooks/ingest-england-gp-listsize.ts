@@ -105,28 +105,42 @@ const FETCH_HEADERS = {
 };
 const NHS_BASE = "https://digital.nhs.uk";
 
+const MONTHS: Record<string, number> = {
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+};
+
+// Try to derive (year, month) from a publication page URL like
+// ".../patients-registered-at-a-gp-practice/may-2024" or ".../may-2024-data".
+function periodFromPubUrl(url: string): { year: number | null; month: number | null } {
+  const lower = url.toLowerCase();
+  const m = lower.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)[-_ ]?(20\d{2})\b/);
+  if (m) return { year: +m[2], month: MONTHS[m[1]] };
+  const m2 = lower.match(/(20\d{2})[-_](0[1-9]|1[0-2])\b/);
+  if (m2) return { year: +m2[1], month: +m2[2] };
+  return { year: null, month: null };
+}
+
 // Discover ALL historically available "all patients by practice" CSV files from the
 // NHS Digital publication index — both current and archived monthly releases.
 async function discoverAllPatientCsvs(): Promise<Array<{ url: string; year: number | null; month: number | null }>> {
-  const seen = new Set<string>();
-  const out: Array<{ url: string; year: number | null; month: number | null }> = [];
+  const seen = new Map<string, { year: number | null; month: number | null }>();
 
-  function addCsvLink(href: string): void {
+  function addCsvLink(href: string, period: { year: number | null; month: number | null }): void {
     const url = href.startsWith("http") ? href : new URL(href, NHS_BASE).toString();
-    if (seen.has(url)) return;
-    seen.add(url);
-    const dm = url.match(/(20\d{2})[-_](\d{2})/);
-    out.push({ url, year: dm ? +dm[1] : null, month: dm ? +dm[2] : null });
+    const prev = seen.get(url);
+    // Prefer entries that have a year/month over null ones.
+    if (!prev || (prev.year == null && period.year != null)) seen.set(url, period);
   }
 
-  function parseCsvLinks(html: string): void {
+  function parseCsvLinks(html: string, period: { year: number | null; month: number | null }): void {
     for (const m of html.matchAll(/href="([^"]+\.csv)"/gi)) {
       const href = m[1];
-      // Only ingest the canonical aggregate practice-level extract.
-      // gp-reg-pat-prac-all.csv (or -v2) contains TOTAL_ALL per practice.
-      // Skip demographic breakdowns (sing-age-male/female/regions), maps, quintiles, LSOA.
-      if (/gp-reg-pat-prac-all(?:[-_]v\d+)?\.csv$/i.test(href)) {
-        addCsvLink(href);
+      // Canonical aggregate practice-level extract — TOTAL_ALL per practice.
+      // Accept the modern "all" file and the older "map" file (also totals).
+      // Skip demographic breakdowns and LSOA splits.
+      if (/gp-reg-pat-prac-(?:all|map)(?:[-_]v\d+)?\.csv$/i.test(href)) {
+        addCsvLink(href, period);
       }
     }
   }
@@ -135,28 +149,39 @@ async function discoverAllPatientCsvs(): Promise<Array<{ url: string; year: numb
   const mainRes = await fetch(PATIENT_INDEX_URL, { headers: FETCH_HEADERS, redirect: "follow" });
   if (!mainRes.ok) throw new Error(`patient index ${mainRes.status}`);
   const mainHtml = await mainRes.text();
-  parseCsvLinks(mainHtml);
+  // Main index represents the latest publication — try to read the period from the index itself.
+  const indexPeriod = (() => {
+    const m = mainHtml.match(/patients[- ]registered[- ]at[- ]a[- ]gp[- ]practice[, ]+([A-Za-z]+)[ -](20\d{2})/i);
+    if (m) {
+      const mn = m[1].toLowerCase();
+      return { year: +m[2], month: MONTHS[mn] ?? null };
+    }
+    return { year: null, month: null };
+  })();
+  parseCsvLinks(mainHtml, indexPeriod);
 
   // Collect links to individual monthly publication archive pages
-  const subPages: string[] = [];
+  const subPages = new Set<string>();
   const archivePath = "/data-and-information/publications/statistical/patients-registered-at-a-gp-practice/";
   for (const m of mainHtml.matchAll(/href="([^"#?]+)"/gi)) {
     const href = m[1];
     if (!href.includes(archivePath)) continue;
     const url = href.startsWith("http") ? href : new URL(href, NHS_BASE).toString();
     if (url === PATIENT_INDEX_URL || url === PATIENT_INDEX_URL + "/") continue;
-    if (!subPages.includes(url)) subPages.push(url);
+    subPages.add(url);
   }
 
-  // Fetch archive pages in parallel batches of 5, up to 72 months (6 years of backfill)
+  // Fetch archive pages in parallel batches of 5, up to 96 months (8 years of backfill).
+  const subPageList = Array.from(subPages);
   const BATCH = 5;
-  const MAX_PAGES = 72;
-  for (let i = 0; i < Math.min(subPages.length, MAX_PAGES); i += BATCH) {
+  const MAX_PAGES = 96;
+  for (let i = 0; i < Math.min(subPageList.length, MAX_PAGES); i += BATCH) {
     await Promise.all(
-      subPages.slice(i, i + BATCH).map(async (url) => {
+      subPageList.slice(i, i + BATCH).map(async (url) => {
         try {
           const r = await fetch(url, { headers: FETCH_HEADERS, redirect: "follow" });
-          if (r.ok) parseCsvLinks(await r.text());
+          if (!r.ok) return;
+          parseCsvLinks(await r.text(), periodFromPubUrl(url));
         } catch {
           // ignore individual page failures silently
         }
@@ -164,8 +189,9 @@ async function discoverAllPatientCsvs(): Promise<Array<{ url: string; year: numb
     );
   }
 
-  return out;
+  return Array.from(seen.entries()).map(([url, p]) => ({ url, ...p }));
 }
+
 
 async function discover() {
   const skip = await alreadyHandled(SOURCE);
