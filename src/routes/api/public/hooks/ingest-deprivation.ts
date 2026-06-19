@@ -79,7 +79,9 @@ async function bulkUpsert(rows: any[]) {
     const slice = rows.slice(i, i + 500);
     const { error } = await supabaseAdmin
       .from("deprivation_zones")
-      .upsert(slice, { onConflict: "nation,zone_code" });
+      // defaultToNull:false keeps existing lat/lng (and any column not in our payload)
+      // intact instead of overwriting with NULL on conflict.
+      .upsert(slice, { onConflict: "nation,zone_code", defaultToNull: false });
     if (error) throw new Error(error.message || JSON.stringify(error));
     upserted += slice.length;
   }
