@@ -244,7 +244,7 @@ function Leaderboards() {
   const nmsUnavailable = service === "nms_count" && country === "Scotland";
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto">
+    <div className="p-4 md:p-10 max-w-7xl mx-auto">
       <PageHeader title="Leaderboards" subtitle="Rank pharmacies across the UK by service." />
 
       <div className="flex gap-1 border-b border-border mb-4">
