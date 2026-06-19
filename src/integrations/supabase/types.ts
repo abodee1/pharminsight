@@ -191,6 +191,78 @@ export type Database = {
           },
         ]
       }
+      deprivation_zones: {
+        Row: {
+          access_decile: number | null
+          created_at: string
+          crime_decile: number | null
+          education_decile: number | null
+          employment_decile: number | null
+          health_decile: number | null
+          housing_decile: number | null
+          id: string
+          idaci_decile: number | null
+          idaopi_decile: number | null
+          income_decile: number | null
+          lat: number | null
+          lng: number | null
+          nation: string
+          overall_decile: number | null
+          overall_rank: number | null
+          overall_score: number | null
+          population: number | null
+          updated_at: string
+          zone_code: string
+          zone_name: string | null
+        }
+        Insert: {
+          access_decile?: number | null
+          created_at?: string
+          crime_decile?: number | null
+          education_decile?: number | null
+          employment_decile?: number | null
+          health_decile?: number | null
+          housing_decile?: number | null
+          id?: string
+          idaci_decile?: number | null
+          idaopi_decile?: number | null
+          income_decile?: number | null
+          lat?: number | null
+          lng?: number | null
+          nation: string
+          overall_decile?: number | null
+          overall_rank?: number | null
+          overall_score?: number | null
+          population?: number | null
+          updated_at?: string
+          zone_code: string
+          zone_name?: string | null
+        }
+        Update: {
+          access_decile?: number | null
+          created_at?: string
+          crime_decile?: number | null
+          education_decile?: number | null
+          employment_decile?: number | null
+          health_decile?: number | null
+          housing_decile?: number | null
+          id?: string
+          idaci_decile?: number | null
+          idaopi_decile?: number | null
+          income_decile?: number | null
+          lat?: number | null
+          lng?: number | null
+          nation?: string
+          overall_decile?: number | null
+          overall_rank?: number | null
+          overall_score?: number | null
+          population?: number | null
+          updated_at?: string
+          zone_code?: string
+          zone_name?: string | null
+        }
+        Relationships: []
+      }
       dispensing_data: {
         Row: {
           created_at: string
@@ -932,6 +1004,28 @@ export type Database = {
         Returns: {
           country: string
           total_items: number
+        }[]
+      }
+      deprivation_in_radius: {
+        Args: {
+          p_lat: number
+          p_lng: number
+          p_nation: string
+          p_radius_m: number
+        }
+        Returns: {
+          avg_access: number
+          avg_crime: number
+          avg_education: number
+          avg_employment: number
+          avg_health: number
+          avg_housing: number
+          avg_idaci: number
+          avg_idaopi: number
+          avg_income: number
+          avg_overall: number
+          total_population: number
+          zone_count: number
         }[]
       }
       gp_practices_near: {
