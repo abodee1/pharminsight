@@ -2,13 +2,45 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { Loader2, ShieldAlert } from "lucide-react";
 import { backfillGpGeocodes, refreshScotlandGpContacts, refreshEnglandGpContacts, getGpCoverage } from "@/lib/gpMatch.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/gp-data")({
-  component: GpDataAdmin,
+  component: GpDataAdminGate,
 });
+
+function GpDataAdminGate() {
+  const { user, loading } = useAuth();
+  const [checking, setChecking] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    if (loading) return;
+    if (!user) { setIsAdmin(false); setChecking(false); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("user_roles").select("role")
+        .eq("user_id", user.id).eq("role", "admin").maybeSingle();
+      setIsAdmin(!!data);
+      setChecking(false);
+    })();
+  }, [user, loading]);
+  if (loading || checking) {
+    return <div className="p-8 text-sm text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Verifying access…</div>;
+  }
+  if (!isAdmin) {
+    return (
+      <div className="p-8 max-w-md mx-auto text-center space-y-2">
+        <ShieldAlert className="h-10 w-10 text-rose-500 mx-auto" />
+        <h1 className="text-xl font-semibold">Admin only</h1>
+        <p className="text-sm text-muted-foreground">You don't have access to GP data administration.</p>
+      </div>
+    );
+  }
+  return <GpDataAdmin />;
+}
 
 type Row = { source: string; dataset: string; year: number | null; month: number | null; status: string };
 
