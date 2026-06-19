@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { PharmacySearch } from "./PharmacySearch";
 
 export const NAV_LINKS = [
+  { to: "/", label: "Home", icon: Home },
   { to: "/dashboard", label: "My Pharmacy", icon: Store },
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy },
   { to: "/benchmarking", label: "Benchmarking", icon: BarChart2 },
