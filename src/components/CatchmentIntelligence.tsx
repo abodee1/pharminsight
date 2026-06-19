@@ -402,7 +402,7 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
               const areaSqMi = Math.PI * effectiveRadius.miles * effectiveRadius.miles;
               const density = areaSqMi > 0 ? Math.round(totalPop / areaSqMi) : 0;
               const statCard = (
-                opts: { icon: React.ReactNode; chipCls: string; label: string; value: React.ReactNode; sub: string; accent: string }
+                opts: { icon: ReactNode; chipCls: string; label: string; value: ReactNode; sub: string; accent: string }
               ) => (
                 <div className={`group relative rounded-lg border border-border bg-card p-3 overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5`}>
                   <div className={`absolute left-0 top-0 bottom-0 w-1 ${opts.accent}`} />
