@@ -105,12 +105,19 @@ const FETCH_HEADERS = {
 };
 const NHS_BASE = "https://digital.nhs.uk";
 
-// NHS Digital sits behind Cloudflare and 403s Worker IPs. Fall back to Firecrawl
-// (residential proxy + headless browser) when direct fetch is blocked.
-async function fetchHtmlSmart(url: string): Promise<string | null> {
+// NHS Digital sits behind Cloudflare and 403s Worker IPs. Returns extracted
+// links (preferred — survives Firecrawl's HTML post-processing) plus raw HTML
+// (best-effort, used for period detection from index headings).
+async function fetchPageSmart(url: string): Promise<{ html: string; links: string[] } | null> {
+  // Direct fetch first
   try {
     const r = await fetch(url, { headers: FETCH_HEADERS, redirect: "follow" });
-    if (r.ok) return await r.text();
+    if (r.ok) {
+      const html = await r.text();
+      const links: string[] = [];
+      for (const m of html.matchAll(/href="([^"#?]+)"/gi)) links.push(m[1]);
+      return { html, links };
+    }
   } catch {
     // fall through
   }
@@ -120,11 +127,14 @@ async function fetchHtmlSmart(url: string): Promise<string | null> {
     const r = await fetch("https://api.firecrawl.dev/v2/scrape", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${fcKey}` },
-      body: JSON.stringify({ url, formats: ["html"], onlyMainContent: false }),
+      body: JSON.stringify({ url, formats: ["html", "links"], onlyMainContent: false }),
     });
     if (!r.ok) return null;
-    const j = await r.json() as { data?: { html?: string; rawHtml?: string } };
-    return j.data?.html ?? j.data?.rawHtml ?? null;
+    const j = await r.json() as { data?: { html?: string; rawHtml?: string; links?: string[] } };
+    return {
+      html: j.data?.html ?? j.data?.rawHtml ?? "",
+      links: j.data?.links ?? [],
+    };
   } catch {
     return null;
   }
@@ -154,45 +164,39 @@ async function discoverAllPatientCsvs(): Promise<Array<{ url: string; year: numb
   function addCsvLink(href: string, period: { year: number | null; month: number | null }): void {
     const url = href.startsWith("http") ? href : new URL(href, NHS_BASE).toString();
     const prev = seen.get(url);
-    // Prefer entries that have a year/month over null ones.
     if (!prev || (prev.year == null && period.year != null)) seen.set(url, period);
   }
 
-  function parseCsvLinks(html: string, period: { year: number | null; month: number | null }): void {
-    for (const m of html.matchAll(/href="([^"]+\.csv)"/gi)) {
-      const href = m[1];
-      // Canonical aggregate practice-level extract — TOTAL_ALL per practice.
-      // Accept the modern "all" file and the older "map" file (also totals).
-      // Skip demographic breakdowns and LSOA splits.
-      if (/gp-reg-pat-prac-(?:all|map)(?:[-_]v\d+)?\.csv$/i.test(href)) {
+  function processCsvCandidates(links: string[], period: { year: number | null; month: number | null }): void {
+    for (const href of links) {
+      if (!/\.csv($|\?)/i.test(href)) continue;
+      // Accept the modern "all" file and the older "map" file (both totals).
+      if (/gp-reg-pat-prac-(?:all|map)(?:[-_]v\d+)?\.csv/i.test(href)) {
         addCsvLink(href, period);
       }
     }
   }
 
   // Fetch main publication index
-  const mainHtml = await fetchHtmlSmart(PATIENT_INDEX_URL);
-  if (!mainHtml) throw new Error(`patient index unreachable (direct + firecrawl)`);
-  // Main index represents the latest publication — try to read the period from the index itself.
+  const mainPage = await fetchPageSmart(PATIENT_INDEX_URL);
+  if (!mainPage) throw new Error(`patient index unreachable (direct + firecrawl)`);
   const indexPeriod = (() => {
-    const m = mainHtml.match(/patients[- ]registered[- ]at[- ]a[- ]gp[- ]practice[, ]+([A-Za-z]+)[ -](20\d{2})/i);
+    const m = mainPage.html.match(/patients[- ]registered[- ]at[- ]a[- ]gp[- ]practice[, ]+([A-Za-z]+)[ -](20\d{2})/i);
     if (m) {
       const mn = m[1].toLowerCase();
       return { year: +m[2], month: MONTHS[mn] ?? null };
     }
     return { year: null, month: null };
   })();
-  parseCsvLinks(mainHtml, indexPeriod);
-
+  processCsvCandidates(mainPage.links, indexPeriod);
   // Collect links to individual monthly publication archive pages
   const subPages = new Set<string>();
   const archivePath = "/data-and-information/publications/statistical/patients-registered-at-a-gp-practice/";
-  for (const m of mainHtml.matchAll(/href="([^"#?]+)"/gi)) {
-    const href = m[1];
+  for (const href of mainPage.links) {
     if (!href.includes(archivePath)) continue;
     const url = href.startsWith("http") ? href : new URL(href, NHS_BASE).toString();
     if (url === PATIENT_INDEX_URL || url === PATIENT_INDEX_URL + "/") continue;
-    subPages.add(url);
+    subPages.add(url.split("#")[0].split("?")[0]);
   }
 
   // Fetch archive pages in parallel batches of 5, up to 96 months (8 years of backfill).
@@ -203,9 +207,9 @@ async function discoverAllPatientCsvs(): Promise<Array<{ url: string; year: numb
     await Promise.all(
       subPageList.slice(i, i + BATCH).map(async (url) => {
         try {
-          const html = await fetchHtmlSmart(url);
-          if (!html) return;
-          parseCsvLinks(html, periodFromPubUrl(url));
+          const page = await fetchPageSmart(url);
+          if (!page) return;
+          processCsvCandidates(page.links, periodFromPubUrl(url));
         } catch {
           // ignore individual page failures silently
         }
