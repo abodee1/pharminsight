@@ -990,6 +990,22 @@ export type Database = {
         }
         Returns: Json
       }
+      catchment_zones_by_decile: {
+        Args: {
+          p_decile: number
+          p_lat: number
+          p_lng: number
+          p_nation: string
+          p_radius_m: number
+        }
+        Returns: {
+          dist_m: number
+          overall_decile: number
+          population: number
+          zone_code: string
+          zone_name: string
+        }[]
+      }
       country_monthly_aggregates: {
         Args: {
           p_country: string
