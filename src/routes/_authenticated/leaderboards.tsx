@@ -95,7 +95,7 @@ function Leaderboards() {
         }
       };
 
-      const [pData, last, upData] = await Promise.all([
+      const [pData, fallbackLatest, upData] = await Promise.all([
         fetchPharms(),
         getLatestSubstantialPeriod(),
         user ? supabase.from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null }),
@@ -103,15 +103,48 @@ function Leaderboards() {
       setPharms(pData);
       setMyPharmId((upData as any)?.data?.pharmacy_id ?? null);
 
-      if (last) {
+      // Country-aware: find the most recent period where this country's data is
+      // substantively complete (>= 80% of the best recent-period row count).
+      let best: { year: number; month: number } | null = fallbackLatest;
+      try {
+        const idSet = new Set(pData.map((p) => p.id));
+        const { data: recent } = await supabase
+          .from("dispensing_data")
+          .select("pharmacy_id,year,month")
+          .order("year", { ascending: false })
+          .order("month", { ascending: false })
+          .limit(50000);
+        if (recent && recent.length) {
+          const counts = new Map<string, { year: number; month: number; n: number }>();
+          for (const r of recent as Array<{ pharmacy_id: string; year: number; month: number }>) {
+            if (!idSet.has(r.pharmacy_id)) continue;
+            const k = `${r.year}-${r.month}`;
+            const cur = counts.get(k) || { year: r.year, month: r.month, n: 0 };
+            cur.n += 1;
+            counts.set(k, cur);
+          }
+          const periodsArr = [...counts.values()].sort(
+            (a, b) => b.year * 12 + b.month - (a.year * 12 + a.month),
+          );
+          if (periodsArr.length) {
+            const peak = Math.max(...periodsArr.slice(0, 6).map((p) => p.n));
+            const threshold = Math.max(50, peak * 0.8);
+            best = periodsArr.find((p) => p.n >= threshold) ?? periodsArr[0];
+          }
+        }
+      } catch {
+        // fall back to fallbackLatest
+      }
+
+      if (best) {
         const list: string[] = [];
-        let y = last.year, m = last.month;
+        let y = best.year, m = best.month;
         for (let i = 0; i < 36; i++) {
           list.push(`${y}-${String(m).padStart(2, "0")}`);
           ({ year: y, month: m } = prevPeriod(y, m));
         }
         setPeriods(list);
-        if (!period) setPeriod(list[0]);
+        setPeriod(list[0]);
       }
       setLoading(false);
     })();
@@ -211,16 +244,16 @@ function Leaderboards() {
   const nmsUnavailable = service === "nms_count" && country === "Scotland";
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto">
+    <div className="p-4 md:p-10 max-w-7xl mx-auto">
       <PageHeader title="Leaderboards" subtitle="Rank pharmacies across the UK by service." />
 
-      <div className="flex gap-1 border-b border-border mb-4">
+      <div className="flex gap-1 border-b border-border mb-4 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-thin">
         {COUNTRIES.map((c) => (
           <button
             key={c}
             onClick={() => { setCountry(c); setRegion("all"); setPage(0); setSearch(""); }}
             className={[
-              "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+              "px-3 md:px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap shrink-0",
               country === c
                 ? "border-gold text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground",
@@ -231,22 +264,23 @@ function Leaderboards() {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-3 mb-4">
-        <select value={service} onChange={(e) => { setService(e.target.value as any); setPage(0); }} className="rounded-md border border-input bg-card px-3 py-2 text-sm">
+      <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 md:gap-3 mb-4">
+        <select value={service} onChange={(e) => { setService(e.target.value as any); setPage(0); }} className="min-w-0 rounded-md border border-input bg-card px-3 py-2 text-sm">
           {SERVICES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
         </select>
-        <select value={region} onChange={(e) => { setRegion(e.target.value); setPage(0); }} className="rounded-md border border-input bg-card px-3 py-2 text-sm">
+        <select value={region} onChange={(e) => { setRegion(e.target.value); setPage(0); }} className="min-w-0 rounded-md border border-input bg-card px-3 py-2 text-sm">
           <option value="all">All {country === "Scotland" ? "Health Boards" : "ICBs"}</option>
           {regions.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
-        <select value={period} onChange={(e) => setPeriod(e.target.value)} className="rounded-md border border-input bg-card px-3 py-2 text-sm">
+        <select value={period} onChange={(e) => setPeriod(e.target.value)} className="col-span-2 min-w-0 rounded-md border border-input bg-card px-3 py-2 text-sm">
           {periods.map((p) => {
             const [y, m] = p.split("-").map(Number);
             return <option key={p} value={p}>{new Date(y, m - 1).toLocaleString("en-GB", { month: "long", year: "numeric" })}</option>;
           })}
         </select>
-        {loading && <span className="text-xs text-muted-foreground self-center">Loading…</span>}
+        {loading && <span className="col-span-2 text-xs text-muted-foreground self-center">Loading…</span>}
       </div>
+
 
       {nmsUnavailable && (
         <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 px-4 py-2.5 text-xs text-amber-800 dark:text-amber-300">
@@ -322,22 +356,23 @@ function Leaderboards() {
           </div>
         </div>
 
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-muted-foreground">
             <tr>
-              <th className="text-left px-4 py-2 font-medium">
+              <th className="text-left px-2 md:px-4 py-2 font-medium">
                 <button onClick={() => toggleSort("rank")} className="hover:text-foreground transition-colors">
                   # {sortIcon("rank")}
                 </button>
               </th>
-              <th className="text-left px-4 py-2 font-medium">Pharmacy</th>
-              <th className="text-left px-4 py-2 font-medium">{country === "Scotland" ? "Health Board" : "ICB"}</th>
-              <th className="text-right px-4 py-2 font-medium">
+              <th className="text-left px-2 md:px-4 py-2 font-medium">Pharmacy</th>
+              <th className="hidden md:table-cell text-left px-4 py-2 font-medium">{country === "Scotland" ? "Health Board" : "ICB"}</th>
+              <th className="text-right px-2 md:px-4 py-2 font-medium">
                 <button onClick={() => toggleSort("count")} className="hover:text-foreground transition-colors">
                   Count {sortIcon("count")}
                 </button>
               </th>
-              <th className="text-right px-4 py-2 font-medium">
+              <th className="text-right px-2 md:px-4 py-2 font-medium whitespace-nowrap">
                 <button onClick={() => toggleSort("change")} className="hover:text-foreground transition-colors">
                   vs prior {sortIcon("change")}
                 </button>
@@ -357,22 +392,25 @@ function Leaderboards() {
               const pct = board.length > 1 ? Math.round((1 - (r.rank - 1) / board.length) * 100) : null;
               return (
                 <tr key={r.ph.id} className={isMine ? "bg-gold/15" : "border-t border-border"}>
-                  <td className="px-4 py-2 font-semibold tabular-nums">
+                  <td className="px-2 md:px-4 py-2 font-semibold tabular-nums align-top">
                     {r.rank}
                     {pct !== null && (
-                      <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">Top {pct}%</span>
+                      <span className="hidden md:inline ml-1.5 text-[10px] font-normal text-muted-foreground">Top {pct}%</span>
                     )}
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-2 md:px-4 py-2 min-w-0">
                     <div className="flex items-baseline gap-2 flex-wrap">
-                      <span>{pharmacyDisplayName(r.ph.name, r.ph.trading_name, r.ph.ods_code)}</span>
+                      <span className="break-words">{pharmacyDisplayName(r.ph.name, r.ph.trading_name, r.ph.ods_code)}</span>
                       {isMine && <span className="text-xs text-gold font-semibold">YOU</span>}
                     </div>
-                    {r.ph.address && <p className="text-[11px] text-muted-foreground truncate max-w-xs">{r.ph.address}</p>}
+                    {r.ph.region && (
+                      <p className="md:hidden text-[11px] text-muted-foreground truncate">{r.ph.region}</p>
+                    )}
+                    {r.ph.address && <p className="hidden md:block text-[11px] text-muted-foreground truncate max-w-xs">{r.ph.address}</p>}
                   </td>
-                  <td className="px-4 py-2 text-muted-foreground">{r.ph.region}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{r.value.toLocaleString()}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">
+                  <td className="hidden md:table-cell px-4 py-2 text-muted-foreground">{r.ph.region}</td>
+                  <td className="px-2 md:px-4 py-2 text-right tabular-nums whitespace-nowrap">{r.value.toLocaleString()}</td>
+                  <td className="px-2 md:px-4 py-2 text-right tabular-nums whitespace-nowrap">
                     {r.isNew ? (
                       <span className="text-muted-foreground text-xs">new</span>
                     ) : r.change === 0 ? (
@@ -388,6 +426,8 @@ function Leaderboards() {
             })}
           </tbody>
         </table>
+        </div>
+
 
         {!loading && (
           <div className="flex justify-between items-center px-4 py-3 text-xs text-muted-foreground border-t border-border">
