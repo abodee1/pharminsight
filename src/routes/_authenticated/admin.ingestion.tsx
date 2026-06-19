@@ -597,6 +597,51 @@ function DataIngestionAdmin() {
     }
   };
 
+  const backfillHook = async (ds: Dataset) => {
+    if (ds.source === "NWSSP_WALES") {
+      toast.error("Wales has no machine-readable upstream source available — backfill not possible until a scraper is built.");
+      return;
+    }
+    setBackfilling((s) => ({ ...s, [ds.source]: true }));
+    setBackfillProgress((s) => ({ ...s, [ds.source]: { done: 0, remaining: 0 } }));
+    toast.info(`Backfilling ${ds.label} — this may take a few minutes…`);
+    let done = 0;
+    let consecutiveNoOps = 0;
+    const MAX_CALLS = 60; // safety cap per click
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      for (let i = 0; i < MAX_CALLS; i++) {
+        const res = await fetch(`/api/public/hooks/${ds.hook}`, {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const j: any = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(humanizeHookError(j, res.status));
+        const processed = Number(j.processed ?? 0);
+        const queued = Number(j.queued ?? 0);
+        const pending = Number(j.pending ?? NaN);
+        done += processed;
+        const remaining = Number.isFinite(pending) ? pending : Math.max(0, queued - processed);
+        setBackfillProgress((s) => ({ ...s, [ds.source]: { done, remaining } }));
+        if (processed === 0 && queued === 0) {
+          consecutiveNoOps++;
+          if (consecutiveNoOps >= 2) break; // nothing left to do
+        } else {
+          consecutiveNoOps = 0;
+        }
+        if (Number.isFinite(pending) && pending === 0 && processed === 0) break;
+      }
+      toast.success(`${ds.label}: backfilled ${done} period${done === 1 ? "" : "s"}`);
+      await refresh();
+    } catch (e: any) {
+      toast.error(`${ds.label} backfill failed`, { description: friendlyMessage(e), duration: 12000 });
+    } finally {
+      setBackfilling((s) => ({ ...s, [ds.source]: false }));
+      setBackfillProgress((s) => ({ ...s, [ds.source]: null }));
+    }
+  };
+
   const triggerHook = async (ds: Dataset) => {
     setRunning((s) => ({ ...s, [ds.source]: true }));
     toast.info(`Triggering ${ds.label}…`);
