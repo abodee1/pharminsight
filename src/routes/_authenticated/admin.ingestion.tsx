@@ -348,9 +348,22 @@ function DatasetCard({ ds, stats, onRun, onBackfill, running, backfilling, backf
           </div>
         )}
 
-        <div className="flex items-center gap-2 pt-2">
-          <Button size="sm" onClick={onRun} disabled={running}>
+        <div className="flex items-center gap-2 pt-2 flex-wrap">
+          <Button size="sm" onClick={onRun} disabled={running || backfilling}>
             {running ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Running…</> : <><RefreshCw className="h-3.5 w-3.5" /> Run now</>}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onBackfill}
+            disabled={running || backfilling || ds.source === "NWSSP_WALES"}
+            title={ds.source === "NWSSP_WALES"
+              ? "No machine-readable upstream available for Wales — can't backfill"
+              : "Loop the ingest hook until every missing period in the recent window is queued and processed"}
+          >
+            {backfilling
+              ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Backfilling{backfillProgress ? ` (${backfillProgress.done} done, ${backfillProgress.remaining} left)` : "…"}</>
+              : <><Database className="h-3.5 w-3.5" /> Backfill gaps</>}
           </Button>
           <a
             href={ds.publisherUrl}
