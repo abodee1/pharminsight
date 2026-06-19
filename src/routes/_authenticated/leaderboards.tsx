@@ -95,7 +95,7 @@ function Leaderboards() {
         }
       };
 
-      const [pData, last, upData] = await Promise.all([
+      const [pData, fallbackLatest, upData] = await Promise.all([
         fetchPharms(),
         getLatestSubstantialPeriod(),
         user ? supabase.from("user_pharmacy").select("pharmacy_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null }),
@@ -103,15 +103,48 @@ function Leaderboards() {
       setPharms(pData);
       setMyPharmId((upData as any)?.data?.pharmacy_id ?? null);
 
-      if (last) {
+      // Country-aware: find the most recent period where this country's data is
+      // substantively complete (>= 80% of the best recent-period row count).
+      let best: { year: number; month: number } | null = fallbackLatest;
+      try {
+        const idSet = new Set(pData.map((p) => p.id));
+        const { data: recent } = await supabase
+          .from("dispensing_data")
+          .select("pharmacy_id,year,month")
+          .order("year", { ascending: false })
+          .order("month", { ascending: false })
+          .limit(50000);
+        if (recent && recent.length) {
+          const counts = new Map<string, { year: number; month: number; n: number }>();
+          for (const r of recent as Array<{ pharmacy_id: string; year: number; month: number }>) {
+            if (!idSet.has(r.pharmacy_id)) continue;
+            const k = `${r.year}-${r.month}`;
+            const cur = counts.get(k) || { year: r.year, month: r.month, n: 0 };
+            cur.n += 1;
+            counts.set(k, cur);
+          }
+          const periodsArr = [...counts.values()].sort(
+            (a, b) => b.year * 12 + b.month - (a.year * 12 + a.month),
+          );
+          if (periodsArr.length) {
+            const peak = Math.max(...periodsArr.slice(0, 6).map((p) => p.n));
+            const threshold = Math.max(50, peak * 0.8);
+            best = periodsArr.find((p) => p.n >= threshold) ?? periodsArr[0];
+          }
+        }
+      } catch {
+        // fall back to fallbackLatest
+      }
+
+      if (best) {
         const list: string[] = [];
-        let y = last.year, m = last.month;
+        let y = best.year, m = best.month;
         for (let i = 0; i < 36; i++) {
           list.push(`${y}-${String(m).padStart(2, "0")}`);
           ({ year: y, month: m } = prevPeriod(y, m));
         }
         setPeriods(list);
-        if (!period) setPeriod(list[0]);
+        setPeriod(list[0]);
       }
       setLoading(false);
     })();
