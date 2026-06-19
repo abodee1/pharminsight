@@ -189,26 +189,14 @@ async function discoverAllPatientCsvs(): Promise<Array<{ url: string; year: numb
     return { year: null, month: null };
   })();
   processCsvCandidates(mainPage.links, indexPeriod);
-  // Main index represents the latest publication — try to read the period from the index itself.
-  const indexPeriod = (() => {
-    const m = mainHtml.match(/patients[- ]registered[- ]at[- ]a[- ]gp[- ]practice[, ]+([A-Za-z]+)[ -](20\d{2})/i);
-    if (m) {
-      const mn = m[1].toLowerCase();
-      return { year: +m[2], month: MONTHS[mn] ?? null };
-    }
-    return { year: null, month: null };
-  })();
-  parseCsvLinks(mainHtml, indexPeriod);
-
   // Collect links to individual monthly publication archive pages
   const subPages = new Set<string>();
   const archivePath = "/data-and-information/publications/statistical/patients-registered-at-a-gp-practice/";
-  for (const m of mainHtml.matchAll(/href="([^"#?]+)"/gi)) {
-    const href = m[1];
+  for (const href of mainPage.links) {
     if (!href.includes(archivePath)) continue;
     const url = href.startsWith("http") ? href : new URL(href, NHS_BASE).toString();
     if (url === PATIENT_INDEX_URL || url === PATIENT_INDEX_URL + "/") continue;
-    subPages.add(url);
+    subPages.add(url.split("#")[0].split("?")[0]);
   }
 
   // Fetch archive pages in parallel batches of 5, up to 96 months (8 years of backfill).
@@ -219,9 +207,9 @@ async function discoverAllPatientCsvs(): Promise<Array<{ url: string; year: numb
     await Promise.all(
       subPageList.slice(i, i + BATCH).map(async (url) => {
         try {
-          const html = await fetchHtmlSmart(url);
-          if (!html) return;
-          parseCsvLinks(html, periodFromPubUrl(url));
+          const page = await fetchPageSmart(url);
+          if (!page) return;
+          processCsvCandidates(page.links, periodFromPubUrl(url));
         } catch {
           // ignore individual page failures silently
         }
