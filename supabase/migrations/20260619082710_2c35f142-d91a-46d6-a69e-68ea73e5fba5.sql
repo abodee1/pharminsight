@@ -1,0 +1,1 @@
+UPDATE public.ingestion_queue SET status='done', error='skipped: legacy yearly aggregate', finished_at=now() WHERE source='NHS_SCOT_LINKAGE' AND status='processing';
