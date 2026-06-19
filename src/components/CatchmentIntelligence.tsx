@@ -118,8 +118,31 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
   const [effectiveRadius, setEffectiveRadius] = useState(RADII[1]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDecile, setSelectedDecile] = useState<number | null>(null);
+  const [zoneList, setZoneList] = useState<{ zone_code: string; zone_name: string; overall_decile: number; population: number | null; dist_m: number }[] | null>(null);
+  const [zoneListLoading, setZoneListLoading] = useState(false);
 
   const radius = RADII[radiusIdx];
+
+  // Reset selection when radius/location changes
+  useEffect(() => { setSelectedDecile(null); setZoneList(null); }, [lat, lng, radius.metres]);
+
+  // Fetch zones when decile selected
+  useEffect(() => {
+    if (selectedDecile == null || lat == null || lng == null) return;
+    let cancelled = false;
+    (async () => {
+      setZoneListLoading(true);
+      const { data, error } = await supabase.rpc("catchment_zones_by_decile", {
+        p_lat: lat, p_lng: lng, p_radius_m: effectiveRadius.metres,
+        p_nation: isScotland ? "scotland" : "england", p_decile: selectedDecile,
+      });
+      if (cancelled) return;
+      if (!error) setZoneList((data as any) ?? []);
+      setZoneListLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [selectedDecile, lat, lng, effectiveRadius.metres, isScotland]);
 
   useEffect(() => {
     if (!supported || lat == null || lng == null) return;
