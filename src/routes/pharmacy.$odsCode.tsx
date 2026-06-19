@@ -24,6 +24,7 @@ import { fetchAll } from "@/lib/fetchAll";
 import { cn } from "@/lib/utils";
 import { setViewedPharmacy, clearViewedPharmacy } from "@/lib/viewedPharmacy";
 import { pharmacyDisplayName } from "@/lib/pharmacyName";
+import { CatchmentIntelligence } from "@/components/CatchmentIntelligence";
 
 type WindowKey = 1 | 3 | 6 | 12;
 
