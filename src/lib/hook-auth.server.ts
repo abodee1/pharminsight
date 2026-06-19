@@ -26,7 +26,7 @@ export async function authorizeHookRequest(request: Request): Promise<HookAuthRe
     return { ok: true, via: "secret" };
   }
 
-  // 2) Authenticated user path. Verify the bearer token with Supabase Auth.
+  // 2) Authenticated user path. Verify the bearer token AND require admin role.
   const authz = request.headers.get("authorization") ?? "";
   const token = authz.toLowerCase().startsWith("bearer ") ? authz.slice(7).trim() : "";
   if (token) {
@@ -41,7 +41,20 @@ export async function authorizeHookRequest(request: Request): Promise<HookAuthRe
     });
     const { data, error } = await client.auth.getUser(token);
     if (!error && data?.user?.id) {
-      return { ok: true, via: "user", userId: data.user.id };
+      const userId = data.user.id;
+      // Require admin role for any user-token initiated ingest. Uses the
+      // SECURITY DEFINER has_role() function, RLS-safe via the user's client.
+      const { data: isAdmin, error: roleErr } = await client.rpc("has_role", {
+        _user_id: userId,
+        _role: "admin",
+      });
+      if (roleErr) {
+        return { ok: false, status: 500, message: "Role check failed" };
+      }
+      if (!isAdmin) {
+        return { ok: false, status: 403, message: "Admin role required" };
+      }
+      return { ok: true, via: "user", userId };
     }
   }
 

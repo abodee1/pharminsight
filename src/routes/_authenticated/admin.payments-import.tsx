@@ -1,13 +1,45 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Upload, FileText, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Upload, FileText, CheckCircle2, AlertTriangle, Loader2, ShieldAlert } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/payments-import")({
-  component: PaymentsImport,
+  component: PaymentsImportGate,
 });
+
+function PaymentsImportGate() {
+  const { user, loading } = useAuth();
+  const [checking, setChecking] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    if (loading) return;
+    if (!user) { setIsAdmin(false); setChecking(false); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("user_roles").select("role")
+        .eq("user_id", user.id).eq("role", "admin").maybeSingle();
+      setIsAdmin(!!data);
+      setChecking(false);
+    })();
+  }, [user, loading]);
+  if (loading || checking) {
+    return <div className="p-8 text-sm text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Verifying access…</div>;
+  }
+  if (!isAdmin) {
+    return (
+      <div className="p-8 max-w-md mx-auto text-center space-y-2">
+        <ShieldAlert className="h-10 w-10 text-rose-500 mx-auto" />
+        <h1 className="text-xl font-semibold">Admin only</h1>
+        <p className="text-sm text-muted-foreground">You don't have access to the payments importer.</p>
+      </div>
+    );
+  }
+  return <PaymentsImport />;
+}
 
 const REQUIRED = ["ods_code", "year", "month"] as const;
 const NUMERIC = [
