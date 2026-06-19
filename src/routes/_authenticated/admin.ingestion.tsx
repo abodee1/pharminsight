@@ -447,6 +447,8 @@ function DataIngestionAdmin() {
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [queue, setQueue] = useState<QueueRow[]>([]);
   const [running, setRunning] = useState<Record<string, boolean>>({});
+  const [backfilling, setBackfilling] = useState<Record<string, boolean>>({});
+  const [backfillProgress, setBackfillProgress] = useState<Record<string, { done: number; remaining: number } | null>>({});
   const [loading, setLoading] = useState(true);
   const [recentEvents, setRecentEvents] = useState<LogRow[]>([]);
   const [freshness, setFreshness] = useState<FreshnessRow[]>([]);
