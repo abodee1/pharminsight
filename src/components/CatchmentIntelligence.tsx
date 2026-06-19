@@ -242,14 +242,19 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
   }
 
   return (
-    <div className="mt-6 rounded-lg bg-card border border-border shadow-sm overflow-hidden">
-      <div className="px-4 md:px-5 py-4 border-b border-border">
+    <div className="mt-6 rounded-xl bg-card border border-border shadow-sm overflow-hidden">
+      <div className="relative px-4 md:px-6 py-5 border-b border-border bg-gradient-to-br from-secondary/60 via-card to-card">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold">Catchment Intelligence</h2>
-            <p className="text-xs text-muted-foreground mt-1">
-              Deprivation profile of the population within your catchment area.
-            </p>
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <MapPin className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">Catchment Intelligence</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Deprivation profile of the population within your catchment area.
+              </p>
+            </div>
           </div>
           <button
             type="button"
@@ -263,6 +268,7 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
           </button>
         </div>
       </div>
+
 
       <div className="p-4 md:p-5 space-y-5">
         {showInfo && (
