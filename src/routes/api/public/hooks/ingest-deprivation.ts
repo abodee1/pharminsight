@@ -24,8 +24,10 @@ const SIMD_CSV_URL =
 const SIMD_RANKS_XLSX_URL =
   "https://www.gov.scot/binaries/content/documents/govscot/publications/statistics/2020/01/scottish-index-of-multiple-deprivation-2020-ranks-and-domain-ranks/documents/scottish-index-of-multiple-deprivation-2020-ranks-and-domain-ranks/scottish-index-of-multiple-deprivation-2020-ranks-and-domain-ranks/govscot%3Adocument/SIMD%2B2020v2%2B-%2Branks.xlsx";
 
+// Public ArcGIS Online mirror of Scottish Government Data Zone 2011 centroids
+// (Easting/Northing reprojected to WGS84 server-side via outSR=4326).
 const DZ_CENTROIDS_URL =
-  "https://maps.gov.scot/server/rest/services/ScotGov/StatisticalUnits/MapServer/4/query";
+  "https://services2.arcgis.com/Ne8d9gKn5SJ3eAaw/arcgis/rest/services/SG_DataZoneCent_2011_(1)/FeatureServer/0/query";
 
 // Loose key normaliser: lowercase, strip everything non-alphanumeric.
 function k(s: string): string {
