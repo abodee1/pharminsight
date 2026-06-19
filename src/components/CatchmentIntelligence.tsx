@@ -341,36 +341,54 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
 
         {!loading && !error && zoneCount > 0 && (
           <>
-            {/* Band headline */}
-            <div className={`flex items-center gap-3 rounded-md border-l-4 ${band.border} bg-secondary/30 px-4 py-3`}>
-              <div>
-                <div className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${band.cls}`}>
-                  {band.label}
+            {/* Band headline — big hero number */}
+            <div className={`relative overflow-hidden rounded-xl bg-gradient-to-r ${band.grad} text-white shadow-sm`}>
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.25),transparent_60%)]" />
+              <div className="relative px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <div className="text-[11px] uppercase tracking-widest text-white/80 font-medium">Overall deprivation</div>
+                  <div className="text-2xl font-semibold mt-0.5 leading-tight">{band.label}</div>
+                  <div className="text-xs text-white/85 mt-1">
+                    Based on {zoneCount} {zoneCount === 1 ? zoneLabel.slice(0, -1) : zoneLabel.toLowerCase()} within {effectiveRadius.label}
+                    {usingFallback && <> · nearest wider catchment shown</>}
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground mt-1.5">
-                  Based on {zoneCount} {zoneCount === 1 ? zoneLabel.slice(0, -1) : zoneLabel.toLowerCase()} within {effectiveRadius.label}.
-                  {usingFallback && <> No zones were found inside {radius.label}, so the nearest wider catchment is shown.</>}
-                  {overall != null && <> Average overall decile: <span className="font-medium text-foreground">{overall.toFixed(1)}</span> / 10.</>}
-                </div>
+                {overall != null && (
+                  <div className="text-right shrink-0">
+                    <div className="text-4xl font-bold tabular-nums leading-none">{overall.toFixed(1)}</div>
+                    <div className="text-[11px] text-white/85 uppercase tracking-wide mt-1">avg decile / 10</div>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Radar */}
-            <div className="w-full h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={radarData} outerRadius="75%">
-                  <PolarGrid stroke="hsl(var(--border))" />
-                  <PolarAngleAxis dataKey="domain" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                  <PolarRadiusAxis domain={[0, 10]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} axisLine={false} tickCount={6} />
-                  <Radar
-                    name="Catchment"
-                    dataKey="value"
-                    stroke="hsl(var(--primary))"
-                    fill="hsl(var(--primary))"
-                    fillOpacity={0.35}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
+            <div className="rounded-lg border border-border bg-gradient-to-br from-secondary/30 to-card p-2 pt-3">
+              <div className="text-xs font-medium text-foreground px-2 mb-1">Deprivation domains</div>
+              <div className="w-full h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart data={radarData} outerRadius="72%">
+                    <defs>
+                      <radialGradient id="catchment-radar-fill" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.55} />
+                        <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.15} />
+                      </radialGradient>
+                    </defs>
+                    <PolarGrid stroke="var(--border)" />
+                    <PolarAngleAxis dataKey="domain" tick={{ fill: "var(--muted-foreground)", fontSize: 11, fontWeight: 500 }} />
+                    <PolarRadiusAxis domain={[0, 10]} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickCount={6} />
+                    <Radar
+                      name="Catchment"
+                      dataKey="value"
+                      stroke="var(--primary)"
+                      strokeWidth={2}
+                      fill="url(#catchment-radar-fill)"
+                      dot={{ r: 3, fill: "var(--primary)", stroke: "var(--card)", strokeWidth: 1.5 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
             {/* Population & concentration stats */}
@@ -383,39 +401,30 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
               const pctLeast = totalPop > 0 ? Math.round((popLeast / totalPop) * 100) : 0;
               const areaSqMi = Math.PI * effectiveRadius.miles * effectiveRadius.miles;
               const density = areaSqMi > 0 ? Math.round(totalPop / areaSqMi) : 0;
+              const statCard = (
+                opts: { icon: React.ReactNode; chipCls: string; label: string; value: React.ReactNode; sub: string; accent: string }
+              ) => (
+                <div className={`group relative rounded-lg border border-border bg-card p-3 overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5`}>
+                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${opts.accent}`} />
+                  <div className="flex items-center gap-2">
+                    <div className={`h-7 w-7 rounded-md flex items-center justify-center ${opts.chipCls}`}>{opts.icon}</div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium leading-tight">{opts.label}</div>
+                  </div>
+                  <div className="text-xl font-semibold tabular-nums mt-2 leading-none">{opts.value}</div>
+                  <div className="text-[11px] text-muted-foreground mt-1">{opts.sub}</div>
+                </div>
+              );
               return (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <div className="rounded-md border border-border bg-secondary/30 p-3">
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
-                      <Users className="h-3 w-3" /> Population
-                    </div>
-                    <div className="text-lg font-semibold tabular-nums mt-1">{totalPop.toLocaleString()}</div>
-                    <div className="text-[11px] text-muted-foreground">≈{density.toLocaleString()}/sq mi</div>
-                  </div>
-                  <div className="rounded-md border border-border bg-secondary/30 p-3">
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
-                      <TrendingDown className="h-3 w-3 text-red-600" /> In most deprived 30%
-                    </div>
-                    <div className="text-lg font-semibold tabular-nums mt-1">{pctMost}%</div>
-                    <div className="text-[11px] text-muted-foreground">{popMost.toLocaleString()} residents</div>
-                  </div>
-                  <div className="rounded-md border border-border bg-secondary/30 p-3">
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
-                      <TrendingUp className="h-3 w-3 text-green-600" /> In least deprived 30%
-                    </div>
-                    <div className="text-lg font-semibold tabular-nums mt-1">{pctLeast}%</div>
-                    <div className="text-[11px] text-muted-foreground">{popLeast.toLocaleString()} residents</div>
-                  </div>
-                  <div className="rounded-md border border-border bg-secondary/30 p-3">
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
-                      <MapPin className="h-3 w-3" /> Catchment area
-                    </div>
-                    <div className="text-lg font-semibold tabular-nums mt-1">{areaSqMi.toFixed(1)} <span className="text-xs font-normal text-muted-foreground">sq mi</span></div>
-                    <div className="text-[11px] text-muted-foreground">{zoneCount} {zoneLabel.toLowerCase()}</div>
-                  </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                  {statCard({ icon: <Users className="h-3.5 w-3.5" />, chipCls: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300", label: "Population", value: totalPop.toLocaleString(), sub: `≈ ${density.toLocaleString()} / sq mi`, accent: "bg-blue-500" })}
+                  {statCard({ icon: <TrendingDown className="h-3.5 w-3.5" />, chipCls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300", label: "Most deprived 30%", value: `${pctMost}%`, sub: `${popMost.toLocaleString()} residents`, accent: "bg-red-500" })}
+                  {statCard({ icon: <TrendingUp className="h-3.5 w-3.5" />, chipCls: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300", label: "Least deprived 30%", value: `${pctLeast}%`, sub: `${popLeast.toLocaleString()} residents`, accent: "bg-green-500" })}
+                  {statCard({ icon: <MapPin className="h-3.5 w-3.5" />, chipCls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300", label: "Catchment area", value: <>{areaSqMi.toFixed(1)}<span className="text-xs font-normal text-muted-foreground ml-1">sq mi</span></>, sub: `${zoneCount} ${zoneLabel.toLowerCase()}`, accent: "bg-amber-500" })}
                 </div>
               );
             })()}
+
+
 
             {/* Decile distribution bar */}
             {breakdown && breakdown.distribution.length > 0 && (() => {
