@@ -1,7 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import {
-  Store, Trophy, BarChart2, GitCompare, Settings,
+  Home, Store, Trophy, BarChart2, GitCompare, Settings,
   LogOut, Menu, User as UserIcon, Search as SearchIcon,
   Stethoscope, Bookmark, Upload, Sparkles,
 } from "lucide-react";
