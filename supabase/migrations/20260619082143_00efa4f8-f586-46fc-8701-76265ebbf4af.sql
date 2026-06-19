@@ -1,0 +1,1 @@
+UPDATE public.ingestion_queue SET status='pending', started_at=NULL, error=NULL, attempts=0 WHERE status='processing' AND started_at < now() - interval '10 minutes';
