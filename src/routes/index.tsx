@@ -3,10 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight, BarChart2, Map, TrendingUp, Pill, Building2,
   Stethoscope, ClipboardCheck, Zap, FileBarChart2, Radar, Compass,
+  MapPin, CheckCircle2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
   component: Landing,
@@ -41,8 +43,76 @@ const fmtCompact = (n: number) => {
 const monthName = (y: number, m: number) =>
   new Date(y, m - 1, 1).toLocaleString("en-GB", { month: "short", year: "numeric" });
 
+type Example = {
+  id: string;
+  name: string;
+  location: string;
+  tag: string;
+  benchmark: { rank: number; label: string; val: number; w: number; me?: boolean }[];
+  competitors: number;
+  trend: number[];
+  decile: number;
+  valuation: string;
+  radius: number;
+};
+
+const EXAMPLES: Example[] = [
+  {
+    id: "urban",
+    name: "Browns Pharmacy",
+    location: "Manchester, England",
+    tag: "Urban · high competition",
+    benchmark: [
+      { rank: 1, label: "Top performer", val: 14200, w: 100 },
+      { rank: 8, label: "Cohort leader", val: 12100, w: 85 },
+      { rank: 14, label: "You — top 8%", val: 10800, w: 76, me: true },
+      { rank: 42, label: "Regional median", val: 8300, w: 58 },
+    ],
+    competitors: 18,
+    trend: [60, 62, 58, 65, 68, 70, 72, 75, 74, 78, 82, 88],
+    decile: 2,
+    valuation: "£1.05m – £1.20m",
+    radius: 1.2,
+  },
+  {
+    id: "suburban",
+    name: "Clyde Pharmacy",
+    location: "Glasgow, Scotland",
+    tag: "Suburban · stable volume",
+    benchmark: [
+      { rank: 1, label: "Top performer", val: 12400, w: 100 },
+      { rank: 6, label: "Cohort leader", val: 10500, w: 85 },
+      { rank: 19, label: "You — top 15%", val: 9100, w: 73, me: true },
+      { rank: 51, label: "Regional median", val: 6400, w: 52 },
+    ],
+    competitors: 9,
+    trend: [72, 70, 71, 73, 72, 74, 75, 74, 76, 75, 77, 78],
+    decile: 5,
+    valuation: "£890k – £1.05m",
+    radius: 2.4,
+  },
+  {
+    id: "city",
+    name: "High Street Pharmacy",
+    location: "Cardiff, Wales",
+    tag: "City centre · high volume",
+    benchmark: [
+      { rank: 1, label: "Top performer", val: 18500, w: 100 },
+      { rank: 3, label: "Cohort leader", val: 16200, w: 88 },
+      { rank: 5, label: "You — top 3%", val: 15400, w: 83, me: true },
+      { rank: 28, label: "Regional median", val: 9800, w: 53 },
+    ],
+    competitors: 23,
+    trend: [90, 88, 92, 89, 94, 91, 95, 93, 96, 94, 97, 95],
+    decile: 3,
+    valuation: "£1.60m – £1.85m",
+    radius: 0.9,
+  },
+];
+
 function Landing() {
   const [data, setData] = useState<Dashboard | null>(null);
+  const [selected, setSelected] = useState<Example>(EXAMPLES[0]);
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -57,8 +127,8 @@ function Landing() {
       <Header />
       <main className="mx-auto max-w-6xl px-6 py-16 md:py-24 space-y-24 md:space-y-32">
         <Hero data={data} />
-        <StatBand data={data} />
-        <FeatureBento data={data} />
+        <ExampleSelector selected={selected} onSelect={setSelected} />
+        <FeatureBento data={data} example={selected} />
         <TrackedGrid />
         <ClosingCTA />
       </main>
@@ -133,32 +203,76 @@ function Hero({ data }: { data: Dashboard | null }) {
   );
 }
 
-function StatBand({ data }: { data: Dashboard | null }) {
-  const t = data?.totals_now;
-  const stats = [
-    { k: "Pharmacies covered", v: t ? t.pharmacies.toLocaleString() : "12,368", sub: "England · Scotland · Wales · NI" },
-    { k: "Items dispensed", v: t ? fmtCompact(t.items) : "—", sub: "this reporting period" },
-    { k: "Pharmacy First", v: t ? fmtCompact(t.pf) : "—", sub: "clinical consultations" },
-    { k: "Months of history", v: "24", sub: "rolling, every contractor" },
-  ];
+function ExampleSelector({ selected, onSelect }: { selected: Example; onSelect: (e: Example) => void }) {
   return (
-    <section className="grid grid-cols-2 md:grid-cols-4 border border-border bg-card divide-x divide-y md:divide-y-0 divide-border">
-      {stats.map((s) => (
-        <div key={s.k} className="p-6 md:p-8">
-          <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-muted-foreground">{s.k}</p>
-          <p className="mt-3 text-3xl md:text-4xl font-bold tabular-nums tracking-tight">{s.v}</p>
-          <p className="mt-2 text-[11px] text-muted-foreground leading-snug">{s.sub}</p>
-        </div>
-      ))}
+    <section className="space-y-8">
+      <div className="text-center space-y-3">
+        <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gold">Interactive demo</p>
+        <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Pick a pharmacy profile.</h2>
+        <p className="text-muted-foreground max-w-xl mx-auto">
+          Switch between real-world scenarios to see how the four intelligence modules adapt to each pharmacy.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {EXAMPLES.map((ex) => {
+          const active = ex.id === selected.id;
+          return (
+            <button
+              key={ex.id}
+              onClick={() => onSelect(ex)}
+              aria-pressed={active}
+              className={cn(
+                "group relative text-left border p-6 transition-all duration-200",
+                active
+                  ? "border-gold bg-gold/[0.04] shadow-sm"
+                  : "border-border bg-card hover:border-gold/40 hover:bg-card/80"
+              )}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-mono font-bold tracking-[0.18em] uppercase text-gold">{ex.tag}</p>
+                  <h3 className="text-lg font-bold tracking-tight">{ex.name}</h3>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-3 w-3" /> {ex.location}
+                  </p>
+                </div>
+                <div
+                  className={cn(
+                    "flex h-5 w-5 items-center justify-center rounded-full border",
+                    active ? "border-gold bg-gold text-gold-foreground" : "border-border text-transparent"
+                  )}
+                >
+                  <CheckCircle2 className="h-3 w-3" />
+                </div>
+              </div>
+              <div className="mt-5 grid grid-cols-3 gap-3 text-[10px] font-mono uppercase tracking-tight text-muted-foreground">
+                <div>
+                  <span className="block text-sm font-bold tabular-nums text-foreground">{ex.competitors}</span>
+                  Competitors
+                </div>
+                <div>
+                  <span className="block text-sm font-bold tabular-nums text-foreground">{ex.benchmark[2].val.toLocaleString()}</span>
+                  Items/mo
+                </div>
+                <div>
+                  <span className="block text-sm font-bold tabular-nums text-foreground">D{ex.decile}</span>
+                  Deprivation
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </section>
   );
 }
 
 /* ---------------- Feature bento ---------------- */
 
-function FeatureBento({ data }: { data: Dashboard | null }) {
+function FeatureBento({ data, example }: { data: Dashboard | null; example: Example }) {
   return (
-    <section className="space-y-6">
+    <section className="space-y-6" key={example.id}>
       <div className="flex items-end justify-between">
         <div>
           <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gold">The Platform</p>
@@ -170,10 +284,10 @@ function FeatureBento({ data }: { data: Dashboard | null }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <BenchmarkCard />
-        <CompetitiveCard />
-        <PerformanceCard trend={data?.totals_trend ?? null} />
-        <AcquisitionCard />
+        <BenchmarkCard example={example} />
+        <CompetitiveCard example={example} />
+        <PerformanceCard trend={data?.totals_trend ?? null} example={example} />
+        <AcquisitionCard example={example} />
       </div>
     </section>
   );
@@ -199,13 +313,7 @@ function CardShell({
   );
 }
 
-function BenchmarkCard() {
-  const rows = [
-    { rank: 1, label: "Top performer", val: 9240, w: 100 },
-    { rank: 4, label: "Cohort leader", val: 7860, w: 85 },
-    { rank: 14, label: "You — top 12%", val: 6420, w: 70, me: true },
-    { rank: 38, label: "Regional median", val: 4880, w: 53 },
-  ];
+function BenchmarkCard({ example }: { example: Example }) {
   return (
     <CardShell
       module="Module 01 · Benchmarking"
@@ -213,11 +321,14 @@ function BenchmarkCard() {
       desc="See exactly where you stand against every pharmacy in your region, cohort, and nationally — by items, services, EPS share and growth."
       viz={
         <div className="space-y-2.5">
-          {rows.map((r) => (
+          {example.benchmark.map((r) => (
             <div key={r.rank} className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3">
               <span className={`text-[10px] font-mono font-bold ${r.me ? "text-gold" : "text-muted-foreground"}`}>#{String(r.rank).padStart(2, "0")}</span>
               <div className="h-1.5 bg-secondary overflow-hidden">
-                <div className={`h-full ${r.me ? "bg-gold" : "bg-foreground/30"}`} style={{ width: `${r.w}%` }} />
+                <div
+                  className={`h-full ${r.me ? "bg-gold" : "bg-foreground/30"}`}
+                  style={{ width: `${r.w}%`, transition: "width 600ms ease" }}
+                />
               </div>
               <span className={`text-[11px] font-mono tabular-nums ${r.me ? "font-bold text-foreground" : "text-muted-foreground"}`}>
                 {r.val.toLocaleString()}
@@ -230,12 +341,14 @@ function BenchmarkCard() {
   );
 }
 
-function CompetitiveCard() {
-  // Sparse fake catchment dots in a 12x6 grid
-  const dots = [
-    [2, 1], [3, 1], [5, 2], [4, 3], [6, 3], [7, 2], [8, 4],
-    [9, 3], [10, 4], [11, 5], [1, 4], [3, 5], [5, 4], [7, 5],
-  ];
+function CompetitiveCard({ example }: { example: Example }) {
+  // Deterministic but jittered dots from the competitor count
+  const dots = Array.from({ length: example.competitors }).map((_, i) => {
+    const x = ((i * 7.3) % 95) + 2.5;
+    const y = ((i * 11.7) % 80) + 10;
+    return [x, y, i];
+  });
+  const meIndex = Math.floor(example.competitors / 2);
   return (
     <CardShell
       module="Module 02 · Competitive Intel"
@@ -248,17 +361,17 @@ function CompetitiveCard() {
               className="absolute inset-0 opacity-50"
               style={{ backgroundImage: "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)", backgroundSize: "16px 16px", color: "var(--border)" }}
             />
-            {dots.map(([x, y], i) => (
+            {dots.map(([x, y, i]) => (
               <span
-                key={i}
-                className={`absolute h-1.5 w-1.5 rounded-full ${i === 5 ? "bg-gold ring-4 ring-gold/20" : "bg-foreground/50"}`}
-                style={{ left: `${x * 8}%`, top: `${y * 14}%` }}
+                key={`${example.id}-${i}`}
+                className={`absolute h-1.5 w-1.5 rounded-full transition-all duration-500 ${i === meIndex ? "bg-gold ring-4 ring-gold/20" : "bg-foreground/50"}`}
+                style={{ left: `${x}%`, top: `${y}%` }}
               />
             ))}
           </div>
           <div className="flex justify-between text-[10px] font-mono uppercase tracking-tight text-muted-foreground">
             <span><span className="inline-block h-1.5 w-1.5 rounded-full bg-gold mr-1.5 align-middle" />You</span>
-            <span>14 competitors · 1.6 km radius</span>
+            <span>{example.competitors} competitors · {example.radius} km radius</span>
           </div>
         </div>
       }
@@ -266,10 +379,9 @@ function CompetitiveCard() {
   );
 }
 
-function PerformanceCard({ trend }: { trend: TrendRow[] | null }) {
+function PerformanceCard({ trend, example }: { trend: TrendRow[] | null; example: Example }) {
   const series = (trend ?? []).slice(-12).map((r) => r.items);
-  const fallback = [40, 55, 45, 60, 52, 68, 64, 72, 78, 74, 84, 92];
-  const data = series.length >= 6 ? series : fallback;
+  const data = series.length >= 6 ? series : example.trend;
   const max = Math.max(...data);
   const min = Math.min(...data);
   const points = data.map((v, i) => {
@@ -277,6 +389,7 @@ function PerformanceCard({ trend }: { trend: TrendRow[] | null }) {
     const y = 100 - ((v - min) / (max - min || 1)) * 100;
     return `${x},${y}`;
   }).join(" ");
+  const lastY = points.split(" ").pop()!.split(",")[1];
   const last = data[data.length - 1];
   const first = data[0];
   const delta = first > 0 ? ((last - first) / first) * 100 : 0;
@@ -290,7 +403,7 @@ function PerformanceCard({ trend }: { trend: TrendRow[] | null }) {
         <div className="space-y-3">
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-14 overflow-visible">
             <polyline points={points} fill="none" stroke="currentColor" strokeWidth="1.5" className="text-foreground" vectorEffect="non-scaling-stroke" />
-            <circle cx="100" cy={points.split(" ").pop()!.split(",")[1]} r="2" className="fill-gold" />
+            <circle cx="100" cy={lastY} r="2" className="fill-gold transition-all duration-500" />
           </svg>
           <div className="flex justify-between items-center text-[10px] font-mono font-bold uppercase tracking-tight">
             <span className="text-muted-foreground">Items dispensed · LTM</span>
@@ -304,7 +417,7 @@ function PerformanceCard({ trend }: { trend: TrendRow[] | null }) {
   );
 }
 
-function AcquisitionCard() {
+function AcquisitionCard({ example }: { example: Example }) {
   return (
     <CardShell
       module="Module 04 · Acquisition"
@@ -314,19 +427,28 @@ function AcquisitionCard() {
         <div className="space-y-3">
           <div className="flex items-baseline justify-between">
             <span className="text-[10px] font-mono font-bold tracking-[0.18em] uppercase text-muted-foreground">Est. valuation band</span>
-            <span className="text-sm font-mono font-bold tabular-nums">£1.25m – £1.40m</span>
+            <span className="text-sm font-mono font-bold tabular-nums">{example.valuation}</span>
           </div>
           <div>
             <div className="flex justify-between text-[9px] font-mono uppercase tracking-tight text-muted-foreground mb-1.5">
               <span>Most deprived</span>
-              <span>Decile 3</span>
+              <span>Decile {example.decile}</span>
               <span>Least deprived</span>
             </div>
             <div className="flex gap-0.5 h-2.5">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((d) => (
                 <div
                   key={d}
-                  className={`flex-1 ${d === 3 ? "bg-gold" : d <= 3 ? "bg-foreground/70" : d <= 5 ? "bg-foreground/30" : "bg-foreground/10"}`}
+                  className={cn(
+                    "flex-1 transition-colors duration-300",
+                    d === example.decile
+                      ? "bg-gold"
+                      : d <= example.decile
+                        ? "bg-foreground/70"
+                        : d <= example.decile + 2
+                          ? "bg-foreground/30"
+                          : "bg-foreground/10"
+                  )}
                 />
               ))}
             </div>
