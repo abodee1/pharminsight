@@ -258,6 +258,41 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
       </div>
 
       <div className="p-4 md:p-5 space-y-5">
+        {showInfo && (
+          <div className="rounded-md border border-border bg-secondary/40 p-4 text-sm leading-relaxed">
+            <div className="flex items-center gap-2 mb-3 text-foreground">
+              <Info className="h-4 w-4" />
+              <span className="font-medium">What these figures mean for this pharmacy</span>
+            </div>
+            <ul className="space-y-2 text-muted-foreground">
+              <li>
+                <span className="font-medium text-foreground">Catchment area:</span> The figures describe the population living within{" "}
+                <span className="font-medium text-foreground">{effectiveRadius.label}</span> of this pharmacy, using {zoneCount} {zoneCount === 1 ? zoneLabel.slice(0, -1) : zoneLabel.toLowerCase()}. Change the radius above to see how the profile changes with distance.
+              </li>
+              {overall != null && (
+                <li>
+                  <span className="font-medium text-foreground">Overall deprivation:</span> The average IMD/SIMD decile for this catchment is{" "}
+                  <span className="font-medium text-foreground">{overall.toFixed(1)} / 10</span> ({band.label.toLowerCase()}). Deciles run from 1 (most deprived) to 10 (least deprived), so a lower number indicates a more deprived catchment on average.
+                </li>
+              )}
+              <li>
+                <span className="font-medium text-foreground">Radar chart:</span> Each spoke shows how this catchment scores across deprivation domains: income, employment, health, education, crime, housing and access. Higher values mean more deprivation in that domain, with 10 being the most deprived decile nationally.
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Population & concentration:</span> The total population estimate, density per square mile, and the share of residents living in the most/least deprived 30% of areas. These help gauge how many people are likely affected by each type of deprivation.
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Decile distribution:</span> The coloured bar shows how catchment residents are spread across all 10 deprivation deciles. Click any band to see the specific {zoneLabel.toLowerCase()} that make up that segment.
+              </li>
+              {insights.length > 0 && (
+                <li>
+                  <span className="font-medium text-foreground">Service opportunities:</span> The suggestions below translate the data into practical service ideas for this pharmacy, such as Pharmacy First, MDS dosette boxes, delivery services or exemption signposting.
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+
         {/* Radius toggle */}
         <div className="inline-flex rounded-full border border-border bg-secondary/40 p-1">
           {RADII.map((r, i) => (
