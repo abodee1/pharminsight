@@ -734,7 +734,10 @@ function DataIngestionAdmin() {
                 ds={ds}
                 stats={statsBySource[ds.source] ?? emptyStats()}
                 onRun={() => triggerHook(ds)}
+                onBackfill={() => backfillHook(ds)}
                 running={!!running[ds.source]}
+                backfilling={!!backfilling[ds.source]}
+                backfillProgress={backfillProgress[ds.source] ?? null}
               />
             ))}
           </div>
@@ -749,7 +752,10 @@ function DataIngestionAdmin() {
                   ds={ds}
                   stats={statsBySource[ds.source] ?? emptyStats()}
                   onRun={() => triggerHook(ds)}
+                  onBackfill={() => backfillHook(ds)}
                   running={!!running[ds.source]}
+                  backfilling={!!backfilling[ds.source]}
+                  backfillProgress={backfillProgress[ds.source] ?? null}
                 />
               ))}
             </div>
