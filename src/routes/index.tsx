@@ -2,11 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight, BarChart2, Map, TrendingUp, Pill, Building2,
-  Stethoscope, ClipboardCheck, Zap, FileBarChart2,
+  Stethoscope, ClipboardCheck, Zap, FileBarChart2, Radar, Compass,
 } from "lucide-react";
-import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-} from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -26,63 +23,45 @@ export const Route = createFileRoute("/")({
   }),
 });
 
-type LeaderRow = { ods: string; name: string; region: string | null; country: string | null; value: number };
 type TrendRow = { year: number; month: number; items: number; eps: number; pf: number; nms: number };
 type CountryRow = { country: string; value: number; pf: number; nms: number; pharmacies: number };
-type RegionRow = { region: string; country: string; value: number; pharmacies: number };
 type Dashboard = {
   period: { year: number; month: number } | null;
   totals_now: { items: number; pf: number; nms: number; eps: number; pharmacies: number };
-  top_items: LeaderRow[];
-  top_pf: LeaderRow[];
-  top_nms: LeaderRow[];
-  top_eps: LeaderRow[];
-  top_fastest_growing: LeaderRow[];
   totals_trend: TrendRow[];
-  top_regions: RegionRow[];
   by_country: CountryRow[];
 };
 
-const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const fmtCompact = (n: number) => {
-  if (n >= 1e9) return (n / 1e9).toFixed(1) + "bn";
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "bn";
   if (n >= 1e6) return (n / 1e6).toFixed(1) + "m";
   if (n >= 1e3) return (n / 1e3).toFixed(0) + "k";
   return String(n);
 };
 const monthName = (y: number, m: number) =>
-  new Date(y, m - 1, 1).toLocaleString("en-GB", { month: "long", year: "numeric" });
-
-const PROOF_POINTS = [
-  "Updated monthly from official NHS sources",
-  "Covering 12,368 pharmacies across the UK",
-  "Used by pharmacy owners, buyers, and prescribers",
-];
+  new Date(y, m - 1, 1).toLocaleString("en-GB", { month: "short", year: "numeric" });
 
 function Landing() {
   const [data, setData] = useState<Dashboard | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     let alive = true;
     (async () => {
-      const { data, error } = await supabase.rpc("public_landing_data");
-      if (!alive) return;
-      if (error) setError(error.message);
-      else setData(data as unknown as Dashboard);
+      const { data } = await supabase.rpc("public_landing_data");
+      if (alive) setData(data as unknown as Dashboard);
     })();
     return () => { alive = false; };
   }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground selection:bg-gold/30">
       <Header />
-      <Hero data={data} />
-      <SocialProof />
-      <Features />
-      <TrendChart data={data?.totals_trend ?? null} />
-      <DataShowcase data={data} />
-      <CTA />
+      <main className="mx-auto max-w-6xl px-6 py-16 md:py-24 space-y-24 md:space-y-32">
+        <Hero data={data} />
+        <StatBand data={data} />
+        <FeatureBento data={data} />
+        <TrackedGrid />
+        <ClosingCTA />
+      </main>
       <Footer />
     </div>
   );
@@ -116,274 +95,332 @@ function Header() {
 
 function Hero({ data }: { data: Dashboard | null }) {
   const period = data?.period;
-  const [proofIdx, setProofIdx] = useState(0);
-  const [proofVisible, setProofVisible] = useState(true);
-  const prefersReduced = useRef(
-    typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-  );
-
-  useEffect(() => {
-    if (prefersReduced.current) return;
-    const t = setInterval(() => {
-      setProofVisible(false);
-      const swap = setTimeout(() => {
-        setProofIdx(i => (i + 1) % PROOF_POINTS.length);
-        setProofVisible(true);
-      }, 300);
-      return () => clearTimeout(swap);
-    }, 3000);
-    return () => clearInterval(t);
-  }, []);
-
   return (
-    <section className="relative mx-auto max-w-5xl px-6 pt-24 pb-20 text-center overflow-hidden">
-      {/* Subtle static gradient background — disabled for reduced motion (no animation anyway) */}
+    <section className="relative text-center space-y-8">
       <div
-        className="pointer-events-none absolute inset-0 -z-10"
+        className="pointer-events-none absolute inset-x-0 -top-20 bottom-0 -z-10 opacity-[0.04]"
         aria-hidden="true"
-        style={{
-          background:
-            "radial-gradient(ellipse 60% 50% at 20% 60%, hsl(var(--primary) / 0.06) 0%, transparent 70%), " +
-            "radial-gradient(ellipse 50% 40% at 80% 20%, hsl(45 93% 47% / 0.05) 0%, transparent 70%)",
-        }}
+        style={{ backgroundImage: "radial-gradient(currentColor 1px, transparent 1px)", backgroundSize: "24px 24px" }}
       />
 
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-        {period ? `Data through ${monthName(period.year, period.month)}` : "Latest data"}
-      </p>
-
-      <h1 className="mt-5 text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.04]">
-        Every UK pharmacy.<br />Every month.<br />One platform.
-      </h1>
-
-      <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-        NHS dispensing data, benchmarking, and competitive intelligence for pharmacy owners, buyers, and prescribers — updated monthly from official sources across all four nations.
-      </p>
-
-      <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-        <Button asChild size="lg" className="w-full sm:w-auto px-8">
-          <Link to="/register">Get started free <ArrowRight className="h-4 w-4 ml-2" /></Link>
-        </Button>
-        <Button asChild size="lg" variant="outline" className="w-full sm:w-auto px-8">
-          <Link to="/leaderboards">Explore data</Link>
-        </Button>
+      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-card text-[10px] font-bold tracking-widest uppercase">
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gold opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-gold" />
+        </span>
+        {period ? `Data updated · ${monthName(period.year, period.month)}` : "Latest NHS data"}
       </div>
 
-      {/* Rotating proof points */}
-      <p
-        className="mt-5 text-sm text-muted-foreground transition-opacity duration-300 motion-reduce:transition-none"
-        style={{ opacity: proofVisible ? 1 : 0 }}
-        aria-live="polite"
-      >
-        {PROOF_POINTS[proofIdx]}
+      <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-[0.95]">
+        Every UK pharmacy.<br />
+        Every month.<br />
+        <span className="text-gold">One platform.</span>
+      </h1>
+
+      <p className="max-w-2xl mx-auto text-lg text-muted-foreground leading-relaxed">
+        Official NHS dispensing data, benchmarking, and competitive intelligence for pharmacy owners and buyers — refreshed monthly from NHS BSA, PHS, and HSC BSO.
       </p>
+
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+        <Button asChild size="lg" className="px-8">
+          <Link to="/register">Get started free <ArrowRight className="h-4 w-4 ml-2" /></Link>
+        </Button>
+        <Button asChild size="lg" variant="outline" className="px-8">
+          <Link to="/leaderboards">Explore the data</Link>
+        </Button>
+      </div>
     </section>
   );
 }
 
-function SocialProof() {
+function StatBand({ data }: { data: Dashboard | null }) {
+  const t = data?.totals_now;
+  const stats = [
+    { k: "Pharmacies covered", v: t ? t.pharmacies.toLocaleString() : "12,368", sub: "England · Scotland · Wales · NI" },
+    { k: "Items dispensed", v: t ? fmtCompact(t.items) : "—", sub: "this reporting period" },
+    { k: "Pharmacy First", v: t ? fmtCompact(t.pf) : "—", sub: "clinical consultations" },
+    { k: "Months of history", v: "24", sub: "rolling, every contractor" },
+  ];
   return (
-    <div className="border-y border-border bg-secondary/30">
-      <div className="mx-auto max-w-6xl px-6 py-3 text-center">
-        <p className="text-xs text-muted-foreground">
-          Covering{" "}
-          <span className="font-semibold text-foreground">England, Scotland, Wales and Northern Ireland</span>
-          {" "}— updated monthly from{" "}
-          <span className="font-semibold text-foreground">NHS BSA, PHS, and HSC BSO</span>
-          {" "}official sources.
+    <section className="grid grid-cols-2 md:grid-cols-4 border border-border bg-card divide-x divide-y md:divide-y-0 divide-border">
+      {stats.map((s) => (
+        <div key={s.k} className="p-6 md:p-8">
+          <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-muted-foreground">{s.k}</p>
+          <p className="mt-3 text-3xl md:text-4xl font-bold tabular-nums tracking-tight">{s.v}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground leading-snug">{s.sub}</p>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/* ---------------- Feature bento ---------------- */
+
+function FeatureBento({ data }: { data: Dashboard | null }) {
+  return (
+    <section className="space-y-6">
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gold">The Platform</p>
+          <h2 className="mt-2 text-3xl md:text-4xl font-bold tracking-tight">Built for serious operators.</h2>
+        </div>
+        <p className="hidden md:block max-w-sm text-sm text-muted-foreground">
+          Four intelligence modules powered by the same official dataset NHS BSA, PHS and HSC BSO publish each month.
         </p>
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <BenchmarkCard />
+        <CompetitiveCard />
+        <PerformanceCard trend={data?.totals_trend ?? null} />
+        <AcquisitionCard />
+      </div>
+    </section>
+  );
+}
+
+function CardShell({
+  module, title, desc, viz,
+}: { module: string; title: string; desc: string; viz: React.ReactNode }) {
+  return (
+    <div className="bg-card border border-border p-8 flex flex-col justify-between transition-colors hover:border-gold/50 shadow-sm">
+      <div className="space-y-4">
+        <div className="flex justify-between items-start gap-4">
+          <p className="text-[10px] font-mono font-bold tracking-[0.18em] uppercase text-gold">{module}</p>
+          <p className="text-right text-[10px] font-mono uppercase tracking-tight text-muted-foreground/70">
+            Live · monthly
+          </p>
+        </div>
+        <h3 className="text-xl font-bold tracking-tight">{title}</h3>
+        <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
+      </div>
+      <div className="mt-8 pt-6 border-t border-border">{viz}</div>
     </div>
   );
 }
 
-const FEATURES = [
-  {
-    icon: BarChart2,
-    title: "Benchmarking",
-    desc: "See exactly where you rank against every pharmacy in your region, cohort, and the UK.",
-  },
-  {
-    icon: Map,
-    title: "Competitive Intelligence",
-    desc: "Map your local landscape, identify GP feeder dependencies, and spot acquisition targets.",
-  },
-  {
-    icon: TrendingUp,
-    title: "Performance Tracking",
-    desc: "Monitor dispensing trends, Pharmacy First growth, and revenue over time.",
-  },
-  {
-    icon: Building2,
-    title: "Acquisition Intelligence",
-    desc: "Automated pharmacy valuations, ownership change alerts, and area opportunity mapping.",
-  },
+function BenchmarkCard() {
+  const rows = [
+    { rank: 1, label: "Top performer", val: 9240, w: 100 },
+    { rank: 4, label: "Cohort leader", val: 7860, w: 85 },
+    { rank: 14, label: "You — top 12%", val: 6420, w: 70, me: true },
+    { rank: 38, label: "Regional median", val: 4880, w: 53 },
+  ];
+  return (
+    <CardShell
+      module="Module 01 · Benchmarking"
+      title="Rank against every UK pharmacy."
+      desc="See exactly where you stand against every pharmacy in your region, cohort, and nationally — by items, services, EPS share and growth."
+      viz={
+        <div className="space-y-2.5">
+          {rows.map((r) => (
+            <div key={r.rank} className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3">
+              <span className={`text-[10px] font-mono font-bold ${r.me ? "text-gold" : "text-muted-foreground"}`}>#{String(r.rank).padStart(2, "0")}</span>
+              <div className="h-1.5 bg-secondary overflow-hidden">
+                <div className={`h-full ${r.me ? "bg-gold" : "bg-foreground/30"}`} style={{ width: `${r.w}%` }} />
+              </div>
+              <span className={`text-[11px] font-mono tabular-nums ${r.me ? "font-bold text-foreground" : "text-muted-foreground"}`}>
+                {r.val.toLocaleString()}
+              </span>
+            </div>
+          ))}
+        </div>
+      }
+    />
+  );
+}
+
+function CompetitiveCard() {
+  // Sparse fake catchment dots in a 12x6 grid
+  const dots = [
+    [2, 1], [3, 1], [5, 2], [4, 3], [6, 3], [7, 2], [8, 4],
+    [9, 3], [10, 4], [11, 5], [1, 4], [3, 5], [5, 4], [7, 5],
+  ];
+  return (
+    <CardShell
+      module="Module 02 · Competitive Intel"
+      title="Map your local landscape."
+      desc="Visualise every competitor in your radius, the GP surgeries that feed them, and the catchment demographics behind their volume."
+      viz={
+        <div className="space-y-2">
+          <div className="relative h-20 border border-border bg-secondary/30 overflow-hidden">
+            <div
+              className="absolute inset-0 opacity-50"
+              style={{ backgroundImage: "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)", backgroundSize: "16px 16px", color: "var(--border)" }}
+            />
+            {dots.map(([x, y], i) => (
+              <span
+                key={i}
+                className={`absolute h-1.5 w-1.5 rounded-full ${i === 5 ? "bg-gold ring-4 ring-gold/20" : "bg-foreground/50"}`}
+                style={{ left: `${x * 8}%`, top: `${y * 14}%` }}
+              />
+            ))}
+          </div>
+          <div className="flex justify-between text-[10px] font-mono uppercase tracking-tight text-muted-foreground">
+            <span><span className="inline-block h-1.5 w-1.5 rounded-full bg-gold mr-1.5 align-middle" />You</span>
+            <span>14 competitors · 1.6 km radius</span>
+          </div>
+        </div>
+      }
+    />
+  );
+}
+
+function PerformanceCard({ trend }: { trend: TrendRow[] | null }) {
+  const series = (trend ?? []).slice(-12).map((r) => r.items);
+  const fallback = [40, 55, 45, 60, 52, 68, 64, 72, 78, 74, 84, 92];
+  const data = series.length >= 6 ? series : fallback;
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const points = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * 100;
+    const y = 100 - ((v - min) / (max - min || 1)) * 100;
+    return `${x},${y}`;
+  }).join(" ");
+  const last = data[data.length - 1];
+  const first = data[0];
+  const delta = first > 0 ? ((last - first) / first) * 100 : 0;
+
+  return (
+    <CardShell
+      module="Module 03 · Performance"
+      title="24 months of every signal."
+      desc="Track items, EPS, Pharmacy First, NMS and revenue across a 24-month rolling window — your pharmacy and every peer, side by side."
+      viz={
+        <div className="space-y-3">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-14 overflow-visible">
+            <polyline points={points} fill="none" stroke="currentColor" strokeWidth="1.5" className="text-foreground" vectorEffect="non-scaling-stroke" />
+            <circle cx="100" cy={points.split(" ").pop()!.split(",")[1]} r="2" className="fill-gold" />
+          </svg>
+          <div className="flex justify-between items-center text-[10px] font-mono font-bold uppercase tracking-tight">
+            <span className="text-muted-foreground">Items dispensed · LTM</span>
+            <span className={delta >= 0 ? "text-gold" : "text-muted-foreground"}>
+              {delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}%
+            </span>
+          </div>
+        </div>
+      }
+    />
+  );
+}
+
+function AcquisitionCard() {
+  return (
+    <CardShell
+      module="Module 04 · Acquisition"
+      title="Targets you'd otherwise miss."
+      desc="Automated valuations, Companies House ownership-change alerts, IMD deprivation deciles, and area-opportunity scores — built on real financials."
+      viz={
+        <div className="space-y-3">
+          <div className="flex items-baseline justify-between">
+            <span className="text-[10px] font-mono font-bold tracking-[0.18em] uppercase text-muted-foreground">Est. valuation band</span>
+            <span className="text-sm font-mono font-bold tabular-nums">£1.25m – £1.40m</span>
+          </div>
+          <div>
+            <div className="flex justify-between text-[9px] font-mono uppercase tracking-tight text-muted-foreground mb-1.5">
+              <span>Most deprived</span>
+              <span>Decile 3</span>
+              <span>Least deprived</span>
+            </div>
+            <div className="flex gap-0.5 h-2.5">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((d) => (
+                <div
+                  key={d}
+                  className={`flex-1 ${d === 3 ? "bg-gold" : d <= 3 ? "bg-foreground/70" : d <= 5 ? "bg-foreground/30" : "bg-foreground/10"}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      }
+    />
+  );
+}
+
+/* ---------------- Tracked grid ---------------- */
+
+const TRACKED = [
+  { icon: Pill, label: "Items dispensed", desc: "Monthly prescription volume for every NHS contractor across all four nations." },
+  { icon: Stethoscope, label: "Pharmacy First", desc: "Consultation volumes across 7 clinical pathways including UTI and sinusitis." },
+  { icon: ClipboardCheck, label: "New Medicine Service", desc: "NMS completion rates and patient engagement trends by contractor." },
+  { icon: Zap, label: "EPS adoption", desc: "Electronic Prescription Service adoption volume and market share per pharmacy." },
+  { icon: BarChart2, label: "Benchmarking", desc: "Rank every pharmacy nationally, regionally, and within specific peer cohorts." },
+  { icon: FileBarChart2, label: "Trend analysis", desc: "24-month rolling history to track growth, decline, and service-mix shifts." },
+  { icon: Compass, label: "GP feeder mapping", desc: "Map GP feeder patterns and identify nearby competitor acquisition targets." },
+  { icon: Building2, label: "Acquisition intel", desc: "Ownership-change alerts, automated valuations, and income-quality scores." },
+  { icon: Radar, label: "Catchment & deprivation", desc: "IMD/SIMD/WIMD/NIMDM deciles across the radius around every pharmacy." },
+  { icon: Map, label: "Local landscape", desc: "Every competitor in your radius with their service-mix and growth trajectory." },
+  { icon: TrendingUp, label: "Fastest-growing", desc: "League tables of pharmacies gaining share month-on-month and year-on-year." },
+  { icon: BarChart2, label: "Country splits", desc: "England, Scotland, Wales and NI volumes broken out by service and region." },
 ] as const;
 
-function Features() {
+function TrackedGrid() {
   return (
-    <section className="mx-auto max-w-6xl px-6 py-20">
-      {/* Mobile: horizontal scroll carousel. md+: 4-column grid. */}
-      <div className="flex gap-5 overflow-x-auto md:overflow-visible md:grid md:grid-cols-4 snap-x snap-mandatory md:snap-none pb-4 md:pb-0 -mx-6 px-6 md:mx-0 md:px-0 scrollbar-none">
-        {FEATURES.map((f) => (
+    <section className="space-y-10">
+      <div className="text-center space-y-3">
+        <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gold">What we track</p>
+        <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Twelve data layers. One source of truth.</h2>
+        <p className="text-muted-foreground max-w-xl mx-auto">
+          Every metric below is rebuilt from official NHS publications each month — no estimates, no scraping.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 border border-border bg-card">
+        {TRACKED.map((m, i) => (
           <div
-            key={f.title}
-            className="snap-start shrink-0 w-[76vw] sm:w-[45vw] md:w-auto min-w-0 rounded-xl border border-border bg-card p-7 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+            key={m.label}
+            className={[
+              "p-6 md:p-7 space-y-3",
+              i % 4 !== 3 ? "md:border-r border-border" : "",
+              i % 2 === 0 ? "border-r md:border-r" : "",
+              i < TRACKED.length - 2 ? "border-b border-border" : "",
+              i < TRACKED.length - 4 ? "md:border-b" : "md:border-b-0",
+            ].join(" ")}
           >
-            <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-secondary border border-border">
-              <f.icon className="h-5 w-5 text-foreground" />
+            <div className="flex items-center justify-between">
+              <m.icon className="h-4 w-4 text-gold" />
+              <span className="text-[9px] font-mono font-bold tracking-tight text-muted-foreground/60">{String(i + 1).padStart(2, "0")}</span>
             </div>
-            <h3 className="text-base font-bold tracking-tight">{f.title}</h3>
-            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+            <h4 className="font-bold text-sm tracking-tight">{m.label}</h4>
+            <p className="text-xs text-muted-foreground leading-relaxed">{m.desc}</p>
           </div>
         ))}
       </div>
-    </section>
-  );
-}
 
-function TrendChart({ data }: { data: TrendRow[] | null }) {
-  if (!data || data.length < 3) return null;
-  const chartData = data.slice(-12).map(r => ({
-    label: `${MONTHS[r.month - 1]} '${String(r.year).slice(2)}`,
-    items: Math.round(r.items / 1000),
-  }));
-
-  return (
-    <section className="border-t border-border bg-secondary/20">
-      <div className="mx-auto max-w-6xl px-6 py-16">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold tracking-tight">UK dispensing trend</h2>
-          <p className="text-sm text-muted-foreground mt-1">Last 12 months · all pharmacies · items dispensed (thousands)</p>
-        </div>
-        <div className="h-56 md:h-64">
-          <ResponsiveContainer>
-            <LineChart data={chartData} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
-              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}k`} width={44} />
-              <Tooltip
-                contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
-                formatter={(v: any) => [`${Number(v).toLocaleString()}k items`, "Total dispensed"]}
-              />
-              <Line
-                type="monotone"
-                dataKey="items"
-                stroke="var(--chart-1)"
-                strokeWidth={2.5}
-                dot={false}
-                activeDot={{ r: 4, strokeWidth: 0 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="text-center">
+        <Link to="/leaderboards" className="inline-flex items-center gap-1.5 text-sm font-semibold underline underline-offset-4 decoration-gold hover:decoration-foreground transition-colors">
+          View the full leaderboards <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
     </section>
   );
 }
 
+/* ---------------- CTA + footer ---------------- */
 
-const TRACKED_METRICS = [
-  {
-    icon: Pill,
-    label: "Items dispensed",
-    desc: "Monthly prescription volume for every NHS contractor across all four nations.",
-  },
-  {
-    icon: Stethoscope,
-    label: "Pharmacy First",
-    desc: "Consultation volumes across 7 clinical pathways including UTI, sinusitis and earache.",
-  },
-  {
-    icon: ClipboardCheck,
-    label: "New Medicine Service",
-    desc: "NMS completion rates and patient engagement trends by contractor.",
-  },
-  {
-    icon: Zap,
-    label: "EPS Items",
-    desc: "Electronic Prescription Service adoption volume and share per pharmacy.",
-  },
-  {
-    icon: BarChart2,
-    label: "Benchmarking",
-    desc: "Rank every pharmacy nationally, regionally, and within peer cohorts.",
-  },
-  {
-    icon: FileBarChart2,
-    label: "Trend analysis",
-    desc: "24-month rolling history to track growth, decline, and service mix shifts.",
-  },
-  {
-    icon: Map,
-    label: "Competitive intelligence",
-    desc: "Map GP feeder patterns, identify nearby competitors and acquisition targets.",
-  },
-  {
-    icon: Building2,
-    label: "Acquisition intelligence",
-    desc: "Automated valuations, Companies House ownership data, and income quality scores.",
-  },
-] as const;
-
-function DataShowcase({ data: _ }: { data: Dashboard | null }) {
+function ClosingCTA() {
   return (
-    <section className="border-t border-border bg-card">
-      <div className="mx-auto max-w-6xl px-6 py-16">
-
-        {/* What PharmInsight tracks */}
-        <div className="rounded-xl border border-border bg-secondary/30 p-6 md:p-8">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-6">
-            What PharmInsight tracks
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {TRACKED_METRICS.map((m) => (
-              <div key={m.label} className="flex flex-col gap-2.5">
-                <div className="h-9 w-9 rounded-lg bg-card border border-border flex items-center justify-center shrink-0">
-                  <m.icon className="h-4 w-4 text-foreground" />
-                </div>
-                <p className="text-sm font-semibold leading-snug">{m.label}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{m.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Link to full leaderboards */}
-        <div className="mt-6 text-center">
-          <Link
-            to="/leaderboards"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            View full leaderboards →
-          </Link>
-        </div>
-
-      </div>
-    </section>
-  );
-}
-
-function CTA() {
-  return (
-    <section className="border-t border-border" style={{ background: "radial-gradient(ellipse 80% 60% at 50% 120%, hsl(var(--primary) / 0.06) 0%, transparent 70%)" }}>
-      <div className="mx-auto max-w-6xl px-6 py-24 text-center">
-        <h2 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight">
+    <section className="relative bg-foreground text-background p-10 md:p-16 text-center overflow-hidden">
+      <div
+        className="absolute inset-0 opacity-[0.06] pointer-events-none"
+        aria-hidden="true"
+        style={{ backgroundImage: "repeating-linear-gradient(45deg, currentColor 0, currentColor 1px, transparent 0, transparent 50%)", backgroundSize: "20px 20px" }}
+      />
+      <div className="relative space-y-6">
+        <h2 className="text-4xl md:text-5xl font-bold tracking-tight">
           Know your market.<br />Own your position.
         </h2>
-        <p className="mt-5 text-muted-foreground max-w-sm mx-auto text-base leading-relaxed">
-          Every pharmacy. Every month. The intelligence you need to make better decisions.
+        <p className="max-w-xl mx-auto text-background/60 leading-relaxed">
+          The intelligence you need to make better pharmacy decisions — across all four UK nations, every single month.
         </p>
-        <div className="mt-8">
-          <Button asChild size="lg" className="px-12 py-4 h-auto text-base font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
-            <Link to="/register">
-              Get started free <ArrowRight className="h-4 w-4 ml-2" />
-            </Link>
+        <div className="pt-2">
+          <Button asChild size="lg" className="bg-gold text-gold-foreground hover:bg-gold/90 px-10 h-12 text-base font-bold">
+            <Link to="/register">Get started free</Link>
           </Button>
+          <p className="mt-6 text-[10px] font-mono uppercase tracking-[0.2em] text-background/40">
+            No credit card · Official NHS data sources
+          </p>
         </div>
-        <p className="mt-5 text-xs text-muted-foreground">
-          No credit card required · Free to explore · Official NHS data sources
-        </p>
       </div>
     </section>
   );
@@ -392,9 +429,9 @@ function CTA() {
 function Footer() {
   return (
     <footer className="border-t border-border">
-      <div className="mx-auto max-w-6xl px-6 py-8 flex flex-col md:flex-row justify-between gap-3 text-xs text-muted-foreground">
+      <div className="mx-auto max-w-6xl px-6 py-8 flex flex-col md:flex-row justify-between gap-3 text-[11px] font-mono uppercase tracking-widest text-muted-foreground">
         <span>© {new Date().getFullYear()} PharmInsight</span>
-        <span>Sources: NHS BSA, PHS, NHS Wales, HSC BSO, Companies House — OGL v3.0</span>
+        <span>Sources: NHS BSA · PHS · NHS Wales · HSC BSO · Companies House — OGL v3.0</span>
       </div>
     </footer>
   );
