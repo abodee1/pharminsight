@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Loader2, Users, TrendingDown, TrendingUp, MapPin, Info } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Loader2, Users, TrendingDown, TrendingUp, MapPin, Info, Lightbulb } from "lucide-react";
 import {
   Radar,
   RadarChart,
