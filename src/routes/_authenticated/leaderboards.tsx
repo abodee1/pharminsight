@@ -247,13 +247,13 @@ function Leaderboards() {
     <div className="p-4 md:p-10 max-w-7xl mx-auto">
       <PageHeader title="Leaderboards" subtitle="Rank pharmacies across the UK by service." />
 
-      <div className="flex gap-1 border-b border-border mb-4">
+      <div className="flex gap-1 border-b border-border mb-4 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-thin">
         {COUNTRIES.map((c) => (
           <button
             key={c}
             onClick={() => { setCountry(c); setRegion("all"); setPage(0); setSearch(""); }}
             className={[
-              "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+              "px-3 md:px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap shrink-0",
               country === c
                 ? "border-gold text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground",
@@ -264,22 +264,23 @@ function Leaderboards() {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-3 mb-4">
-        <select value={service} onChange={(e) => { setService(e.target.value as any); setPage(0); }} className="rounded-md border border-input bg-card px-3 py-2 text-sm">
+      <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 md:gap-3 mb-4">
+        <select value={service} onChange={(e) => { setService(e.target.value as any); setPage(0); }} className="min-w-0 rounded-md border border-input bg-card px-3 py-2 text-sm">
           {SERVICES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
         </select>
-        <select value={region} onChange={(e) => { setRegion(e.target.value); setPage(0); }} className="rounded-md border border-input bg-card px-3 py-2 text-sm">
+        <select value={region} onChange={(e) => { setRegion(e.target.value); setPage(0); }} className="min-w-0 rounded-md border border-input bg-card px-3 py-2 text-sm">
           <option value="all">All {country === "Scotland" ? "Health Boards" : "ICBs"}</option>
           {regions.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
-        <select value={period} onChange={(e) => setPeriod(e.target.value)} className="rounded-md border border-input bg-card px-3 py-2 text-sm">
+        <select value={period} onChange={(e) => setPeriod(e.target.value)} className="col-span-2 min-w-0 rounded-md border border-input bg-card px-3 py-2 text-sm">
           {periods.map((p) => {
             const [y, m] = p.split("-").map(Number);
             return <option key={p} value={p}>{new Date(y, m - 1).toLocaleString("en-GB", { month: "long", year: "numeric" })}</option>;
           })}
         </select>
-        {loading && <span className="text-xs text-muted-foreground self-center">Loading…</span>}
+        {loading && <span className="col-span-2 text-xs text-muted-foreground self-center">Loading…</span>}
       </div>
+
 
       {nmsUnavailable && (
         <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 px-4 py-2.5 text-xs text-amber-800 dark:text-amber-300">
