@@ -66,20 +66,32 @@ const DOMAIN_KEYS = [
   { key: "avg_access", label: "Access" },
 ] as const;
 
-function bandFor(d: number | null): { label: string; cls: string; border: string } {
-  if (d == null) return { label: "Unknown", cls: "bg-muted text-muted-foreground", border: "border-muted" };
-  if (d >= 9) return { label: "Most Deprived", cls: "bg-red-700 text-white", border: "border-red-700" };
-  if (d >= 7) return { label: "High Deprivation", cls: "bg-orange-600 text-white", border: "border-orange-600" };
-  if (d >= 5) return { label: "Moderate Deprivation", cls: "bg-amber-500 text-white", border: "border-amber-500" };
-  if (d >= 3) return { label: "Low Deprivation", cls: "bg-lime-500 text-white", border: "border-lime-500" };
-  return { label: "Least Deprived", cls: "bg-green-600 text-white", border: "border-green-600" };
+function bandFor(d: number | null): { label: string; cls: string; border: string; grad: string; ring: string } {
+  if (d == null) return { label: "Unknown", cls: "bg-muted text-muted-foreground", border: "border-muted", grad: "from-muted to-muted", ring: "ring-muted" };
+  // d: 1 = most deprived → 10 = least deprived
+  if (d <= 2) return { label: "Most Deprived", cls: "bg-red-700 text-white", border: "border-red-700", grad: "from-red-700 to-red-500", ring: "ring-red-200" };
+  if (d <= 4) return { label: "High Deprivation", cls: "bg-orange-600 text-white", border: "border-orange-600", grad: "from-orange-600 to-amber-400", ring: "ring-orange-200" };
+  if (d <= 6) return { label: "Moderate Deprivation", cls: "bg-amber-500 text-white", border: "border-amber-500", grad: "from-amber-500 to-lime-400", ring: "ring-amber-200" };
+  if (d <= 8) return { label: "Low Deprivation", cls: "bg-lime-500 text-white", border: "border-lime-500", grad: "from-lime-500 to-green-500", ring: "ring-lime-200" };
+  return { label: "Least Deprived", cls: "bg-green-600 text-white", border: "border-green-600", grad: "from-green-600 to-emerald-500", ring: "ring-green-200" };
 }
 
-function badgeColor(d: number | null): string {
-  if (d == null) return "bg-muted text-muted-foreground";
-  if (d >= 7) return "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200 border border-red-300/50";
-  if (d >= 4) return "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 border border-amber-300/50";
-  return "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200 border border-green-300/50";
+function meterColor(d: number | null): string {
+  if (d == null) return "bg-muted";
+  if (d >= 8) return "bg-red-600";
+  if (d >= 6) return "bg-orange-500";
+  if (d >= 4) return "bg-amber-500";
+  if (d >= 2) return "bg-lime-500";
+  return "bg-green-600";
+}
+
+function meterText(d: number | null): string {
+  if (d == null) return "text-muted-foreground";
+  if (d >= 8) return "text-red-700 dark:text-red-300";
+  if (d >= 6) return "text-orange-700 dark:text-orange-300";
+  if (d >= 4) return "text-amber-700 dark:text-amber-300";
+  if (d >= 2) return "text-lime-700 dark:text-lime-300";
+  return "text-green-700 dark:text-green-300";
 }
 
 function insightFor(key: string, isScotland: boolean, isEngland: boolean): string | null {
