@@ -8,7 +8,7 @@ import { requireAdminAuth } from "@/integrations/supabase/admin-middleware";
  * (free, no API key, up to 100 postcodes per request).
  */
 export const backfillGpGeocodes = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdminAuth])
   .inputValidator((input: { limit?: number }) =>
     z.object({ limit: z.number().min(1).max(20000).optional() }).parse(input),
   )
@@ -93,7 +93,7 @@ function splitCsvLine(line: string): string[] {
 }
 
 export const refreshScotlandGpContacts = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdminAuth])
   .handler(async () => {
     const pkgRes = await fetch(
       "https://www.opendata.nhs.scot/api/3/action/package_show?id=gp-practice-contact-details-and-list-sizes",
@@ -163,7 +163,7 @@ export const refreshScotlandGpContacts = createServerFn({ method: "POST" })
   });
 
 export const refreshEnglandGpContacts = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdminAuth])
   .handler(async () => {
     let offset = 1;
     const limit = 1000;
@@ -204,7 +204,7 @@ export const refreshEnglandGpContacts = createServerFn({ method: "POST" })
  * Coverage health snapshot for the admin dashboard.
  */
 export const getGpCoverage = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdminAuth])
   .handler(async () => {
     const head = { count: "exact" as const, head: true };
     const [total, withName, withPostcode, withLat, scotTotal, engTotal] = await Promise.all([
