@@ -17,7 +17,8 @@ import {
 
 const SOURCE = "NHSBSA_GP";
 const CKAN_BASE = "https://opendata.nhsbsa.net/api/3/action";
-const PACKAGES = ["english-prescribing-data-epd-snomed", "english-prescribing-data-epd"];
+// english-prescribing-data-epd-snomed was removed from NHSBSA CKAN (returns 404); EPD is the live package.
+const PACKAGES = ["english-prescribing-data-epd"];
 const CHUNK_SIZE = 50 * 1024 * 1024; // 50 MB
 
 // ---------- Discovery ----------

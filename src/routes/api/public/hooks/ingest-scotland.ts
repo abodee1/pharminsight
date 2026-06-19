@@ -457,6 +457,16 @@ async function processQueueItem(item: {
       for (const r of data ?? []) idMap.set(r.ods_code, r.id);
     }
 
+    // Resolve log year/month: prefer queue values, but fall back to latest period in the actual
+    // CSV data. This prevents null year/month in ingestion_log when CKAN URLs are opaque UUIDs
+    // and parseYearMonth() could only extract the year (not the month).
+    let logYear = item.year ?? 0;
+    let logMonth = item.month ?? 0;
+    for (const a of agg.values()) {
+      const score = a.year * 12 + (a.month || 0);
+      if (score > logYear * 12 + logMonth) { logYear = a.year; logMonth = a.month; }
+    }
+
     // Build dispensing rows
     const dispRows = Array.from(agg.values())
       .filter((a) => idMap.has(a.ods_code) && a.month > 0)
@@ -506,8 +516,8 @@ async function processQueueItem(item: {
       source: SOURCE,
       dataset: item.dataset,
       resource_url: item.resource_url,
-      year: item.year,
-      month: item.month,
+      year: logYear || null,
+      month: logMonth || null,
       status: "success",
       rows_ingested: inserted,
     });

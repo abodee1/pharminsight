@@ -50,14 +50,35 @@ const CKAN_SOURCES: CkanSource[] = [
     dataset: "prescriptions-in-the-community",
     hook: "ingest-scotland-gp",
   },
+  {
+    // NI BSO dispensing data published via OpenDataNI on data.gov.uk CKAN
+    source: "HSCNI_BSO",
+    label: "Northern Ireland — pharmacy dispensing (BSO)",
+    ckanBase: "https://ckan.publishing.service.gov.uk/api/3/action",
+    dataset: "dispensing-by-contractor",
+    hook: "ingest-ni",
+  },
 ];
 
 type CkanResource = { id: string; name: string; url: string };
 
+const MONTH_NAMES: Record<string, number> = {
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+};
+
 function parseYearMonth(s: string): { y: number; m: number } | null {
-  const m = s.match(/(20\d{2})(0[1-9]|1[0-2])/);
-  if (!m) return null;
-  return { y: +m[1], m: +m[2] };
+  // 1. YYYYMM numeric (e.g. in URL: pitc202409 or in name: 202604)
+  const m1 = s.match(/(20\d{2})(0[1-9]|1[0-2])/);
+  if (m1) return { y: +m1[1], m: +m1[2] };
+  // 2. Word month + year (e.g. "April 2026" — used in NI BSO resource names)
+  const m2 = s.match(/\b([A-Za-z]{3,9})\s+(20\d{2})\b/);
+  if (m2) {
+    const key = m2[1].toLowerCase();
+    const month = MONTH_NAMES[key] ?? Object.entries(MONTH_NAMES).find(([k]) => k.startsWith(key))?.[1];
+    if (month) return { y: +m2[2], m: month };
+  }
+  return null;
 }
 
 // Fetch with a hard 8-second timeout so slow CKAN portals don't stall the handler

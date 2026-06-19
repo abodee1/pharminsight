@@ -6,24 +6,32 @@ const SOURCE = "NWSSP_WALES";
 
 type CkanResource = { id: string; name: string; url: string; format: string; created?: string; last_modified?: string };
 
-// NWSSP (NHS Wales Shared Services Partnership) open data.
-// Primary dispensing data is on data.gov.uk (same CKAN as NI); contractor activity is on the
-// NWSSP open data portal.
-// TODO: verify these dataset IDs — search "nwssp dispensing" at https://ckan.publishing.service.gov.uk
-// and "pharmacy contractor activity" at https://opendata.nwssp.wales.nhs.uk/api/3/action.
-const SOURCES = [
-  {
-    ckanBase: "https://ckan.publishing.service.gov.uk/api/3/action",
-    dataset: "dispensing-by-pharmacy-contractor-wales",
-    filter: (r: CkanResource) => r.format?.toUpperCase() === "CSV",
-  },
-  {
-    // NWSSP open data CKAN — contractor activity (NMS, Pharmacy First, EPS, payments)
-    ckanBase: "https://opendata.nwssp.wales.nhs.uk/api/3/action",
-    dataset: "community-pharmacy-contractor-activity",
-    filter: (r: CkanResource) => r.format?.toUpperCase() === "CSV",
-  },
-] as const;
+// NWSSP (NHS Wales Shared Services Partnership) pharmacy dispensing data.
+//
+// DATA SOURCE STATUS (2026-06, verified):
+//   1. ckan.publishing.service.gov.uk/dispensing-by-pharmacy-contractor-wales → HTTP 404 (no such dataset)
+//   2. opendata.nwssp.wales.nhs.uk/community-pharmacy-contractor-activity → connection refused (portal down)
+//
+// Actual data lives at:
+//   https://nwssp.nhs.wales/ourservices/primary-care-services/general-information/
+//     data-and-publications/pharmacy-practice-dispensing-data/
+// BUT the file listing is rendered by a Mura CMS async dataTables component that requires
+// JavaScript execution — no machine-readable API or direct CSV URLs are available via HTTP alone.
+//
+// To implement this pipeline, a headless browser scraper (e.g. Playwright) is needed.
+// Until then, discover() logs a single error entry to ingestion_log so the admin UI
+// correctly shows Wales as having no working data source.
+//
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _DEAD_SOURCES = [
+  { ckanBase: "https://ckan.publishing.service.gov.uk/api/3/action", dataset: "dispensing-by-pharmacy-contractor-wales" },
+  { ckanBase: "https://opendata.nwssp.wales.nhs.uk/api/3/action", dataset: "community-pharmacy-contractor-activity" },
+];
+const SOURCES: Array<{
+  ckanBase: string;
+  dataset: string;
+  filter: (r: CkanResource) => boolean;
+}> = [];
 
 const MONTH_NAMES: Record<string, number> = {
   january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
@@ -123,6 +131,26 @@ async function discover() {
       .upsert(chunk, { onConflict: "source,dataset,resource_url" });
     if (!error) queued += chunk.length;
   }
+
+  // If no items were queued and no prior data exists, write a single error log entry
+  // so the admin UI shows Wales as broken rather than healthy with zero ingestions.
+  if (queue.length === 0) {
+    const noSourceUrl = "https://nwssp.nhs.wales/ourservices/primary-care-services/general-information/data-and-publications/pharmacy-practice-dispensing-data/";
+    const { data: existing } = await supabaseAdmin.from("ingestion_log")
+      .select("id").eq("source", SOURCE).eq("resource_url", noSourceUrl).limit(1);
+    if (!existing?.length) {
+      await supabaseAdmin.from("ingestion_log").insert({
+        source: SOURCE,
+        dataset: "nwssp-pharmacy-dispensing",
+        resource_url: noSourceUrl,
+        year: null,
+        month: null,
+        status: "failed",
+        error: "No machine-readable data source available. CKAN endpoints broken; NWSSP website requires JavaScript rendering. Implement headless browser scraper to enable this pipeline.",
+      });
+    }
+  }
+
   return queued;
 }
 
@@ -295,9 +323,8 @@ async function processQueueItem(item: {
   }
 }
 
-const DATASET_PRIORITY = [
-  "dispensing-by-pharmacy-contractor-wales",
-  "community-pharmacy-contractor-activity",
+const DATASET_PRIORITY: string[] = [
+  // No live datasets until a headless browser scraper is implemented.
 ];
 
 async function runBatch(batchSize = 1) {
