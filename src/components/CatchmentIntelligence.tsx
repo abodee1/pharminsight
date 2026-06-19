@@ -521,57 +521,75 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
 
             {/* Most & least deprived zones */}
             {breakdown && (breakdown.most_deprived || breakdown.least_deprived) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 {breakdown.most_deprived && (
-                  <div className="rounded-md border-l-4 border-red-600 bg-secondary/30 px-3 py-2">
-                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Most deprived nearby</div>
-                    <div className="text-sm font-medium mt-0.5">{breakdown.most_deprived.zone_name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Decile {breakdown.most_deprived.overall_decile}
-                      {breakdown.most_deprived.population != null && <> · {breakdown.most_deprived.population.toLocaleString()} residents</>}
+                  <div className="relative rounded-lg border border-border bg-card p-3 overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-600" />
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Most deprived nearby</div>
+                        <div className="text-sm font-semibold mt-1 truncate">{breakdown.most_deprived.zone_name}</div>
+                        {breakdown.most_deprived.population != null && (
+                          <div className="text-[11px] text-muted-foreground mt-0.5">{breakdown.most_deprived.population.toLocaleString()} residents</div>
+                        )}
+                      </div>
+                      <div className="shrink-0 text-center px-2.5 py-1.5 rounded-md bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300">
+                        <div className="text-[9px] uppercase tracking-wider leading-none">Decile</div>
+                        <div className="text-xl font-bold tabular-nums leading-none mt-0.5">{breakdown.most_deprived.overall_decile}</div>
+                      </div>
                     </div>
                   </div>
                 )}
                 {breakdown.least_deprived && (
-                  <div className="rounded-md border-l-4 border-green-600 bg-secondary/30 px-3 py-2">
-                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Least deprived nearby</div>
-                    <div className="text-sm font-medium mt-0.5">{breakdown.least_deprived.zone_name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Decile {breakdown.least_deprived.overall_decile}
-                      {breakdown.least_deprived.population != null && <> · {breakdown.least_deprived.population.toLocaleString()} residents</>}
+                  <div className="relative rounded-lg border border-border bg-card p-3 overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-600" />
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Least deprived nearby</div>
+                        <div className="text-sm font-semibold mt-1 truncate">{breakdown.least_deprived.zone_name}</div>
+                        {breakdown.least_deprived.population != null && (
+                          <div className="text-[11px] text-muted-foreground mt-0.5">{breakdown.least_deprived.population.toLocaleString()} residents</div>
+                        )}
+                      </div>
+                      <div className="shrink-0 text-center px-2.5 py-1.5 rounded-md bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300">
+                        <div className="text-[9px] uppercase tracking-wider leading-none">Decile</div>
+                        <div className="text-xl font-bold tabular-nums leading-none mt-0.5">{breakdown.least_deprived.overall_decile}</div>
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Domain badges */}
-            <div>
-              <div className="text-xs font-medium text-foreground mb-1.5">Domain deciles</div>
-              <div className="flex flex-wrap gap-2">
-                {DOMAIN_KEYS.map((d) => {
-                  const v = agg ? Number((agg as any)[d.key] ?? 0) : 0;
-                  return (
-                    <span
-                      key={d.key}
-                      className={`text-xs px-2.5 py-1 rounded-md font-medium ${badgeColor(v)}`}
-                    >
-                      {d.label}: <span className="tabular-nums">{v.toFixed(1)}</span>
-                    </span>
-                  );
-                })}
-                {isEngland && agg?.avg_idaci != null && (
-                  <span className={`text-xs px-2.5 py-1 rounded-md font-medium ${badgeColor(Number(agg.avg_idaci))}`}>
-                    Children (IDACI): <span className="tabular-nums">{Number(agg.avg_idaci).toFixed(1)}</span>
-                  </span>
-                )}
-                {isEngland && agg?.avg_idaopi != null && (
-                  <span className={`text-xs px-2.5 py-1 rounded-md font-medium ${badgeColor(Number(agg.avg_idaopi))}`}>
-                    Older people (IDAOPI): <span className="tabular-nums">{Number(agg.avg_idaopi).toFixed(1)}</span>
-                  </span>
-                )}
+            {/* Domain meters */}
+            <div className="rounded-lg border border-border bg-card p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-xs font-medium text-foreground">Domain deciles</div>
+                <div className="text-[10px] text-muted-foreground">0 least · 10 most deprived</div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2.5">
+                {(() => {
+                  const items: { key: string; label: string; value: number }[] = DOMAIN_KEYS.map((d) => ({
+                    key: d.key, label: d.label, value: agg ? Number((agg as any)[d.key] ?? 0) : 0,
+                  }));
+                  if (isEngland && agg?.avg_idaci != null) items.push({ key: "idaci", label: "Children (IDACI)", value: Number(agg.avg_idaci) });
+                  if (isEngland && agg?.avg_idaopi != null) items.push({ key: "idaopi", label: "Older people (IDAOPI)", value: Number(agg.avg_idaopi) });
+                  return items.map((it) => (
+                    <div key={it.key} className="flex items-center gap-2.5">
+                      <div className="w-24 sm:w-28 text-[11px] text-foreground/80 truncate">{it.label}</div>
+                      <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${meterColor(it.value)} transition-all`}
+                          style={{ width: `${Math.min(100, Math.max(0, (it.value / 10) * 100))}%` }}
+                        />
+                      </div>
+                      <div className="w-8 text-right text-[11px] font-semibold tabular-nums text-foreground">{it.value.toFixed(1)}</div>
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
+
 
             {/* Insights */}
             {insights.length > 0 && (
