@@ -164,25 +164,31 @@ async function discoverAllPatientCsvs(): Promise<Array<{ url: string; year: numb
   function addCsvLink(href: string, period: { year: number | null; month: number | null }): void {
     const url = href.startsWith("http") ? href : new URL(href, NHS_BASE).toString();
     const prev = seen.get(url);
-    // Prefer entries that have a year/month over null ones.
     if (!prev || (prev.year == null && period.year != null)) seen.set(url, period);
   }
 
-  function parseCsvLinks(html: string, period: { year: number | null; month: number | null }): void {
-    for (const m of html.matchAll(/href="([^"]+\.csv)"/gi)) {
-      const href = m[1];
-      // Canonical aggregate practice-level extract — TOTAL_ALL per practice.
-      // Accept the modern "all" file and the older "map" file (also totals).
-      // Skip demographic breakdowns and LSOA splits.
-      if (/gp-reg-pat-prac-(?:all|map)(?:[-_]v\d+)?\.csv$/i.test(href)) {
+  function processCsvCandidates(links: string[], period: { year: number | null; month: number | null }): void {
+    for (const href of links) {
+      if (!/\.csv($|\?)/i.test(href)) continue;
+      // Accept the modern "all" file and the older "map" file (both totals).
+      if (/gp-reg-pat-prac-(?:all|map)(?:[-_]v\d+)?\.csv/i.test(href)) {
         addCsvLink(href, period);
       }
     }
   }
 
   // Fetch main publication index
-  const mainHtml = await fetchHtmlSmart(PATIENT_INDEX_URL);
-  if (!mainHtml) throw new Error(`patient index unreachable (direct + firecrawl)`);
+  const mainPage = await fetchPageSmart(PATIENT_INDEX_URL);
+  if (!mainPage) throw new Error(`patient index unreachable (direct + firecrawl)`);
+  const indexPeriod = (() => {
+    const m = mainPage.html.match(/patients[- ]registered[- ]at[- ]a[- ]gp[- ]practice[, ]+([A-Za-z]+)[ -](20\d{2})/i);
+    if (m) {
+      const mn = m[1].toLowerCase();
+      return { year: +m[2], month: MONTHS[mn] ?? null };
+    }
+    return { year: null, month: null };
+  })();
+  processCsvCandidates(mainPage.links, indexPeriod);
   // Main index represents the latest publication — try to read the period from the index itself.
   const indexPeriod = (() => {
     const m = mainHtml.match(/patients[- ]registered[- ]at[- ]a[- ]gp[- ]practice[, ]+([A-Za-z]+)[ -](20\d{2})/i);
