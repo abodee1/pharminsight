@@ -203,9 +203,9 @@ async function discoverAllPatientCsvs(): Promise<Array<{ url: string; year: numb
     await Promise.all(
       subPageList.slice(i, i + BATCH).map(async (url) => {
         try {
-          const r = await fetch(url, { headers: FETCH_HEADERS, redirect: "follow" });
-          if (!r.ok) return;
-          parseCsvLinks(await r.text(), periodFromPubUrl(url));
+          const html = await fetchHtmlSmart(url);
+          if (!html) return;
+          parseCsvLinks(html, periodFromPubUrl(url));
         } catch {
           // ignore individual page failures silently
         }
