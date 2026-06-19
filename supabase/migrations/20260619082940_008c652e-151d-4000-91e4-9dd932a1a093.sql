@@ -1,0 +1,1 @@
+SELECT public.refresh_landing_cache();
