@@ -275,11 +275,14 @@ function StatusBadge({ status }: { status: string | null | undefined }) {
   );
 }
 
-function DatasetCard({ ds, stats, onRun, running }: {
+function DatasetCard({ ds, stats, onRun, onBackfill, running, backfilling, backfillProgress }: {
   ds: Dataset;
   stats: Stats;
   onRun: () => void;
+  onBackfill: () => void;
   running: boolean;
+  backfilling: boolean;
+  backfillProgress?: { done: number; remaining: number } | null;
 }) {
   const Icon = ds.icon;
   const lastSuccess = stats.latestSuccess;
