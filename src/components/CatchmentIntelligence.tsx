@@ -36,6 +36,12 @@ const RADII: { label: string; miles: number; metres: number }[] = [
   { label: "2 mi", miles: 2, metres: 3219 },
 ];
 
+const FALLBACK_RADII: { label: string; miles: number; metres: number }[] = [
+  ...RADII,
+  { label: "5 mi", miles: 5, metres: 8047 },
+  { label: "10 mi", miles: 10, metres: 16093 },
+];
+
 const DOMAIN_KEYS = [
   { key: "avg_income", label: "Income" },
   { key: "avg_employment", label: "Employment" },
@@ -94,6 +100,7 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
 
   const [radiusIdx, setRadiusIdx] = useState(1);
   const [agg, setAgg] = useState<Agg | null>(null);
+  const [effectiveRadius, setEffectiveRadius] = useState(RADII[1]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,19 +112,34 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
     (async () => {
       setLoading(true);
       setError(null);
-      const { data, error } = await supabase.rpc("deprivation_in_radius", {
-        p_lat: lat,
-        p_lng: lng,
-        p_radius_m: radius.metres,
-        p_nation: isScotland ? "scotland" : "england",
-      });
+      const attempts = FALLBACK_RADII.filter((r) => r.metres >= radius.metres);
+      let selectedAgg: Agg | null = null;
+      let selectedRadius = radius;
+      let selectedError: string | null = null;
+
+      for (const attempt of attempts) {
+        const { data, error } = await supabase.rpc("deprivation_in_radius", {
+          p_lat: lat,
+          p_lng: lng,
+          p_radius_m: attempt.metres,
+          p_nation: isScotland ? "scotland" : "england",
+        });
+        if (error) {
+          selectedError = error.message;
+          break;
+        }
+        const row = (Array.isArray(data) ? data[0] : data) as Agg | null;
+        selectedAgg = row ?? null;
+        selectedRadius = attempt;
+        if ((row?.zone_count ?? 0) > 0) break;
+      }
       if (cancelled) return;
-      if (error) {
-        setError(error.message);
+      if (selectedError) {
+        setError(selectedError);
         setAgg(null);
       } else {
-        const row = Array.isArray(data) ? data[0] : data;
-        setAgg(row ?? null);
+        setAgg(selectedAgg);
+        setEffectiveRadius(selectedRadius);
       }
       setLoading(false);
     })();
@@ -144,6 +166,7 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
   const band = bandFor(overall);
   const zoneCount = agg?.zone_count ?? 0;
   const zoneLabel = isEngland ? "LSOAs" : "Data Zones";
+  const usingFallback = effectiveRadius.metres !== radius.metres;
 
   const radarData = DOMAIN_KEYS.map((d) => {
     const v = agg ? (agg as any)[d.key] : null;
@@ -207,8 +230,7 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
 
         {!loading && !error && zoneCount === 0 && (
           <div className="rounded-md border border-dashed border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
-            No deprivation areas found within {radius.label} of this pharmacy. Try a wider radius, or
-            data ingestion for this nation may be pending.
+            No deprivation areas found within {effectiveRadius.label} of this pharmacy.
           </div>
         )}
 
@@ -221,7 +243,8 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
                   {band.label}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1.5">
-                  Based on {zoneCount} {zoneCount === 1 ? zoneLabel.slice(0, -1) : zoneLabel.toLowerCase()} within {radius.label}.
+                  Based on {zoneCount} {zoneCount === 1 ? zoneLabel.slice(0, -1) : zoneLabel.toLowerCase()} within {effectiveRadius.label}.
+                  {usingFallback && <> No zones were found inside {radius.label}, so the nearest wider catchment is shown.</>}
                   {overall != null && <> Average overall decile: <span className="font-medium text-foreground">{overall.toFixed(1)}</span> / 10.</>}
                 </div>
               </div>
@@ -275,9 +298,9 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
             {/* Footer */}
             <p className="text-[11px] text-muted-foreground pt-2 border-t border-border/60">
               {isEngland ? (
-                <>Catchment based on {zoneCount} LSOAs within {radius.label}. Deprivation data: English Indices of Deprivation 2025 (IMD25), MHCLG. Open Government Licence v3.0.</>
+                <>Catchment based on {zoneCount} LSOAs within {effectiveRadius.label}. Deprivation data: English Indices of Deprivation 2025 (IMD25), MHCLG. Open Government Licence v3.0.</>
               ) : (
-                <>Catchment based on {zoneCount} Data Zones within {radius.label}. Deprivation data: Scottish Index of Multiple Deprivation 2020v2 (SIMD), Scottish Government / NHS Scotland. Open Government Licence v3.0.</>
+                <>Catchment based on {zoneCount} Data Zones within {effectiveRadius.label}. Deprivation data: Scottish Index of Multiple Deprivation 2020v2 (SIMD), Scottish Government / NHS Scotland. Open Government Licence v3.0.</>
               )}
             </p>
           </>
