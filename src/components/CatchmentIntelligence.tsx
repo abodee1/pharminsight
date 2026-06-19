@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Users, TrendingDown, TrendingUp, MapPin } from "lucide-react";
+import { Loader2, Users, TrendingDown, TrendingUp, MapPin, Info } from "lucide-react";
 import {
   Radar,
   RadarChart,
@@ -121,6 +121,7 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
   const [selectedDecile, setSelectedDecile] = useState<number | null>(null);
   const [zoneList, setZoneList] = useState<{ zone_code: string; zone_name: string; overall_decile: number; population: number | null; dist_m: number }[] | null>(null);
   const [zoneListLoading, setZoneListLoading] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   const radius = RADII[radiusIdx];
 
@@ -236,10 +237,24 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
   return (
     <div className="mt-6 rounded-lg bg-card border border-border shadow-sm overflow-hidden">
       <div className="px-4 md:px-5 py-4 border-b border-border">
-        <h2 className="text-base font-semibold">Catchment Intelligence</h2>
-        <p className="text-xs text-muted-foreground mt-1">
-          Deprivation profile of the population within your catchment area.
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold">Catchment Intelligence</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Deprivation profile of the population within your catchment area.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowInfo(!showInfo)}
+            aria-expanded={showInfo}
+            className={`shrink-0 inline-flex items-center justify-center rounded-full p-1.5 transition-colors ${showInfo ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+            aria-label="What do these figures mean?"
+            title="What do these figures mean?"
+          >
+            <Info className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <div className="p-4 md:p-5 space-y-5">
