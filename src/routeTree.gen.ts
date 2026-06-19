@@ -41,6 +41,7 @@ import { Route as ApiPublicHooksIngestNiRouteImport } from './routes/api/public/
 import { Route as ApiPublicHooksIngestEnglandGpListsizeRouteImport } from './routes/api/public/hooks/ingest-england-gp-listsize'
 import { Route as ApiPublicHooksIngestEnglandGpRouteImport } from './routes/api/public/hooks/ingest-england-gp'
 import { Route as ApiPublicHooksIngestEnglandRouteImport } from './routes/api/public/hooks/ingest-england'
+import { Route as ApiPublicHooksIngestDeprivationRouteImport } from './routes/api/public/hooks/ingest-deprivation'
 import { Route as ApiPublicHooksCheckDataFreshnessRouteImport } from './routes/api/public/hooks/check-data-freshness'
 
 const RegisterRoute = RegisterRouteImport.update({
@@ -222,6 +223,12 @@ const ApiPublicHooksIngestEnglandRoute =
     path: '/api/public/hooks/ingest-england',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksIngestDeprivationRoute =
+  ApiPublicHooksIngestDeprivationRouteImport.update({
+    id: '/api/public/hooks/ingest-deprivation',
+    path: '/api/public/hooks/ingest-deprivation',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksCheckDataFreshnessRoute =
   ApiPublicHooksCheckDataFreshnessRouteImport.update({
     id: '/api/public/hooks/check-data-freshness',
@@ -250,6 +257,7 @@ export interface FileRoutesByFullPath {
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/gp-surgeries/$code': typeof AuthenticatedGpSurgeriesCodeRoute
   '/api/public/hooks/check-data-freshness': typeof ApiPublicHooksCheckDataFreshnessRoute
+  '/api/public/hooks/ingest-deprivation': typeof ApiPublicHooksIngestDeprivationRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-england-gp': typeof ApiPublicHooksIngestEnglandGpRoute
   '/api/public/hooks/ingest-england-gp-listsize': typeof ApiPublicHooksIngestEnglandGpListsizeRoute
@@ -284,6 +292,7 @@ export interface FileRoutesByTo {
   '/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/gp-surgeries/$code': typeof AuthenticatedGpSurgeriesCodeRoute
   '/api/public/hooks/check-data-freshness': typeof ApiPublicHooksCheckDataFreshnessRoute
+  '/api/public/hooks/ingest-deprivation': typeof ApiPublicHooksIngestDeprivationRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-england-gp': typeof ApiPublicHooksIngestEnglandGpRoute
   '/api/public/hooks/ingest-england-gp-listsize': typeof ApiPublicHooksIngestEnglandGpListsizeRoute
@@ -320,6 +329,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/payments-import': typeof AuthenticatedAdminPaymentsImportRoute
   '/_authenticated/gp-surgeries/$code': typeof AuthenticatedGpSurgeriesCodeRoute
   '/api/public/hooks/check-data-freshness': typeof ApiPublicHooksCheckDataFreshnessRoute
+  '/api/public/hooks/ingest-deprivation': typeof ApiPublicHooksIngestDeprivationRoute
   '/api/public/hooks/ingest-england': typeof ApiPublicHooksIngestEnglandRoute
   '/api/public/hooks/ingest-england-gp': typeof ApiPublicHooksIngestEnglandGpRoute
   '/api/public/hooks/ingest-england-gp-listsize': typeof ApiPublicHooksIngestEnglandGpListsizeRoute
@@ -356,6 +366,7 @@ export interface FileRouteTypes {
     | '/admin/payments-import'
     | '/gp-surgeries/$code'
     | '/api/public/hooks/check-data-freshness'
+    | '/api/public/hooks/ingest-deprivation'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-england-gp'
     | '/api/public/hooks/ingest-england-gp-listsize'
@@ -390,6 +401,7 @@ export interface FileRouteTypes {
     | '/admin/payments-import'
     | '/gp-surgeries/$code'
     | '/api/public/hooks/check-data-freshness'
+    | '/api/public/hooks/ingest-deprivation'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-england-gp'
     | '/api/public/hooks/ingest-england-gp-listsize'
@@ -425,6 +437,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/payments-import'
     | '/_authenticated/gp-surgeries/$code'
     | '/api/public/hooks/check-data-freshness'
+    | '/api/public/hooks/ingest-deprivation'
     | '/api/public/hooks/ingest-england'
     | '/api/public/hooks/ingest-england-gp'
     | '/api/public/hooks/ingest-england-gp-listsize'
@@ -446,6 +459,7 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   PharmacyOdsCodeRoute: typeof PharmacyOdsCodeRoute
   ApiPublicHooksCheckDataFreshnessRoute: typeof ApiPublicHooksCheckDataFreshnessRoute
+  ApiPublicHooksIngestDeprivationRoute: typeof ApiPublicHooksIngestDeprivationRoute
   ApiPublicHooksIngestEnglandRoute: typeof ApiPublicHooksIngestEnglandRoute
   ApiPublicHooksIngestEnglandGpRoute: typeof ApiPublicHooksIngestEnglandGpRoute
   ApiPublicHooksIngestEnglandGpListsizeRoute: typeof ApiPublicHooksIngestEnglandGpListsizeRoute
@@ -686,6 +700,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksIngestEnglandRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/ingest-deprivation': {
+      id: '/api/public/hooks/ingest-deprivation'
+      path: '/api/public/hooks/ingest-deprivation'
+      fullPath: '/api/public/hooks/ingest-deprivation'
+      preLoaderRoute: typeof ApiPublicHooksIngestDeprivationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/check-data-freshness': {
       id: '/api/public/hooks/check-data-freshness'
       path: '/api/public/hooks/check-data-freshness'
@@ -755,6 +776,7 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   PharmacyOdsCodeRoute: PharmacyOdsCodeRoute,
   ApiPublicHooksCheckDataFreshnessRoute: ApiPublicHooksCheckDataFreshnessRoute,
+  ApiPublicHooksIngestDeprivationRoute: ApiPublicHooksIngestDeprivationRoute,
   ApiPublicHooksIngestEnglandRoute: ApiPublicHooksIngestEnglandRoute,
   ApiPublicHooksIngestEnglandGpRoute: ApiPublicHooksIngestEnglandGpRoute,
   ApiPublicHooksIngestEnglandGpListsizeRoute:
