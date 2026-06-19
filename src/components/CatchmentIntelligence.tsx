@@ -115,6 +115,7 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
 
   const [radiusIdx, setRadiusIdx] = useState(1);
   const [agg, setAgg] = useState<Agg | null>(null);
+  const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
   const [effectiveRadius, setEffectiveRadius] = useState(RADII[1]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,24 +128,26 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
     (async () => {
       setLoading(true);
       setError(null);
+      const nation = isScotland ? "scotland" : "england";
       const attempts = FALLBACK_RADII.filter((r) => r.metres >= radius.metres);
       let selectedAgg: Agg | null = null;
+      let selectedBreakdown: Breakdown | null = null;
       let selectedRadius = radius;
       let selectedError: string | null = null;
 
       for (const attempt of attempts) {
-        const { data, error } = await supabase.rpc("deprivation_in_radius", {
-          p_lat: lat,
-          p_lng: lng,
-          p_radius_m: attempt.metres,
-          p_nation: isScotland ? "scotland" : "england",
-        });
-        if (error) {
-          selectedError = error.message;
-          break;
-        }
-        const row = (Array.isArray(data) ? data[0] : data) as Agg | null;
+        const [aggRes, brkRes] = await Promise.all([
+          supabase.rpc("deprivation_in_radius", {
+            p_lat: lat, p_lng: lng, p_radius_m: attempt.metres, p_nation: nation,
+          }),
+          supabase.rpc("catchment_breakdown", {
+            p_lat: lat, p_lng: lng, p_radius_m: attempt.metres, p_nation: nation,
+          }),
+        ]);
+        if (aggRes.error) { selectedError = aggRes.error.message; break; }
+        const row = (Array.isArray(aggRes.data) ? aggRes.data[0] : aggRes.data) as Agg | null;
         selectedAgg = row ?? null;
+        selectedBreakdown = (brkRes.data as Breakdown | null) ?? null;
         selectedRadius = attempt;
         if ((row?.zone_count ?? 0) > 0) break;
       }
@@ -152,8 +155,10 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
       if (selectedError) {
         setError(selectedError);
         setAgg(null);
+        setBreakdown(null);
       } else {
         setAgg(selectedAgg);
+        setBreakdown(selectedBreakdown);
         setEffectiveRadius(selectedRadius);
       }
       setLoading(false);
