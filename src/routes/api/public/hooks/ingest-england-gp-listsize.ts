@@ -105,12 +105,19 @@ const FETCH_HEADERS = {
 };
 const NHS_BASE = "https://digital.nhs.uk";
 
-// NHS Digital sits behind Cloudflare and 403s Worker IPs. Fall back to Firecrawl
-// (residential proxy + headless browser) when direct fetch is blocked.
-async function fetchHtmlSmart(url: string): Promise<string | null> {
+// NHS Digital sits behind Cloudflare and 403s Worker IPs. Returns extracted
+// links (preferred — survives Firecrawl's HTML post-processing) plus raw HTML
+// (best-effort, used for period detection from index headings).
+async function fetchPageSmart(url: string): Promise<{ html: string; links: string[] } | null> {
+  // Direct fetch first
   try {
     const r = await fetch(url, { headers: FETCH_HEADERS, redirect: "follow" });
-    if (r.ok) return await r.text();
+    if (r.ok) {
+      const html = await r.text();
+      const links: string[] = [];
+      for (const m of html.matchAll(/href="([^"#?]+)"/gi)) links.push(m[1]);
+      return { html, links };
+    }
   } catch {
     // fall through
   }
@@ -120,11 +127,14 @@ async function fetchHtmlSmart(url: string): Promise<string | null> {
     const r = await fetch("https://api.firecrawl.dev/v2/scrape", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${fcKey}` },
-      body: JSON.stringify({ url, formats: ["html"], onlyMainContent: false }),
+      body: JSON.stringify({ url, formats: ["html", "links"], onlyMainContent: false }),
     });
     if (!r.ok) return null;
-    const j = await r.json() as { data?: { html?: string; rawHtml?: string } };
-    return j.data?.html ?? j.data?.rawHtml ?? null;
+    const j = await r.json() as { data?: { html?: string; rawHtml?: string; links?: string[] } };
+    return {
+      html: j.data?.html ?? j.data?.rawHtml ?? "",
+      links: j.data?.links ?? [],
+    };
   } catch {
     return null;
   }
