@@ -105,6 +105,31 @@ const FETCH_HEADERS = {
 };
 const NHS_BASE = "https://digital.nhs.uk";
 
+// NHS Digital sits behind Cloudflare and 403s Worker IPs. Fall back to Firecrawl
+// (residential proxy + headless browser) when direct fetch is blocked.
+async function fetchHtmlSmart(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url, { headers: FETCH_HEADERS, redirect: "follow" });
+    if (r.ok) return await r.text();
+  } catch {
+    // fall through
+  }
+  const fcKey = process.env.FIRECRAWL_API_KEY;
+  if (!fcKey) return null;
+  try {
+    const r = await fetch("https://api.firecrawl.dev/v2/scrape", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${fcKey}` },
+      body: JSON.stringify({ url, formats: ["html"], onlyMainContent: false }),
+    });
+    if (!r.ok) return null;
+    const j = await r.json() as { data?: { html?: string; rawHtml?: string } };
+    return j.data?.html ?? j.data?.rawHtml ?? null;
+  } catch {
+    return null;
+  }
+}
+
 const MONTHS: Record<string, number> = {
   january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
   july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
