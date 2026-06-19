@@ -981,6 +981,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      catchment_breakdown: {
+        Args: {
+          p_lat: number
+          p_lng: number
+          p_nation: string
+          p_radius_m: number
+        }
+        Returns: Json
+      }
       country_monthly_aggregates: {
         Args: {
           p_country: string

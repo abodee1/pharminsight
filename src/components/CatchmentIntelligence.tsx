@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Users, TrendingDown, TrendingUp, MapPin } from "lucide-react";
 import {
   Radar,
   RadarChart,
@@ -28,6 +28,21 @@ type Agg = {
   avg_access: number | null;
   avg_idaci: number | null;
   avg_idaopi: number | null;
+  total_population: number | null;
+};
+
+type Breakdown = {
+  distribution: { decile: number; zone_count: number; population: number }[];
+  most_deprived: { zone_name: string; overall_decile: number; population: number | null } | null;
+  least_deprived: { zone_name: string; overall_decile: number; population: number | null } | null;
+  totals: {
+    total_pop: number;
+    pop_most_deprived_30: number;
+    pop_least_deprived_30: number;
+    zones_most_deprived_30: number;
+    avg_idaci: number | null;
+    avg_idaopi: number | null;
+  } | null;
 };
 
 const RADII: { label: string; miles: number; metres: number }[] = [
@@ -100,6 +115,7 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
 
   const [radiusIdx, setRadiusIdx] = useState(1);
   const [agg, setAgg] = useState<Agg | null>(null);
+  const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
   const [effectiveRadius, setEffectiveRadius] = useState(RADII[1]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,24 +128,26 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
     (async () => {
       setLoading(true);
       setError(null);
+      const nation = isScotland ? "scotland" : "england";
       const attempts = FALLBACK_RADII.filter((r) => r.metres >= radius.metres);
       let selectedAgg: Agg | null = null;
+      let selectedBreakdown: Breakdown | null = null;
       let selectedRadius = radius;
       let selectedError: string | null = null;
 
       for (const attempt of attempts) {
-        const { data, error } = await supabase.rpc("deprivation_in_radius", {
-          p_lat: lat,
-          p_lng: lng,
-          p_radius_m: attempt.metres,
-          p_nation: isScotland ? "scotland" : "england",
-        });
-        if (error) {
-          selectedError = error.message;
-          break;
-        }
-        const row = (Array.isArray(data) ? data[0] : data) as Agg | null;
+        const [aggRes, brkRes] = await Promise.all([
+          supabase.rpc("deprivation_in_radius", {
+            p_lat: lat, p_lng: lng, p_radius_m: attempt.metres, p_nation: nation,
+          }),
+          supabase.rpc("catchment_breakdown", {
+            p_lat: lat, p_lng: lng, p_radius_m: attempt.metres, p_nation: nation,
+          }),
+        ]);
+        if (aggRes.error) { selectedError = aggRes.error.message; break; }
+        const row = (Array.isArray(aggRes.data) ? aggRes.data[0] : aggRes.data) as Agg | null;
         selectedAgg = row ?? null;
+        selectedBreakdown = (brkRes.data as Breakdown | null) ?? null;
         selectedRadius = attempt;
         if ((row?.zone_count ?? 0) > 0) break;
       }
@@ -137,8 +155,10 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
       if (selectedError) {
         setError(selectedError);
         setAgg(null);
+        setBreakdown(null);
       } else {
         setAgg(selectedAgg);
+        setBreakdown(selectedBreakdown);
         setEffectiveRadius(selectedRadius);
       }
       setLoading(false);
@@ -268,31 +288,156 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
               </ResponsiveContainer>
             </div>
 
+            {/* Population & concentration stats */}
+            {(() => {
+              const totals = breakdown?.totals;
+              const totalPop = totals?.total_pop ?? agg?.total_population ?? 0;
+              const popMost = totals?.pop_most_deprived_30 ?? 0;
+              const popLeast = totals?.pop_least_deprived_30 ?? 0;
+              const pctMost = totalPop > 0 ? Math.round((popMost / totalPop) * 100) : 0;
+              const pctLeast = totalPop > 0 ? Math.round((popLeast / totalPop) * 100) : 0;
+              const areaSqMi = Math.PI * effectiveRadius.miles * effectiveRadius.miles;
+              const density = areaSqMi > 0 ? Math.round(totalPop / areaSqMi) : 0;
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="rounded-md border border-border bg-secondary/30 p-3">
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
+                      <Users className="h-3 w-3" /> Population
+                    </div>
+                    <div className="text-lg font-semibold tabular-nums mt-1">{totalPop.toLocaleString()}</div>
+                    <div className="text-[11px] text-muted-foreground">≈{density.toLocaleString()}/sq mi</div>
+                  </div>
+                  <div className="rounded-md border border-border bg-secondary/30 p-3">
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
+                      <TrendingDown className="h-3 w-3 text-red-600" /> In most deprived 30%
+                    </div>
+                    <div className="text-lg font-semibold tabular-nums mt-1">{pctMost}%</div>
+                    <div className="text-[11px] text-muted-foreground">{popMost.toLocaleString()} residents</div>
+                  </div>
+                  <div className="rounded-md border border-border bg-secondary/30 p-3">
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
+                      <TrendingUp className="h-3 w-3 text-green-600" /> In least deprived 30%
+                    </div>
+                    <div className="text-lg font-semibold tabular-nums mt-1">{pctLeast}%</div>
+                    <div className="text-[11px] text-muted-foreground">{popLeast.toLocaleString()} residents</div>
+                  </div>
+                  <div className="rounded-md border border-border bg-secondary/30 p-3">
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
+                      <MapPin className="h-3 w-3" /> Catchment area
+                    </div>
+                    <div className="text-lg font-semibold tabular-nums mt-1">{areaSqMi.toFixed(1)} <span className="text-xs font-normal text-muted-foreground">sq mi</span></div>
+                    <div className="text-[11px] text-muted-foreground">{zoneCount} {zoneLabel.toLowerCase()}</div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Decile distribution bar */}
+            {breakdown && breakdown.distribution.length > 0 && (() => {
+              const totalPop = breakdown.totals?.total_pop ?? 0;
+              const decileColors: Record<number, string> = {
+                1: "bg-red-700", 2: "bg-red-600", 3: "bg-orange-600",
+                4: "bg-orange-500", 5: "bg-amber-500", 6: "bg-amber-400",
+                7: "bg-lime-500", 8: "bg-lime-600", 9: "bg-green-600", 10: "bg-green-700",
+              };
+              return (
+                <div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                    <span className="font-medium text-foreground">Population by deprivation decile</span>
+                    <span>1 = most deprived → 10 = least</span>
+                  </div>
+                  <div className="flex h-6 w-full rounded-md overflow-hidden border border-border">
+                    {[1,2,3,4,5,6,7,8,9,10].map((d) => {
+                      const row = breakdown.distribution.find((r) => r.decile === d);
+                      const pop = row?.population ?? 0;
+                      const pct = totalPop > 0 ? (pop / totalPop) * 100 : 0;
+                      if (pct <= 0) return null;
+                      return (
+                        <div
+                          key={d}
+                          className={`${decileColors[d]} h-full flex items-center justify-center text-[10px] font-medium text-white`}
+                          style={{ width: `${pct}%` }}
+                          title={`Decile ${d}: ${pop.toLocaleString()} (${pct.toFixed(1)}%) · ${row?.zone_count ?? 0} ${zoneLabel.toLowerCase()}`}
+                        >
+                          {pct >= 8 ? `${Math.round(pct)}%` : ""}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-between text-[10px] text-muted-foreground mt-1 px-0.5">
+                    <span>Decile 1</span><span>5</span><span>Decile 10</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Most & least deprived zones */}
+            {breakdown && (breakdown.most_deprived || breakdown.least_deprived) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {breakdown.most_deprived && (
+                  <div className="rounded-md border-l-4 border-red-600 bg-secondary/30 px-3 py-2">
+                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Most deprived nearby</div>
+                    <div className="text-sm font-medium mt-0.5">{breakdown.most_deprived.zone_name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Decile {breakdown.most_deprived.overall_decile}
+                      {breakdown.most_deprived.population != null && <> · {breakdown.most_deprived.population.toLocaleString()} residents</>}
+                    </div>
+                  </div>
+                )}
+                {breakdown.least_deprived && (
+                  <div className="rounded-md border-l-4 border-green-600 bg-secondary/30 px-3 py-2">
+                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Least deprived nearby</div>
+                    <div className="text-sm font-medium mt-0.5">{breakdown.least_deprived.zone_name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Decile {breakdown.least_deprived.overall_decile}
+                      {breakdown.least_deprived.population != null && <> · {breakdown.least_deprived.population.toLocaleString()} residents</>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Domain badges */}
-            <div className="flex flex-wrap gap-2">
-              {DOMAIN_KEYS.map((d) => {
-                const v = agg ? Number((agg as any)[d.key] ?? 0) : 0;
-                return (
-                  <span
-                    key={d.key}
-                    className={`text-xs px-2.5 py-1 rounded-md font-medium ${badgeColor(v)}`}
-                  >
-                    {d.label}: <span className="tabular-nums">{v.toFixed(1)}</span>
+            <div>
+              <div className="text-xs font-medium text-foreground mb-1.5">Domain deciles</div>
+              <div className="flex flex-wrap gap-2">
+                {DOMAIN_KEYS.map((d) => {
+                  const v = agg ? Number((agg as any)[d.key] ?? 0) : 0;
+                  return (
+                    <span
+                      key={d.key}
+                      className={`text-xs px-2.5 py-1 rounded-md font-medium ${badgeColor(v)}`}
+                    >
+                      {d.label}: <span className="tabular-nums">{v.toFixed(1)}</span>
+                    </span>
+                  );
+                })}
+                {isEngland && agg?.avg_idaci != null && (
+                  <span className={`text-xs px-2.5 py-1 rounded-md font-medium ${badgeColor(Number(agg.avg_idaci))}`}>
+                    Children (IDACI): <span className="tabular-nums">{Number(agg.avg_idaci).toFixed(1)}</span>
                   </span>
-                );
-              })}
+                )}
+                {isEngland && agg?.avg_idaopi != null && (
+                  <span className={`text-xs px-2.5 py-1 rounded-md font-medium ${badgeColor(Number(agg.avg_idaopi))}`}>
+                    Older people (IDAOPI): <span className="tabular-nums">{Number(agg.avg_idaopi).toFixed(1)}</span>
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Insights */}
             {insights.length > 0 && (
-              <ul className="space-y-2 text-sm leading-relaxed">
-                {insights.map((s, i) => (
-                  <li key={i} className="flex gap-2">
-                    <span className="text-primary mt-1">•</span>
-                    <span>{s}</span>
-                  </li>
-                ))}
-              </ul>
+              <div>
+                <div className="text-xs font-medium text-foreground mb-1.5">Service opportunities</div>
+                <ul className="space-y-2 text-sm leading-relaxed">
+                  {insights.map((s, i) => (
+                    <li key={i} className="flex gap-2">
+                      <span className="text-primary mt-1">•</span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {/* Footer */}
