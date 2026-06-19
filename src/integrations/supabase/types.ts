@@ -1028,6 +1028,15 @@ export type Database = {
           zone_count: number
         }[]
       }
+      deprivation_set_centroids: {
+        Args: {
+          p_codes: string[]
+          p_lats: number[]
+          p_lngs: number[]
+          p_nation: string
+        }
+        Returns: number
+      }
       gp_practices_near: {
         Args: {
           p_lat: number
