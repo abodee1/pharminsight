@@ -171,9 +171,8 @@ async function discoverAllPatientCsvs(): Promise<Array<{ url: string; year: numb
   }
 
   // Fetch main publication index
-  const mainRes = await fetch(PATIENT_INDEX_URL, { headers: FETCH_HEADERS, redirect: "follow" });
-  if (!mainRes.ok) throw new Error(`patient index ${mainRes.status}`);
-  const mainHtml = await mainRes.text();
+  const mainHtml = await fetchHtmlSmart(PATIENT_INDEX_URL);
+  if (!mainHtml) throw new Error(`patient index unreachable (direct + firecrawl)`);
   // Main index represents the latest publication — try to read the period from the index itself.
   const indexPeriod = (() => {
     const m = mainHtml.match(/patients[- ]registered[- ]at[- ]a[- ]gp[- ]practice[, ]+([A-Za-z]+)[ -](20\d{2})/i);
