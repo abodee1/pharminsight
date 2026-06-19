@@ -24,6 +24,7 @@ import { fetchAll } from "@/lib/fetchAll";
 import { cn } from "@/lib/utils";
 import { setViewedPharmacy, clearViewedPharmacy } from "@/lib/viewedPharmacy";
 import { pharmacyDisplayName } from "@/lib/pharmacyName";
+import { CatchmentIntelligence } from "@/components/CatchmentIntelligence";
 
 type WindowKey = 1 | 3 | 6 | 12;
 
@@ -788,55 +789,7 @@ function PharmacyProfile() {
           )}
           */}
 
-          <div className="mt-6 rounded-lg bg-card border border-border shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Monthly history — last 24 months</h2>
-              <span className="text-xs text-muted-foreground">Newest first</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-secondary/40 text-xs uppercase text-muted-foreground">
-                  <tr>
-                    <th className="text-left px-3 py-2 font-medium">Month</th>
-                    <th className="text-right px-3 py-2 font-medium">Items</th>
-                    {isEngland && <th className="text-right px-3 py-2 font-medium">EPS items</th>}
-                    {isEngland && <th className="text-right px-3 py-2 font-medium">EPS nom.</th>}
-                    {isEngland && <th className="text-right px-3 py-2 font-medium">NMS</th>}
-                    <th className="text-right px-3 py-2 font-medium">PF</th>
-                    <th className="text-right px-3 py-2 font-medium">PF £</th>
-                    {isScotland && <th className="text-right px-3 py-2 font-medium">EHC</th>}
-                    {isScotland && <th className="text-right px-3 py-2 font-medium">Meth.</th>}
-                    {isScotland && <th className="text-right px-3 py-2 font-medium">Smoke.</th>}
-                    {isScotland && <th className="text-right px-3 py-2 font-medium">MCR £</th>}
-                    {(isScotland || isWales) && <th className="text-right px-3 py-2 font-medium">Gross £</th>}
-                    {(isScotland || isWales) && <th className="text-right px-3 py-2 font-medium">Final £</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {tableRows.map((r) => {
-                    const fmtGbp = (v: number | string | null) => "£" + (Number(v) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
-                    return (
-                      <tr key={`${r.year}-${r.month}`} className="border-t border-border">
-                        <td className="px-3 py-2 whitespace-nowrap">{MONTHS[r.month - 1]} {r.year}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{r.items_dispensed.toLocaleString()}</td>
-                        {isEngland && <td className="px-3 py-2 text-right tabular-nums">{r.eps_items.toLocaleString()}</td>}
-                        {isEngland && <td className="px-3 py-2 text-right tabular-nums">{r.eps_nominations.toLocaleString()}</td>}
-                        {isEngland && <td className="px-3 py-2 text-right tabular-nums">{r.nms_count.toLocaleString()}</td>}
-                        <td className="px-3 py-2 text-right tabular-nums">{r.pharmacy_first_count.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.pharmacy_first_payment)}</td>
-                        {isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.ehc_items.toLocaleString()}</td>}
-                        {isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.methadone_items.toLocaleString()}</td>}
-                        {isScotland && <td className="px-3 py-2 text-right tabular-nums">{r.smoking_cessation.toLocaleString()}</td>}
-                        {isScotland && <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.mcr_payment)}</td>}
-                        {(isScotland || isWales) && <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.gross_cost)}</td>}
-                        {(isScotland || isWales) && <td className="px-3 py-2 text-right tabular-nums">{fmtGbp(r.final_payment)}</td>}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <CatchmentIntelligence lat={pharmacy.lat} lng={pharmacy.lng} country={pharmacy.country} />
         </>
       )}
 
