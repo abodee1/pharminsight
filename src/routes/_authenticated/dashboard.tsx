@@ -24,6 +24,7 @@ import { clearViewedPharmacy } from "@/lib/viewedPharmacy";
 import { DataAttribution } from "@/components/DataAttribution";
 import { pharmacyDisplayName } from "@/lib/pharmacyName";
 import { PharmacySearch } from "@/components/PharmacySearch";
+import { CatchmentIntelligence } from "@/components/CatchmentIntelligence";
 
 type WindowKey = 1 | 3 | 6 | 12;
 
