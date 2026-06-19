@@ -356,22 +356,23 @@ function Leaderboards() {
           </div>
         </div>
 
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-muted-foreground">
             <tr>
-              <th className="text-left px-4 py-2 font-medium">
+              <th className="text-left px-2 md:px-4 py-2 font-medium">
                 <button onClick={() => toggleSort("rank")} className="hover:text-foreground transition-colors">
                   # {sortIcon("rank")}
                 </button>
               </th>
-              <th className="text-left px-4 py-2 font-medium">Pharmacy</th>
-              <th className="text-left px-4 py-2 font-medium">{country === "Scotland" ? "Health Board" : "ICB"}</th>
-              <th className="text-right px-4 py-2 font-medium">
+              <th className="text-left px-2 md:px-4 py-2 font-medium">Pharmacy</th>
+              <th className="hidden md:table-cell text-left px-4 py-2 font-medium">{country === "Scotland" ? "Health Board" : "ICB"}</th>
+              <th className="text-right px-2 md:px-4 py-2 font-medium">
                 <button onClick={() => toggleSort("count")} className="hover:text-foreground transition-colors">
                   Count {sortIcon("count")}
                 </button>
               </th>
-              <th className="text-right px-4 py-2 font-medium">
+              <th className="text-right px-2 md:px-4 py-2 font-medium whitespace-nowrap">
                 <button onClick={() => toggleSort("change")} className="hover:text-foreground transition-colors">
                   vs prior {sortIcon("change")}
                 </button>
@@ -391,22 +392,25 @@ function Leaderboards() {
               const pct = board.length > 1 ? Math.round((1 - (r.rank - 1) / board.length) * 100) : null;
               return (
                 <tr key={r.ph.id} className={isMine ? "bg-gold/15" : "border-t border-border"}>
-                  <td className="px-4 py-2 font-semibold tabular-nums">
+                  <td className="px-2 md:px-4 py-2 font-semibold tabular-nums align-top">
                     {r.rank}
                     {pct !== null && (
-                      <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">Top {pct}%</span>
+                      <span className="hidden md:inline ml-1.5 text-[10px] font-normal text-muted-foreground">Top {pct}%</span>
                     )}
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-2 md:px-4 py-2 min-w-0">
                     <div className="flex items-baseline gap-2 flex-wrap">
-                      <span>{pharmacyDisplayName(r.ph.name, r.ph.trading_name, r.ph.ods_code)}</span>
+                      <span className="break-words">{pharmacyDisplayName(r.ph.name, r.ph.trading_name, r.ph.ods_code)}</span>
                       {isMine && <span className="text-xs text-gold font-semibold">YOU</span>}
                     </div>
-                    {r.ph.address && <p className="text-[11px] text-muted-foreground truncate max-w-xs">{r.ph.address}</p>}
+                    {r.ph.region && (
+                      <p className="md:hidden text-[11px] text-muted-foreground truncate">{r.ph.region}</p>
+                    )}
+                    {r.ph.address && <p className="hidden md:block text-[11px] text-muted-foreground truncate max-w-xs">{r.ph.address}</p>}
                   </td>
-                  <td className="px-4 py-2 text-muted-foreground">{r.ph.region}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{r.value.toLocaleString()}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">
+                  <td className="hidden md:table-cell px-4 py-2 text-muted-foreground">{r.ph.region}</td>
+                  <td className="px-2 md:px-4 py-2 text-right tabular-nums whitespace-nowrap">{r.value.toLocaleString()}</td>
+                  <td className="px-2 md:px-4 py-2 text-right tabular-nums whitespace-nowrap">
                     {r.isNew ? (
                       <span className="text-muted-foreground text-xs">new</span>
                     ) : r.change === 0 ? (
@@ -422,6 +426,8 @@ function Leaderboards() {
             })}
           </tbody>
         </table>
+        </div>
+
 
         {!loading && (
           <div className="flex justify-between items-center px-4 py-3 text-xs text-muted-foreground border-t border-border">
