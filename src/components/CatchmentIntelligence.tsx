@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Users, TrendingDown, TrendingUp, MapPin } from "lucide-react";
 import {
   Radar,
   RadarChart,
@@ -28,6 +28,21 @@ type Agg = {
   avg_access: number | null;
   avg_idaci: number | null;
   avg_idaopi: number | null;
+  total_population: number | null;
+};
+
+type Breakdown = {
+  distribution: { decile: number; zone_count: number; population: number }[];
+  most_deprived: { zone_name: string; overall_decile: number; population: number | null } | null;
+  least_deprived: { zone_name: string; overall_decile: number; population: number | null } | null;
+  totals: {
+    total_pop: number;
+    pop_most_deprived_30: number;
+    pop_least_deprived_30: number;
+    zones_most_deprived_30: number;
+    avg_idaci: number | null;
+    avg_idaopi: number | null;
+  } | null;
 };
 
 const RADII: { label: string; miles: number; metres: number }[] = [
