@@ -49,13 +49,12 @@ const RADII: { label: string; miles: number; metres: number }[] = [
   { label: "0.5 mi", miles: 0.5, metres: 805 },
   { label: "1 mi", miles: 1, metres: 1609 },
   { label: "2 mi", miles: 2, metres: 3219 },
-];
-
-const FALLBACK_RADII: { label: string; miles: number; metres: number }[] = [
-  ...RADII,
+  { label: "3 mi", miles: 3, metres: 4828 },
   { label: "5 mi", miles: 5, metres: 8047 },
   { label: "10 mi", miles: 10, metres: 16093 },
 ];
+
+const FALLBACK_RADII = RADII;
 
 const DOMAIN_KEYS = [
   { key: "avg_income", label: "Income" },
