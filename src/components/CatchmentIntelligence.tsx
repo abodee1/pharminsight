@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Loader2, Users, TrendingDown, TrendingUp, MapPin, Info } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Loader2, Users, TrendingDown, TrendingUp, MapPin, Info, Lightbulb } from "lucide-react";
 import {
   Radar,
   RadarChart,
@@ -66,13 +66,13 @@ const DOMAIN_KEYS = [
   { key: "avg_access", label: "Access" },
 ] as const;
 
-function bandFor(d: number | null): { label: string; cls: string; border: string } {
-  if (d == null) return { label: "Unknown", cls: "bg-muted text-muted-foreground", border: "border-muted" };
-  if (d >= 9) return { label: "Most Deprived", cls: "bg-red-700 text-white", border: "border-red-700" };
-  if (d >= 7) return { label: "High Deprivation", cls: "bg-orange-600 text-white", border: "border-orange-600" };
-  if (d >= 5) return { label: "Moderate Deprivation", cls: "bg-amber-500 text-white", border: "border-amber-500" };
-  if (d >= 3) return { label: "Low Deprivation", cls: "bg-lime-500 text-white", border: "border-lime-500" };
-  return { label: "Least Deprived", cls: "bg-green-600 text-white", border: "border-green-600" };
+function bandFor(d: number | null): { label: string; cls: string; border: string; grad: string; ring: string } {
+  if (d == null) return { label: "Unknown", cls: "bg-muted text-muted-foreground", border: "border-muted", grad: "from-muted to-muted", ring: "ring-muted" };
+  if (d >= 9) return { label: "Most Deprived", cls: "bg-red-700 text-white", border: "border-red-700", grad: "from-red-700 to-red-500", ring: "ring-red-200" };
+  if (d >= 7) return { label: "High Deprivation", cls: "bg-orange-600 text-white", border: "border-orange-600", grad: "from-orange-600 to-amber-400", ring: "ring-orange-200" };
+  if (d >= 5) return { label: "Moderate Deprivation", cls: "bg-amber-500 text-white", border: "border-amber-500", grad: "from-amber-500 to-lime-400", ring: "ring-amber-200" };
+  if (d >= 3) return { label: "Low Deprivation", cls: "bg-lime-500 text-white", border: "border-lime-500", grad: "from-lime-500 to-green-500", ring: "ring-lime-200" };
+  return { label: "Least Deprived", cls: "bg-green-600 text-white", border: "border-green-600", grad: "from-green-600 to-emerald-500", ring: "ring-green-200" };
 }
 
 function badgeColor(d: number | null): string {
@@ -80,6 +80,13 @@ function badgeColor(d: number | null): string {
   if (d >= 7) return "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200 border border-red-300/50";
   if (d >= 4) return "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 border border-amber-300/50";
   return "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200 border border-green-300/50";
+}
+
+function meterColor(d: number | null): string {
+  if (d == null) return "bg-muted";
+  if (d >= 7) return "bg-red-500";
+  if (d >= 4) return "bg-amber-500";
+  return "bg-green-500";
 }
 
 function insightFor(key: string, isScotland: boolean, isEngland: boolean): string | null {
@@ -235,14 +242,19 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
   }
 
   return (
-    <div className="mt-6 rounded-lg bg-card border border-border shadow-sm overflow-hidden">
-      <div className="px-4 md:px-5 py-4 border-b border-border">
+    <div className="mt-6 rounded-xl bg-card border border-border shadow-sm overflow-hidden">
+      <div className="relative px-4 md:px-6 py-5 border-b border-border bg-gradient-to-br from-secondary/60 via-card to-card">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold">Catchment Intelligence</h2>
-            <p className="text-xs text-muted-foreground mt-1">
-              Deprivation profile of the population within your catchment area.
-            </p>
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <MapPin className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">Catchment Intelligence</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Deprivation profile of the population within your catchment area.
+              </p>
+            </div>
           </div>
           <button
             type="button"
@@ -256,6 +268,7 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
           </button>
         </div>
       </div>
+
 
       <div className="p-4 md:p-5 space-y-5">
         {showInfo && (
@@ -328,36 +341,54 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
 
         {!loading && !error && zoneCount > 0 && (
           <>
-            {/* Band headline */}
-            <div className={`flex items-center gap-3 rounded-md border-l-4 ${band.border} bg-secondary/30 px-4 py-3`}>
-              <div>
-                <div className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${band.cls}`}>
-                  {band.label}
+            {/* Band headline — big hero number */}
+            <div className={`relative overflow-hidden rounded-xl bg-gradient-to-r ${band.grad} text-white shadow-sm`}>
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.25),transparent_60%)]" />
+              <div className="relative px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <div className="text-[11px] uppercase tracking-widest text-white/80 font-medium">Overall deprivation</div>
+                  <div className="text-2xl font-semibold mt-0.5 leading-tight">{band.label}</div>
+                  <div className="text-xs text-white/85 mt-1">
+                    Based on {zoneCount} {zoneCount === 1 ? zoneLabel.slice(0, -1) : zoneLabel.toLowerCase()} within {effectiveRadius.label}
+                    {usingFallback && <> · nearest wider catchment shown</>}
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground mt-1.5">
-                  Based on {zoneCount} {zoneCount === 1 ? zoneLabel.slice(0, -1) : zoneLabel.toLowerCase()} within {effectiveRadius.label}.
-                  {usingFallback && <> No zones were found inside {radius.label}, so the nearest wider catchment is shown.</>}
-                  {overall != null && <> Average overall decile: <span className="font-medium text-foreground">{overall.toFixed(1)}</span> / 10.</>}
-                </div>
+                {overall != null && (
+                  <div className="text-right shrink-0">
+                    <div className="text-4xl font-bold tabular-nums leading-none">{overall.toFixed(1)}</div>
+                    <div className="text-[11px] text-white/85 uppercase tracking-wide mt-1">avg decile / 10</div>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Radar */}
-            <div className="w-full h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={radarData} outerRadius="75%">
-                  <PolarGrid stroke="hsl(var(--border))" />
-                  <PolarAngleAxis dataKey="domain" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                  <PolarRadiusAxis domain={[0, 10]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} axisLine={false} tickCount={6} />
-                  <Radar
-                    name="Catchment"
-                    dataKey="value"
-                    stroke="hsl(var(--primary))"
-                    fill="hsl(var(--primary))"
-                    fillOpacity={0.35}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
+            <div className="rounded-lg border border-border bg-gradient-to-br from-secondary/30 to-card p-2 pt-3">
+              <div className="text-xs font-medium text-foreground px-2 mb-1">Deprivation domains</div>
+              <div className="w-full h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart data={radarData} outerRadius="72%">
+                    <defs>
+                      <radialGradient id="catchment-radar-fill" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.55} />
+                        <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.15} />
+                      </radialGradient>
+                    </defs>
+                    <PolarGrid stroke="var(--border)" />
+                    <PolarAngleAxis dataKey="domain" tick={{ fill: "var(--muted-foreground)", fontSize: 11, fontWeight: 500 }} />
+                    <PolarRadiusAxis domain={[0, 10]} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickCount={6} />
+                    <Radar
+                      name="Catchment"
+                      dataKey="value"
+                      stroke="var(--primary)"
+                      strokeWidth={2}
+                      fill="url(#catchment-radar-fill)"
+                      dot={{ r: 3, fill: "var(--primary)", stroke: "var(--card)", strokeWidth: 1.5 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
             {/* Population & concentration stats */}
@@ -370,39 +401,30 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
               const pctLeast = totalPop > 0 ? Math.round((popLeast / totalPop) * 100) : 0;
               const areaSqMi = Math.PI * effectiveRadius.miles * effectiveRadius.miles;
               const density = areaSqMi > 0 ? Math.round(totalPop / areaSqMi) : 0;
+              const statCard = (
+                opts: { icon: ReactNode; chipCls: string; label: string; value: ReactNode; sub: string; accent: string }
+              ) => (
+                <div className={`group relative rounded-lg border border-border bg-card p-3 overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5`}>
+                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${opts.accent}`} />
+                  <div className="flex items-center gap-2">
+                    <div className={`h-7 w-7 rounded-md flex items-center justify-center ${opts.chipCls}`}>{opts.icon}</div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium leading-tight">{opts.label}</div>
+                  </div>
+                  <div className="text-xl font-semibold tabular-nums mt-2 leading-none">{opts.value}</div>
+                  <div className="text-[11px] text-muted-foreground mt-1">{opts.sub}</div>
+                </div>
+              );
               return (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <div className="rounded-md border border-border bg-secondary/30 p-3">
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
-                      <Users className="h-3 w-3" /> Population
-                    </div>
-                    <div className="text-lg font-semibold tabular-nums mt-1">{totalPop.toLocaleString()}</div>
-                    <div className="text-[11px] text-muted-foreground">≈{density.toLocaleString()}/sq mi</div>
-                  </div>
-                  <div className="rounded-md border border-border bg-secondary/30 p-3">
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
-                      <TrendingDown className="h-3 w-3 text-red-600" /> In most deprived 30%
-                    </div>
-                    <div className="text-lg font-semibold tabular-nums mt-1">{pctMost}%</div>
-                    <div className="text-[11px] text-muted-foreground">{popMost.toLocaleString()} residents</div>
-                  </div>
-                  <div className="rounded-md border border-border bg-secondary/30 p-3">
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
-                      <TrendingUp className="h-3 w-3 text-green-600" /> In least deprived 30%
-                    </div>
-                    <div className="text-lg font-semibold tabular-nums mt-1">{pctLeast}%</div>
-                    <div className="text-[11px] text-muted-foreground">{popLeast.toLocaleString()} residents</div>
-                  </div>
-                  <div className="rounded-md border border-border bg-secondary/30 p-3">
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
-                      <MapPin className="h-3 w-3" /> Catchment area
-                    </div>
-                    <div className="text-lg font-semibold tabular-nums mt-1">{areaSqMi.toFixed(1)} <span className="text-xs font-normal text-muted-foreground">sq mi</span></div>
-                    <div className="text-[11px] text-muted-foreground">{zoneCount} {zoneLabel.toLowerCase()}</div>
-                  </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                  {statCard({ icon: <Users className="h-3.5 w-3.5" />, chipCls: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300", label: "Population", value: totalPop.toLocaleString(), sub: `≈ ${density.toLocaleString()} / sq mi`, accent: "bg-blue-500" })}
+                  {statCard({ icon: <TrendingDown className="h-3.5 w-3.5" />, chipCls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300", label: "Most deprived 30%", value: `${pctMost}%`, sub: `${popMost.toLocaleString()} residents`, accent: "bg-red-500" })}
+                  {statCard({ icon: <TrendingUp className="h-3.5 w-3.5" />, chipCls: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300", label: "Least deprived 30%", value: `${pctLeast}%`, sub: `${popLeast.toLocaleString()} residents`, accent: "bg-green-500" })}
+                  {statCard({ icon: <MapPin className="h-3.5 w-3.5" />, chipCls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300", label: "Catchment area", value: <>{areaSqMi.toFixed(1)}<span className="text-xs font-normal text-muted-foreground ml-1">sq mi</span></>, sub: `${zoneCount} ${zoneLabel.toLowerCase()}`, accent: "bg-amber-500" })}
                 </div>
               );
             })()}
+
+
 
             {/* Decile distribution bar */}
             {breakdown && breakdown.distribution.length > 0 && (() => {
@@ -413,12 +435,12 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
                 7: "bg-lime-500", 8: "bg-lime-600", 9: "bg-green-600", 10: "bg-green-700",
               };
               return (
-                <div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <div className="flex items-center justify-between text-xs mb-2.5">
                     <span className="font-medium text-foreground">Population by deprivation decile</span>
-                    <span>1 = most deprived → 10 = least</span>
+                    <span className="text-muted-foreground">click a band for detail</span>
                   </div>
-                  <div className="flex h-6 w-full rounded-md overflow-hidden border border-border">
+                  <div className="flex h-9 w-full rounded-lg overflow-hidden border border-border shadow-inner bg-secondary/40">
                     {[1,2,3,4,5,6,7,8,9,10].map((d) => {
                       const row = breakdown.distribution.find((r) => r.decile === d);
                       const pop = row?.population ?? 0;
@@ -429,19 +451,23 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
                           key={d}
                           type="button"
                           onClick={() => setSelectedDecile(selectedDecile === d ? null : d)}
-                          className={`${decileColors[d]} h-full flex items-center justify-center text-[10px] font-medium text-white transition-all hover:opacity-80 ${selectedDecile === d ? "ring-2 ring-foreground ring-inset" : ""}`}
+                          className={`${decileColors[d]} relative h-full flex items-center justify-center text-[10px] font-semibold text-white transition-all hover:brightness-110 ${selectedDecile === d ? "ring-2 ring-offset-1 ring-foreground z-10 scale-y-110" : ""}`}
                           style={{ width: `${pct}%` }}
                           title={`Decile ${d}: ${pop.toLocaleString()} (${pct.toFixed(1)}%) · ${row?.zone_count ?? 0} ${zoneLabel.toLowerCase()} — click for details`}
                         >
-                          {pct >= 8 ? `${Math.round(pct)}%` : ""}
+                          <span className="absolute inset-0 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
+                          <span className="relative drop-shadow-sm">{pct >= 7 ? `${Math.round(pct)}%` : ""}</span>
                         </button>
                       );
                     })}
                   </div>
-                  <div className="flex justify-between text-[10px] text-muted-foreground mt-1 px-0.5">
-                    <span>Decile 1</span><span>5</span><span>Decile 10</span>
+                  {/* Scale */}
+                  <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-red-700" /> 1 most deprived</span>
+                    <span className="flex-1 h-px bg-gradient-to-r from-red-600 via-amber-500 to-green-600" />
+                    <span className="inline-flex items-center gap-1">10 least deprived <span className="h-2 w-2 rounded-sm bg-green-700" /></span>
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-1.5">Click a band to see the {zoneLabel.toLowerCase()} in that decile.</p>
+
 
                   {/* Decile drill-down */}
                   {selectedDecile != null && (() => {
@@ -495,72 +521,96 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
 
             {/* Most & least deprived zones */}
             {breakdown && (breakdown.most_deprived || breakdown.least_deprived) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 {breakdown.most_deprived && (
-                  <div className="rounded-md border-l-4 border-red-600 bg-secondary/30 px-3 py-2">
-                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Most deprived nearby</div>
-                    <div className="text-sm font-medium mt-0.5">{breakdown.most_deprived.zone_name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Decile {breakdown.most_deprived.overall_decile}
-                      {breakdown.most_deprived.population != null && <> · {breakdown.most_deprived.population.toLocaleString()} residents</>}
+                  <div className="relative rounded-lg border border-border bg-card p-3 overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-600" />
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Most deprived nearby</div>
+                        <div className="text-sm font-semibold mt-1 truncate">{breakdown.most_deprived.zone_name}</div>
+                        {breakdown.most_deprived.population != null && (
+                          <div className="text-[11px] text-muted-foreground mt-0.5">{breakdown.most_deprived.population.toLocaleString()} residents</div>
+                        )}
+                      </div>
+                      <div className="shrink-0 text-center px-2.5 py-1.5 rounded-md bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300">
+                        <div className="text-[9px] uppercase tracking-wider leading-none">Decile</div>
+                        <div className="text-xl font-bold tabular-nums leading-none mt-0.5">{breakdown.most_deprived.overall_decile}</div>
+                      </div>
                     </div>
                   </div>
                 )}
                 {breakdown.least_deprived && (
-                  <div className="rounded-md border-l-4 border-green-600 bg-secondary/30 px-3 py-2">
-                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Least deprived nearby</div>
-                    <div className="text-sm font-medium mt-0.5">{breakdown.least_deprived.zone_name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Decile {breakdown.least_deprived.overall_decile}
-                      {breakdown.least_deprived.population != null && <> · {breakdown.least_deprived.population.toLocaleString()} residents</>}
+                  <div className="relative rounded-lg border border-border bg-card p-3 overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-600" />
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Least deprived nearby</div>
+                        <div className="text-sm font-semibold mt-1 truncate">{breakdown.least_deprived.zone_name}</div>
+                        {breakdown.least_deprived.population != null && (
+                          <div className="text-[11px] text-muted-foreground mt-0.5">{breakdown.least_deprived.population.toLocaleString()} residents</div>
+                        )}
+                      </div>
+                      <div className="shrink-0 text-center px-2.5 py-1.5 rounded-md bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300">
+                        <div className="text-[9px] uppercase tracking-wider leading-none">Decile</div>
+                        <div className="text-xl font-bold tabular-nums leading-none mt-0.5">{breakdown.least_deprived.overall_decile}</div>
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Domain badges */}
-            <div>
-              <div className="text-xs font-medium text-foreground mb-1.5">Domain deciles</div>
-              <div className="flex flex-wrap gap-2">
-                {DOMAIN_KEYS.map((d) => {
-                  const v = agg ? Number((agg as any)[d.key] ?? 0) : 0;
-                  return (
-                    <span
-                      key={d.key}
-                      className={`text-xs px-2.5 py-1 rounded-md font-medium ${badgeColor(v)}`}
-                    >
-                      {d.label}: <span className="tabular-nums">{v.toFixed(1)}</span>
-                    </span>
-                  );
-                })}
-                {isEngland && agg?.avg_idaci != null && (
-                  <span className={`text-xs px-2.5 py-1 rounded-md font-medium ${badgeColor(Number(agg.avg_idaci))}`}>
-                    Children (IDACI): <span className="tabular-nums">{Number(agg.avg_idaci).toFixed(1)}</span>
-                  </span>
-                )}
-                {isEngland && agg?.avg_idaopi != null && (
-                  <span className={`text-xs px-2.5 py-1 rounded-md font-medium ${badgeColor(Number(agg.avg_idaopi))}`}>
-                    Older people (IDAOPI): <span className="tabular-nums">{Number(agg.avg_idaopi).toFixed(1)}</span>
-                  </span>
-                )}
+            {/* Domain meters */}
+            <div className="rounded-lg border border-border bg-card p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-xs font-medium text-foreground">Domain deciles</div>
+                <div className="text-[10px] text-muted-foreground">0 least · 10 most deprived</div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2.5">
+                {(() => {
+                  const items: { key: string; label: string; value: number }[] = DOMAIN_KEYS.map((d) => ({
+                    key: d.key, label: d.label, value: agg ? Number((agg as any)[d.key] ?? 0) : 0,
+                  }));
+                  if (isEngland && agg?.avg_idaci != null) items.push({ key: "idaci", label: "Children (IDACI)", value: Number(agg.avg_idaci) });
+                  if (isEngland && agg?.avg_idaopi != null) items.push({ key: "idaopi", label: "Older people (IDAOPI)", value: Number(agg.avg_idaopi) });
+                  return items.map((it) => (
+                    <div key={it.key} className="flex items-center gap-2.5">
+                      <div className="w-24 sm:w-28 text-[11px] text-foreground/80 truncate">{it.label}</div>
+                      <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${meterColor(it.value)} transition-all`}
+                          style={{ width: `${Math.min(100, Math.max(0, (it.value / 10) * 100))}%` }}
+                        />
+                      </div>
+                      <div className="w-8 text-right text-[11px] font-semibold tabular-nums text-foreground">{it.value.toFixed(1)}</div>
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
 
+
             {/* Insights */}
             {insights.length > 0 && (
-              <div>
-                <div className="text-xs font-medium text-foreground mb-1.5">Service opportunities</div>
-                <ul className="space-y-2 text-sm leading-relaxed">
+              <div className="rounded-lg border border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-4">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="h-7 w-7 rounded-md bg-primary/10 text-primary flex items-center justify-center">
+                    <Lightbulb className="h-4 w-4" />
+                  </div>
+                  <div className="text-sm font-semibold text-foreground">Service opportunities</div>
+                </div>
+                <ul className="space-y-2.5 text-sm leading-relaxed">
                   {insights.map((s, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="text-primary mt-1">•</span>
-                      <span>{s}</span>
+                    <li key={i} className="flex gap-2.5 pl-1">
+                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                      <span className="text-foreground/85">{s}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             )}
+
 
             {/* Footer */}
             <p className="text-[11px] text-muted-foreground pt-2 border-t border-border/60">
