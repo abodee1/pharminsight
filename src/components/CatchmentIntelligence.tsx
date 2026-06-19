@@ -593,18 +593,24 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
 
             {/* Insights */}
             {insights.length > 0 && (
-              <div>
-                <div className="text-xs font-medium text-foreground mb-1.5">Service opportunities</div>
-                <ul className="space-y-2 text-sm leading-relaxed">
+              <div className="rounded-lg border border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-4">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="h-7 w-7 rounded-md bg-primary/10 text-primary flex items-center justify-center">
+                    <Lightbulb className="h-4 w-4" />
+                  </div>
+                  <div className="text-sm font-semibold text-foreground">Service opportunities</div>
+                </div>
+                <ul className="space-y-2.5 text-sm leading-relaxed">
                   {insights.map((s, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="text-primary mt-1">•</span>
-                      <span>{s}</span>
+                    <li key={i} className="flex gap-2.5 pl-1">
+                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                      <span className="text-foreground/85">{s}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             )}
+
 
             {/* Footer */}
             <p className="text-[11px] text-muted-foreground pt-2 border-t border-border/60">
