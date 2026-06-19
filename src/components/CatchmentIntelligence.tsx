@@ -435,12 +435,12 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
                 7: "bg-lime-500", 8: "bg-lime-600", 9: "bg-green-600", 10: "bg-green-700",
               };
               return (
-                <div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <div className="flex items-center justify-between text-xs mb-2.5">
                     <span className="font-medium text-foreground">Population by deprivation decile</span>
-                    <span>1 = most deprived → 10 = least</span>
+                    <span className="text-muted-foreground">click a band for detail</span>
                   </div>
-                  <div className="flex h-6 w-full rounded-md overflow-hidden border border-border">
+                  <div className="flex h-9 w-full rounded-lg overflow-hidden border border-border shadow-inner bg-secondary/40">
                     {[1,2,3,4,5,6,7,8,9,10].map((d) => {
                       const row = breakdown.distribution.find((r) => r.decile === d);
                       const pop = row?.population ?? 0;
@@ -451,19 +451,23 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
                           key={d}
                           type="button"
                           onClick={() => setSelectedDecile(selectedDecile === d ? null : d)}
-                          className={`${decileColors[d]} h-full flex items-center justify-center text-[10px] font-medium text-white transition-all hover:opacity-80 ${selectedDecile === d ? "ring-2 ring-foreground ring-inset" : ""}`}
+                          className={`${decileColors[d]} relative h-full flex items-center justify-center text-[10px] font-semibold text-white transition-all hover:brightness-110 ${selectedDecile === d ? "ring-2 ring-offset-1 ring-foreground z-10 scale-y-110" : ""}`}
                           style={{ width: `${pct}%` }}
                           title={`Decile ${d}: ${pop.toLocaleString()} (${pct.toFixed(1)}%) · ${row?.zone_count ?? 0} ${zoneLabel.toLowerCase()} — click for details`}
                         >
-                          {pct >= 8 ? `${Math.round(pct)}%` : ""}
+                          <span className="absolute inset-0 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
+                          <span className="relative drop-shadow-sm">{pct >= 7 ? `${Math.round(pct)}%` : ""}</span>
                         </button>
                       );
                     })}
                   </div>
-                  <div className="flex justify-between text-[10px] text-muted-foreground mt-1 px-0.5">
-                    <span>Decile 1</span><span>5</span><span>Decile 10</span>
+                  {/* Scale */}
+                  <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-red-700" /> 1 most deprived</span>
+                    <span className="flex-1 h-px bg-gradient-to-r from-red-600 via-amber-500 to-green-600" />
+                    <span className="inline-flex items-center gap-1">10 least deprived <span className="h-2 w-2 rounded-sm bg-green-700" /></span>
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-1.5">Click a band to see the {zoneLabel.toLowerCase()} in that decile.</p>
+
 
                   {/* Decile drill-down */}
                   {selectedDecile != null && (() => {
