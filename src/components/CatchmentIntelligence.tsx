@@ -375,20 +375,70 @@ export function CatchmentIntelligence({ lat, lng, country }: Props) {
                       const pct = totalPop > 0 ? (pop / totalPop) * 100 : 0;
                       if (pct <= 0) return null;
                       return (
-                        <div
+                        <button
                           key={d}
-                          className={`${decileColors[d]} h-full flex items-center justify-center text-[10px] font-medium text-white`}
+                          type="button"
+                          onClick={() => setSelectedDecile(selectedDecile === d ? null : d)}
+                          className={`${decileColors[d]} h-full flex items-center justify-center text-[10px] font-medium text-white transition-all hover:opacity-80 ${selectedDecile === d ? "ring-2 ring-foreground ring-inset" : ""}`}
                           style={{ width: `${pct}%` }}
-                          title={`Decile ${d}: ${pop.toLocaleString()} (${pct.toFixed(1)}%) · ${row?.zone_count ?? 0} ${zoneLabel.toLowerCase()}`}
+                          title={`Decile ${d}: ${pop.toLocaleString()} (${pct.toFixed(1)}%) · ${row?.zone_count ?? 0} ${zoneLabel.toLowerCase()} — click for details`}
                         >
                           {pct >= 8 ? `${Math.round(pct)}%` : ""}
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
                   <div className="flex justify-between text-[10px] text-muted-foreground mt-1 px-0.5">
                     <span>Decile 1</span><span>5</span><span>Decile 10</span>
                   </div>
+                  <p className="text-[11px] text-muted-foreground mt-1.5">Click a band to see the {zoneLabel.toLowerCase()} in that decile.</p>
+
+                  {/* Decile drill-down */}
+                  {selectedDecile != null && (() => {
+                    const row = breakdown.distribution.find((r) => r.decile === selectedDecile);
+                    const pct = totalPop > 0 && row ? (row.population / totalPop) * 100 : 0;
+                    const band = bandFor(selectedDecile);
+                    return (
+                      <div className="mt-3 rounded-md border border-border bg-background p-3">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${band.cls}`}>Decile {selectedDecile}</span>
+                            <span className="text-xs text-muted-foreground">{band.label}</span>
+                          </div>
+                          <button onClick={() => setSelectedDecile(null)} className="text-xs text-muted-foreground hover:text-foreground">Close ✕</button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+                          <div><div className="text-muted-foreground">Zones</div><div className="font-semibold tabular-nums">{row?.zone_count ?? 0}</div></div>
+                          <div><div className="text-muted-foreground">Population</div><div className="font-semibold tabular-nums">{(row?.population ?? 0).toLocaleString()}</div></div>
+                          <div><div className="text-muted-foreground">% of catchment</div><div className="font-semibold tabular-nums">{pct.toFixed(1)}%</div></div>
+                        </div>
+                        {zoneListLoading && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                            <Loader2 className="h-3 w-3 animate-spin" /> Loading {zoneLabel.toLowerCase()}…
+                          </div>
+                        )}
+                        {!zoneListLoading && zoneList && zoneList.length > 0 && (
+                          <div className="max-h-56 overflow-y-auto rounded border border-border divide-y divide-border">
+                            {zoneList.map((z) => (
+                              <div key={z.zone_code} className="px-2.5 py-1.5 text-xs flex items-center justify-between gap-2 hover:bg-secondary/40">
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium truncate">{z.zone_name}</div>
+                                  <div className="text-[10px] text-muted-foreground">{z.zone_code}</div>
+                                </div>
+                                <div className="text-right text-muted-foreground whitespace-nowrap">
+                                  <div className="tabular-nums">{(z.population ?? 0).toLocaleString()}</div>
+                                  <div className="text-[10px] tabular-nums">{(z.dist_m / 1609).toFixed(2)} mi</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {!zoneListLoading && zoneList && zoneList.length === 0 && (
+                          <p className="text-xs text-muted-foreground">No {zoneLabel.toLowerCase()} in this decile.</p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })()}
