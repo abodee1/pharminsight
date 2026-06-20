@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetchAll";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell as RCell } from "recharts";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, Cell as RCell } from "recharts";
 import { Loader2, Users, Share2, Target, AlertTriangle } from "lucide-react";
 
 type Pharm = { id: string; name: string; ods_code?: string | null; country: string | null };
@@ -280,8 +280,16 @@ export function GpFeederOverlap({
                   }}
                   labelFormatter={(_l, payload: any) => payload?.[0]?.payload?.full ?? ""}
                 />
+                <Legend
+                  wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                  iconType="square"
+                  formatter={(value) => {
+                    const ph = pharms.find((p) => p.id === value);
+                    return <span className="text-foreground">{ph?.name ?? value}</span>;
+                  }}
+                />
                 {pharms.map((p, i) => (
-                  <Bar key={p.id} dataKey={p.id} stackId="a" fill={colorFor(p.id)} radius={i === pharms.length - 1 ? [0, 4, 4, 0] : 0} />
+                  <Bar key={p.id} dataKey={p.id} name={p.id} stackId="a" fill={colorFor(p.id)} radius={i === pharms.length - 1 ? [0, 4, 4, 0] : 0} />
                 ))}
               </BarChart>
             </ResponsiveContainer>

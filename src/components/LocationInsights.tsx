@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { generateInsight } from "@/lib/insights.functions";
+import { gpDisplayName, gpDisplayAddress } from "@/lib/gpName";
 
 type Props = {
   pharmacyId: string;
@@ -26,14 +27,10 @@ type Catchment = {
 };
 
 type NearbyPharm = { name: string; distance_m: number };
-type NearbyGP = { name: string; distance_m: number };
+type NearbyGP = { name: string; address: string; distance_m: number };
 
 function fmtDist(m: number) {
   return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`;
-}
-
-function gpName(g: { practice_name?: string | null; google_name?: string | null }): string {
-  return g.practice_name || g.google_name || "GP Practice";
 }
 
 export function LocationInsights({ pharmacyId, pharmacyName, postcode, address }: Props) {
@@ -108,7 +105,7 @@ export function LocationInsights({ pharmacyId, pharmacyName, postcode, address }
 
         const gps: NearbyGP[] = ((gpRes.data ?? []) as any[])
           .slice(0, 10)
-          .map((p: any) => ({ name: gpName(p), distance_m: Math.round(p.distance_m) }));
+          .map((p: any) => ({ name: gpDisplayName(p), address: gpDisplayAddress(p), distance_m: Math.round(p.distance_m) }));
 
         if (!cancelled) setNearby({ pharmacies, gps });
       } catch { /* ignore */ }
@@ -228,9 +225,12 @@ export function LocationInsights({ pharmacyId, pharmacyName, postcode, address }
               ) : (
                 <ul className="space-y-1.5">
                   {nearby.gps.map((g, i) => (
-                    <li key={i} className="flex items-center justify-between gap-2 text-xs rounded-lg bg-secondary/40 px-3 py-2">
-                      <span className="font-medium truncate">{g.name}</span>
-                      <span className="shrink-0 text-muted-foreground tabular-nums">{fmtDist(g.distance_m)}</span>
+                    <li key={i} className="flex items-start justify-between gap-2 text-xs rounded-lg bg-secondary/40 px-3 py-2">
+                      <span className="min-w-0">
+                        <span className="font-medium block truncate">{g.name}</span>
+                        {g.address && <span className="block text-muted-foreground truncate text-[11px] mt-0.5">{g.address}</span>}
+                      </span>
+                      <span className="shrink-0 text-muted-foreground tabular-nums mt-0.5">{fmtDist(g.distance_m)}</span>
                     </li>
                   ))}
                 </ul>
