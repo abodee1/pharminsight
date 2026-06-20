@@ -116,15 +116,15 @@ export function GPPracticeDialog({ open, onOpenChange, practiceCode, fallbackNam
                     <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                       <defs>
                         <linearGradient id="dlgItemsFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
-                          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                          <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.35} />
+                          <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                      <YAxis tick={{ fontSize: 11 }} width={50} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => v >= 1000 ? `${Math.round(v/1000)}k` : `${v}`} />
-                      <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} formatter={(v: number) => [`${v.toLocaleString()} items`, "Prescribed"]} />
-                      <Line type="monotone" dataKey="items" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2.5, fill: "hsl(var(--primary))" }} activeDot={{ r: 5 }} fill="url(#dlgItemsFill)" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
+                      <YAxis tick={{ fontSize: 11 }} width={50} stroke="var(--muted-foreground)" tickFormatter={(v) => v >= 1000 ? `${Math.round(v/1000)}k` : `${v}`} />
+                      <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} formatter={(v: number) => [`${v.toLocaleString()} items`, "Prescribed"]} />
+                      <Line type="monotone" dataKey="items" stroke="var(--primary)" strokeWidth={2.5} dot={{ r: 2.5, fill: "var(--primary)" }} activeDot={{ r: 5 }} fill="url(#dlgItemsFill)" />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
