@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAll } from "@/lib/fetchAll";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell as RCell } from "recharts";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, Cell as RCell } from "recharts";
 import { Loader2, Users, Share2, Target, AlertTriangle } from "lucide-react";
 
 type Pharm = { id: string; name: string; ods_code?: string | null; country: string | null };
