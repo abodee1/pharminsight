@@ -129,7 +129,7 @@ export function LocalLandscape({ pharmacyName, postcode, address }: Props) {
         const needsLookup = rawGps.filter(g => !g.practice_name && !g.google_name);
         if (needsLookup.length > 0) {
           const resolved = await Promise.all(needsLookup.map(g => resolveOdsName(g.practice_code)));
-          needsLookup.forEach((g, i) => { g.practice_name = resolved[i]; });
+          needsLookup.forEach((g, i) => { if (resolved[i]) g.practice_name = resolved[i]; });
         }
         setDoctors(rawGps);
       } catch (e: any) {
