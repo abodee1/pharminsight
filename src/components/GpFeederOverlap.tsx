@@ -280,8 +280,8 @@ export function GpFeederOverlap({
                   }}
                   labelFormatter={(_l, payload: any) => payload?.[0]?.payload?.full ?? ""}
                 />
-                {pharms.map((p) => (
-                  <Bar key={p.id} dataKey={p.id} stackId="a" fill={colorFor(p.id)} />
+                {pharms.map((p, i) => (
+                  <Bar key={p.id} dataKey={p.id} stackId="a" fill={colorFor(p.id)} radius={i === pharms.length - 1 ? [0, 4, 4, 0] : 0} />
                 ))}
               </BarChart>
             </ResponsiveContainer>
@@ -345,6 +345,9 @@ export function GpFeederOverlap({
                           </span>
                           <span className="tabular-nums font-semibold shrink-0">{fmtPct(f.share)}</span>
                         </div>
+                        {f.postcode && (
+                          <p className="text-[10px] text-muted-foreground pl-4 mt-0.5 truncate">{f.postcode}</p>
+                        )}
                         <div className="mt-1 flex items-center gap-2">
                           <div className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden">
                             <div className="h-full rounded-full" style={{ width: `${Math.min(100, f.share)}%`, background: colorFor(p.id) }} />

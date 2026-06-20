@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Stethoscope, Pill, Loader2, GitCompare } from "lucide-react";
 import { GPPracticeDialog } from "@/components/GPPracticeDialog";
 import { pharmacyDisplayName } from "@/lib/pharmacyName";
+import { gpDisplayName } from "@/lib/gpName";
 
 type Props = {
   pharmacyName: string;
@@ -30,21 +31,21 @@ type NearbyGP = {
   distance_m: number;
 };
 
-function displayPracticeName(g: { google_name?: string | null; practice_name?: string | null; practice_code?: string }) {
-  return g.practice_name || g.google_name || g.practice_code || "GP Practice";
+function displayPracticeName(g: { google_name?: string | null; practice_name?: string | null; address_line?: string | null; postcode?: string | null }) {
+  return gpDisplayName(g);
 }
 
-async function resolveOdsName(code: string): Promise<string> {
+async function resolveOdsName(code: string): Promise<string | null> {
   try {
     const res = await fetch(`https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/${encodeURIComponent(code)}`);
-    if (!res.ok) return code;
+    if (!res.ok) return null;
     const j = await res.json() as { Organisation?: { Name?: string } };
     const raw = j?.Organisation?.Name;
-    if (!raw) return code;
+    if (!raw) return null;
     // ODS names come back in UPPER CASE — convert to Title Case for readability
     return raw.replace(/\b\w+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
   } catch {
-    return code;
+    return null;
   }
 }
 
@@ -129,7 +130,7 @@ export function LocalLandscape({ pharmacyName, postcode, address }: Props) {
         const needsLookup = rawGps.filter(g => !g.practice_name && !g.google_name);
         if (needsLookup.length > 0) {
           const resolved = await Promise.all(needsLookup.map(g => resolveOdsName(g.practice_code)));
-          needsLookup.forEach((g, i) => { g.practice_name = resolved[i]; });
+          needsLookup.forEach((g, i) => { if (resolved[i]) g.practice_name = resolved[i]; });
         }
         setDoctors(rawGps);
       } catch (e: any) {

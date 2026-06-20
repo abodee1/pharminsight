@@ -24,6 +24,7 @@ type Practice = {
   country: string | null;
   health_board: string | null;
   postcode: string | null;
+  address_line: string | null;
 };
 
 type Prescribing = { year: number; month: number; total_items: number; total_nic: number; is_provisional: boolean };
@@ -44,7 +45,7 @@ export function GPPracticeDialog({ open, onOpenChange, practiceCode, fallbackNam
       setLoading(true);
       try {
         const [{ data: prac }, { data: presc }, { data: ls }] = await Promise.all([
-          supabase.from("gp_practices").select("practice_code,practice_name,google_name,name_verified_at,country,health_board,postcode").eq("practice_code", practiceCode).maybeSingle(),
+          supabase.from("gp_practices").select("practice_code,practice_name,google_name,name_verified_at,country,health_board,postcode,address_line").eq("practice_code", practiceCode).maybeSingle(),
           supabase.from("gp_prescribing").select("year,month,total_items,total_nic,is_provisional").eq("practice_code", practiceCode).order("year", { ascending: false }).order("month", { ascending: false }).limit(24),
           supabase.from("gp_list_sizes").select("list_size_date,registered_patients").eq("practice_code", practiceCode).order("list_size_date", { ascending: false }).limit(1).maybeSingle(),
         ]);
@@ -82,7 +83,10 @@ export function GPPracticeDialog({ open, onOpenChange, practiceCode, fallbackNam
             )}
           </DialogTitle>
           <DialogDescription>
-            {practice?.postcode ? <span>{practice.postcode}</span> : fallbackAddress ? <span>{fallbackAddress}</span> : null}
+            {practice?.address_line || fallbackAddress ? (
+              <span>{practice?.address_line || fallbackAddress}</span>
+            ) : null}
+            {practice?.postcode ? <span>{practice?.address_line || fallbackAddress ? ", " : ""}{practice.postcode}</span> : null}
             {practice?.country ? <span> · {practice.country}</span> : null}
           </DialogDescription>
         </DialogHeader>
@@ -110,12 +114,17 @@ export function GPPracticeDialog({ open, onOpenChange, practiceCode, fallbackNam
                 <div className="h-48">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} width={50} />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="items" stroke="var(--primary)" strokeWidth={2} dot={false} />
-
+                      <defs>
+                        <linearGradient id="dlgItemsFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.35} />
+                          <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
+                      <YAxis tick={{ fontSize: 11 }} width={50} stroke="var(--muted-foreground)" tickFormatter={(v) => v >= 1000 ? `${Math.round(v/1000)}k` : `${v}`} />
+                      <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} formatter={(v: number) => [`${v.toLocaleString()} items`, "Prescribed"]} />
+                      <Line type="monotone" dataKey="items" stroke="var(--primary)" strokeWidth={2.5} dot={{ r: 2.5, fill: "var(--primary)" }} activeDot={{ r: 5 }} fill="url(#dlgItemsFill)" />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
