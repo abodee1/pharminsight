@@ -45,6 +45,7 @@ type Row = {
   country: string | null;
   health_board: string | null;
   postcode: string | null;
+  address_line: string | null;
 };
 
 
@@ -75,7 +76,7 @@ function GPSurgeriesPage() {
       setLoading(true);
       let q = supabase
         .from("gp_practices")
-        .select("practice_code,practice_name,google_name,name_verified_at,country,health_board,postcode", { count: "exact" });
+        .select("practice_code,practice_name,google_name,name_verified_at,country,health_board,postcode,address_line", { count: "exact" });
 
       if (country !== "all") q = q.eq("country", country);
       if (debounced) {
