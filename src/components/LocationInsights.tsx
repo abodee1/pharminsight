@@ -105,7 +105,7 @@ export function LocationInsights({ pharmacyId, pharmacyName, postcode, address }
 
         const gps: NearbyGP[] = ((gpRes.data ?? []) as any[])
           .slice(0, 10)
-          .map((p: any) => ({ name: gpName(p), distance_m: Math.round(p.distance_m) }));
+          .map((p: any) => ({ name: gpDisplayName(p), address: gpDisplayAddress(p), distance_m: Math.round(p.distance_m) }));
 
         if (!cancelled) setNearby({ pharmacies, gps });
       } catch { /* ignore */ }
