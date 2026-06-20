@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users } from "lucide-react";
+import { gpDisplayName, gpDisplayAddress } from "@/lib/gpName";
 
 interface Props {
   pharmacyOds: string;
@@ -11,6 +12,7 @@ interface Props {
 interface GpFeeder {
   practice_code: string;
   name: string;
+  address: string;
   itemsToUs: number;
   shareOfOurInflow: number;
 }
@@ -31,9 +33,6 @@ function inPeriod(row: { year: number; month: number }, fromYear: number, fromMo
   return row.year > fromYear || (row.year === fromYear && row.month >= fromMonth);
 }
 
-function gpName(g: { practice_name?: string | null; google_name?: string | null; practice_code?: string }): string {
-  return g.practice_name || g.google_name || g.practice_code || "Unknown GP";
-}
 
 export function NominationFlow({ pharmacyOds, country }: Props) {
   const [periodIdx, setPeriodIdx] = useState(2);
@@ -79,21 +78,23 @@ export function NominationFlow({ pharmacyOds, country }: Props) {
         .slice(0, 10)
         .map(([code]) => code);
 
-      // GP names — prefer practice_name, then google_name
-      const { data: gpNames } = await supabase
+      // GP names + addresses
+      const { data: gpRows } = await supabase
         .from("gp_practices")
-        .select("practice_code,practice_name,google_name")
+        .select("practice_code,practice_name,google_name,postcode,address_line")
         .in("practice_code", top10);
 
-      const nameMap = new Map<string, string>(
-        (gpNames ?? []).map(g => [g.practice_code, gpName(g)])
+      const metaMap = new Map<string, { name: string; address: string }>(
+        (gpRows ?? []).map((g) => [g.practice_code, { name: gpDisplayName(g), address: gpDisplayAddress(g) }])
       );
 
       const result: GpFeeder[] = top10.map(code => {
         const itemsToUs = gpToUs.get(code) ?? 0;
+        const m = metaMap.get(code);
         return {
           practice_code: code,
-          name: nameMap.get(code) ?? code,
+          name: m?.name ?? "GP Practice",
+          address: m?.address ?? "",
           itemsToUs,
           shareOfOurInflow: ourTotal > 0 ? (itemsToUs / ourTotal) * 100 : 0,
         };
@@ -184,9 +185,9 @@ export function NominationFlow({ pharmacyOds, country }: Props) {
                       </span>
 
                       <div className="flex-1 min-w-0">
-                        {/* Name + code */}
+                        {/* Name + address (instead of GP code) */}
                         <p className="text-sm font-medium leading-snug">{gp.name}</p>
-                        <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{gp.practice_code}</p>
+                        {gp.address && <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{gp.address}</p>}
 
                         {/* Progress bar */}
                         <div className="mt-2 h-1.5 rounded-full bg-secondary overflow-hidden">
