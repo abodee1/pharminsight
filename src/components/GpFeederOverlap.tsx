@@ -280,8 +280,16 @@ export function GpFeederOverlap({
                   }}
                   labelFormatter={(_l, payload: any) => payload?.[0]?.payload?.full ?? ""}
                 />
+                <Legend
+                  wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                  iconType="square"
+                  formatter={(value) => {
+                    const ph = pharms.find((p) => p.id === value);
+                    return <span className="text-foreground">{ph?.name ?? value}</span>;
+                  }}
+                />
                 {pharms.map((p, i) => (
-                  <Bar key={p.id} dataKey={p.id} stackId="a" fill={colorFor(p.id)} radius={i === pharms.length - 1 ? [0, 4, 4, 0] : 0} />
+                  <Bar key={p.id} dataKey={p.id} name={p.id} stackId="a" fill={colorFor(p.id)} radius={i === pharms.length - 1 ? [0, 4, 4, 0] : 0} />
                 ))}
               </BarChart>
             </ResponsiveContainer>
