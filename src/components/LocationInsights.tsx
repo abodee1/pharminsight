@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { generateInsight } from "@/lib/insights.functions";
+import { gpDisplayName, gpDisplayAddress } from "@/lib/gpName";
 
 type Props = {
   pharmacyId: string;
