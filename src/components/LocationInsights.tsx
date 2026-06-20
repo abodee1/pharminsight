@@ -27,14 +27,10 @@ type Catchment = {
 };
 
 type NearbyPharm = { name: string; distance_m: number };
-type NearbyGP = { name: string; distance_m: number };
+type NearbyGP = { name: string; address: string; distance_m: number };
 
 function fmtDist(m: number) {
   return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`;
-}
-
-function gpName(g: { practice_name?: string | null; google_name?: string | null }): string {
-  return g.practice_name || g.google_name || "GP Practice";
 }
 
 export function LocationInsights({ pharmacyId, pharmacyName, postcode, address }: Props) {
