@@ -9,6 +9,7 @@ import {
 } from "recharts";
 import { Loader2, Stethoscope, ArrowLeft, Users, FileText, PoundSterling, TrendingUp, TrendingDown, Minus, MapPin } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { gpDisplayName, gpDisplayAddress } from "@/lib/gpName";
 
 export const Route = createFileRoute("/_authenticated/gp-surgeries/$code")({
   head: () => ({ meta: [{ title: "GP Practice analytics — PharmInsight" }] }),
@@ -16,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/gp-surgeries/$code")({
 });
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-type Practice = { practice_code: string; practice_name: string | null; google_name: string | null; name_verified_at: string | null; country: string | null; health_board: string | null; postcode: string | null };
+type Practice = { practice_code: string; practice_name: string | null; google_name: string | null; name_verified_at: string | null; country: string | null; health_board: string | null; postcode: string | null; address_line: string | null };
 
 type Prescribing = { year: number; month: number; total_items: number; total_nic: number; is_provisional: boolean };
 type ListSize = { list_size_date: string; registered_patients: number };
@@ -36,7 +37,7 @@ function GPPracticePage() {
     (async () => {
       setLoading(true);
       const [{ data: prac }, { data: presc }, { data: ls }] = await Promise.all([
-        supabase.from("gp_practices").select("practice_code,practice_name,google_name,name_verified_at,country,health_board,postcode").eq("practice_code", code).maybeSingle(),
+        supabase.from("gp_practices").select("practice_code,practice_name,google_name,name_verified_at,country,health_board,postcode,address_line").eq("practice_code", code).maybeSingle(),
         supabase.from("gp_prescribing").select("year,month,total_items,total_nic,is_provisional").eq("practice_code", code).order("year").order("month"),
         supabase.from("gp_list_sizes").select("list_size_date,registered_patients").eq("practice_code", code).order("list_size_date"),
       ]);
@@ -114,13 +115,10 @@ function GPPracticePage() {
       <Link to="/gp-surgeries" className="mt-4 inline-flex items-center gap-1 text-sm text-primary hover:underline"><ArrowLeft className="h-4 w-4" /> All surgeries</Link>
     </div>
   );
-  // Prefer the Google-verified name when present; otherwise pretty-case the NHS source name.
-  const prettyName = practice.google_name
-    || (practice.practice_name || practice.practice_code).replace(
-      /\w\S*/g,
-      (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
-    );
-  const subtitleParts = [practice.postcode, practice.health_board, practice.country].filter(Boolean) as string[];
+  // Display the practice by its address; only show the code as small ancillary info.
+  const prettyName = gpDisplayName(practice);
+  const fullAddress = gpDisplayAddress(practice);
+  const subtitleParts = [fullAddress, practice.health_board, practice.country].filter(Boolean) as string[];
   if (practice.name_verified_at) subtitleParts.push("✓ Verified by Google Maps");
 
   return (

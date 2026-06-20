@@ -34,17 +34,17 @@ function displayPracticeName(g: { google_name?: string | null; practice_name?: s
   return g.practice_name || g.google_name || g.practice_code || "GP Practice";
 }
 
-async function resolveOdsName(code: string): Promise<string> {
+async function resolveOdsName(code: string): Promise<string | null> {
   try {
     const res = await fetch(`https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations/${encodeURIComponent(code)}`);
-    if (!res.ok) return code;
+    if (!res.ok) return null;
     const j = await res.json() as { Organisation?: { Name?: string } };
     const raw = j?.Organisation?.Name;
-    if (!raw) return code;
+    if (!raw) return null;
     // ODS names come back in UPPER CASE — convert to Title Case for readability
     return raw.replace(/\b\w+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
   } catch {
-    return code;
+    return null;
   }
 }
 
