@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Stethoscope, Pill, Loader2, GitCompare } from "lucide-react";
 import { GPPracticeDialog } from "@/components/GPPracticeDialog";
 import { pharmacyDisplayName } from "@/lib/pharmacyName";
+import { gpDisplayName } from "@/lib/gpName";
 
 type Props = {
   pharmacyName: string;
@@ -30,8 +31,8 @@ type NearbyGP = {
   distance_m: number;
 };
 
-function displayPracticeName(g: { google_name?: string | null; practice_name?: string | null; practice_code?: string }) {
-  return g.practice_name || g.google_name || g.practice_code || "GP Practice";
+function displayPracticeName(g: { google_name?: string | null; practice_name?: string | null; address_line?: string | null; postcode?: string | null }) {
+  return gpDisplayName(g);
 }
 
 async function resolveOdsName(code: string): Promise<string | null> {
