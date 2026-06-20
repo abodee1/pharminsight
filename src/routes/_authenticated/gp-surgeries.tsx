@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Search, Stethoscope, BarChart2 } from "lucide-react";
 import { GPPracticeDialog } from "@/components/GPPracticeDialog";
 import { PageHeader } from "@/components/PageHeader";
+import { gpDisplayName, gpDisplayAddress } from "@/lib/gpName";
 
 // Words that appear in Google Maps place names but rarely help discriminate
 // between GP surgeries — we strip them so a search like "The Smith Medical
@@ -150,29 +151,30 @@ function GPSurgeriesPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Practice</TableHead>
-              <TableHead className="hidden md:table-cell">Code</TableHead>
-              <TableHead className="hidden sm:table-cell">Postcode</TableHead>
+              <TableHead className="hidden sm:table-cell">Address</TableHead>
               <TableHead className="hidden lg:table-cell">Health board / region</TableHead>
               <TableHead>Country</TableHead>
               <TableHead className="text-right w-24"></TableHead>
-
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin inline mr-2" /> Loading surgeries…
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
                   No surgeries match your search.
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((r) => (
+              rows.map((r) => {
+                const name = gpDisplayName(r);
+                const addr = gpDisplayAddress(r);
+                return (
                 <TableRow key={r.practice_code}>
                   <TableCell className="font-medium">
                     <Link
@@ -181,7 +183,7 @@ function GPSurgeriesPage() {
                       className="inline-flex items-center gap-2 hover:underline"
                     >
                       <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span>{r.google_name || r.practice_name || "—"}</span>
+                      <span>{name}</span>
                       {r.name_verified_at && (
                         <span
                           title="Verified against Google Maps"
@@ -191,12 +193,9 @@ function GPSurgeriesPage() {
                         </span>
                       )}
                     </Link>
+                    <p className="sm:hidden text-xs text-muted-foreground mt-0.5">{addr || "—"}</p>
                   </TableCell>
-
-                  <TableCell className="hidden md:table-cell font-mono text-xs">
-                    {r.practice_code}
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">{r.postcode || "—"}</TableCell>
+                  <TableCell className="hidden sm:table-cell text-muted-foreground">{addr || "—"}</TableCell>
                   <TableCell className="hidden lg:table-cell text-muted-foreground">
                     {r.health_board || "—"}
                   </TableCell>
@@ -210,12 +209,13 @@ function GPSurgeriesPage() {
                     </button>
                   </TableCell>
                 </TableRow>
-              ))
-
+                );
+              })
             )}
           </TableBody>
         </Table>
       </div>
+
 
       <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">
         <span>
